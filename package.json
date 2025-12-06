@@ -9,13 +9,19 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "code-generator.flutter-handler",
         "title": "Flutter handler"
+      },
+      {
+        "command": "code-generator.vsCodeExtHandler",
+        "title": "AntigravityHandler"
       }
     ]
   },

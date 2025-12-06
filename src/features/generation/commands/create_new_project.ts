@@ -4,6 +4,8 @@ import { getUserInput } from "../../../utils/ui/ui_ask_folder";
 import { AppDatabaseGenerator } from "../generators/app_database_generator";
 import { GenerationService } from "../generators/generation_service";
 import { GenerationConfig } from "../config/generation_config";
+import { startAppFix } from "../../../utils/start_app_fix";
+import { gitInit } from "../../../utils/git_init";
 
 const SERVERPOD_GENERATE = 'serverpod generate';
 const build_runner = 'dart run build_runner build -d';
@@ -38,6 +40,10 @@ export async function createNewProject(): Promise<void> {
     // Create database.dart file (drift table)
     const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
     await appDatabaseGenerator.generate();
+
+    // Fix common Flutter project issues and init git
+    startAppFix(config.targetFlutterProjectPath);
+    gitInit(monoRepoPath);
 
     const openCommand = `antigravity -g "${monoRepoPath}"`;
 
