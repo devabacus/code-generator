@@ -1,18 +1,18 @@
 import { window } from "vscode";
-import { createNewProject } from "../createNewProject";
-
+import { createDataFilesByReplacement } from "../features/generation/commands/create_data_files_by_replacement";
+import { createNewProject } from "../features/generation/commands/create_new_project";
 
 export async function flutterHandler() {
     const options: { [key: string]: () => Promise<any> } = {
-        'Новый проект c serverpod': () => createNewProject(),
+        'New project with serverpod': () => createNewProject(),
+        'Create data files from yaml': () => createDataFilesByReplacement(),
     };
 
     const choice = await window.showQuickPick(Object.keys(options), {
-        placeHolder: 'Выберите действие',
+        placeHolder: 'Select action',
     });
 
     if (choice && options[choice]) {
         await options[choice]();
     }
 }
-
