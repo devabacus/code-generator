@@ -11,6 +11,10 @@ import { PgProxyPodGenerator } from "../generators/k8s/pg_proxy_pod_generator";
 import { ClusterIssuerGenerator } from "../generators/k8s/cluster_issuer_generator";
 import { DockerfileProdGenerator } from "../generators/k8s/dockerfile_prod_generator";
 import { DeploymentDockerGenerator } from "../generators/k8s/deployment_docker_generator";
+import { TerraformMainGenerator } from "../generators/terraform/terraform_main_generator";
+import { TerraformVariablesGenerator } from "../generators/terraform/terraform_variables_generator";
+import { TerraformTfvarsExampleGenerator } from "../generators/terraform/terraform_tfvars_example_generator";
+import { TerraformApplyScriptGenerator } from "../generators/terraform/terraform_apply_script_generator";
 import { getRootWorkspaceFolders } from "../../../utils/path_util";
 import { window } from "vscode";
 
@@ -38,8 +42,9 @@ export async function generateServerpodK8s(): Promise<void> {
         const yamlContent = await fileSystem.readFile(serverDataPath);
         const serverData = parseServerDataYaml(yamlContent);
 
-        // Generate all K8s files
+        // Generate all K8s and Terraform files
         const generators = [
+            // K8s generators
             new ConfigMapGenerator(fileSystem),
             new DeploymentGenerator(fileSystem),
             new IngressGenerator(fileSystem),
@@ -50,6 +55,11 @@ export async function generateServerpodK8s(): Promise<void> {
             new ClusterIssuerGenerator(fileSystem),
             new DockerfileProdGenerator(fileSystem),
             new DeploymentDockerGenerator(fileSystem),
+            // Terraform generators
+            new TerraformMainGenerator(fileSystem),
+            new TerraformVariablesGenerator(fileSystem),
+            new TerraformTfvarsExampleGenerator(fileSystem),
+            new TerraformApplyScriptGenerator(fileSystem),
         ];
 
         for (const generator of generators) {

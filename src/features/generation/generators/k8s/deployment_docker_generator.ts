@@ -80,6 +80,10 @@ jobs:
         with:
           kubeconfig: \${{ secrets.KUBE_CONFIG }}
 
+      - name: Create Namespace
+        run: |
+          kubectl apply -f ${appName}_server/k8s/namespace.yaml
+
       - name: Create or Update Image Pull Secret
         run: |
           kubectl create secret docker-registry timeweb-registry-secret \\
@@ -87,6 +91,7 @@ jobs:
             --docker-username=\${{ secrets.REGISTRY_USER }} \\
             --docker-password=\${{ secrets.REGISTRY_PASSWORD }} \\
             --docker-email=${email} \\
+            -n ${appName} \\
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create or Update Kubernetes Secret for Serverpod
@@ -95,6 +100,7 @@ jobs:
             --from-literal=database-password='\${{ secrets.DB_PASSWORD }}' \\
             --from-literal=redis-password='\${{ secrets.REDIS_PASSWORD }}' \\
             --from-literal=service-secret='\${{ secrets.SERVICE_SECRET }}' \\
+            -n ${appName} \\
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Update manifests with new image tag
@@ -120,17 +126,17 @@ jobs:
 
       - name: Run database migration
         run: |
-          kubectl delete job serverpod-migration-job-${appName} --ignore-not-found=true
+          kubectl delete job serverpod-migration-job-${appName} -n ${appName} --ignore-not-found=true
           kubectl apply -f ${appName}_server/k8s/job.yaml
 
-          kubectl wait --for=condition=complete job/serverpod-migration-job-${appName} --timeout=5m
+          kubectl wait --for=condition=complete job/serverpod-migration-job-${appName} -n ${appName} --timeout=5m
 
       - name: Deploy main application
         run: |
           kubectl apply -f ${appName}_server/k8s/deployment.yaml
-          kubectl rollout status deployment/${appName}-server-deployment --timeout=3m
+          kubectl rollout status deployment/${appName}-server-deployment -n ${appName} --timeout=3m
 
-          kubectl get pods -l app=${appName}-server
+          kubectl get pods -n ${appName} -l app=${appName}-server
 `;
     }
 }

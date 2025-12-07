@@ -25,9 +25,6 @@ export async function vsCodeExtHandler() {
 async function reinstallExtension() {
     const reinstallExtCmds = [
         'vsce package',
-        // 'code --uninstall-extension mrfrolk.code-helper',
-        // 'code --install-extension code-helper-0.0.1.vsix'
-        'antigravity --uninstall-extension mrfrolk.code-generator',
         'antigravity --install-extension code-generator-0.0.1.vsix --force'
     ];
     await terminalCommands(reinstallExtCmds, getRootWorkspaceFolders());
