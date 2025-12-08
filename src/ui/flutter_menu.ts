@@ -5,7 +5,7 @@ import { generateServerpodK8s } from "../features/generation/commands/generate_s
 
 export async function flutterHandler() {
     const options: { [key: string]: () => Promise<any> } = {
-        'New project with serverpod_1': () => createNewProject(),
+        'New project with serverpod': () => createNewProject(),
         'Create data files from yaml': () => createDataFilesByReplacement(),
         'Generate Serverpod K8s files': () => generateServerpodK8s(),
     };

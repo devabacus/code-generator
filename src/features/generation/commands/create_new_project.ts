@@ -43,7 +43,7 @@ export async function createNewProject(): Promise<void> {
 
     // Fix common Flutter project issues and init git
     startAppFix(config.targetFlutterProjectPath);
-    gitInit(monoRepoPath);
+    gitInit(monoRepoPath, targetProject);
 
     const openCommand = `antigravity -g "${monoRepoPath}"`;
 
