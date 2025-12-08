@@ -7,7 +7,8 @@ import { GenerationConfig } from "../config/generation_config";
 import { startAppFix } from "../../../utils/start_app_fix";
 import { gitInit } from "../../../utils/git_init";
 
-const SERVERPOD_GENERATE = 'serverpod generate';
+const SERVERPOD_GENERATE = 'serverpod generate --experimental-features=all';
+const SERVERPOD_CREATE_MIGRATION = 'serverpod create-migration --experimental-features=all --force';
 const build_runner = 'dart run build_runner build -d';
 const pubGet = 'flutter pub get';
 
@@ -54,6 +55,7 @@ export async function createNewProject(): Promise<void> {
 
     // Run serverpod generate in server folder, and build_runner in flutter and admin
     await executeCommand(SERVERPOD_GENERATE, config.targetServerProjectPath);
+    await executeCommand(SERVERPOD_CREATE_MIGRATION, config.targetServerProjectPath);
     await executeCommand(build_runner, config.targetFlutterProjectPath);
     await executeCommand(build_runner, config.targetAdminProjectPath);
 
