@@ -15,6 +15,7 @@ import { TerraformMainGenerator } from "../generators/terraform/terraform_main_g
 import { TerraformVariablesGenerator } from "../generators/terraform/terraform_variables_generator";
 import { TerraformTfvarsExampleGenerator } from "../generators/terraform/terraform_tfvars_example_generator";
 import { TerraformApplyScriptGenerator } from "../generators/terraform/terraform_apply_script_generator";
+import { EnvGenerator } from "../generators/flutter/env_generator";
 import { getRootWorkspaceFolders } from "../../../utils/path_util";
 import { window } from "vscode";
 
@@ -60,6 +61,8 @@ export async function generateServerpodK8s(): Promise<void> {
             new TerraformVariablesGenerator(fileSystem),
             new TerraformTfvarsExampleGenerator(fileSystem),
             new TerraformApplyScriptGenerator(fileSystem),
+            // Flutter generators
+            new EnvGenerator(fileSystem),
         ];
 
         for (const generator of generators) {
