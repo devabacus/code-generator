@@ -27,6 +27,22 @@
       {
         "command": "code-generator.vsCodeExtHandler",
         "title": "AntigravityHandler"
+      },
+      {
+        "command": "code-generator.createNewProject",
+        "title": "Code Generator: Create New Serverpod Project"
+      },
+      {
+        "command": "code-generator.addPython",
+        "title": "Code Generator: Add Python to Project"
+      },
+      {
+        "command": "code-generator.createDataFiles",
+        "title": "Code Generator: Create Data Files from YAML"
+      },
+      {
+        "command": "code-generator.generateK8s",
+        "title": "Code Generator: Generate Serverpod K8s Files"
       }
     ]
   },
