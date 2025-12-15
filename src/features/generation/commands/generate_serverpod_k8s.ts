@@ -74,3 +74,5 @@ export async function generateServerpodK8s(): Promise<void> {
         window.showErrorMessage(`Error generating K8s files: ${error}`);
     }
 }
+
+

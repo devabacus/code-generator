@@ -34,6 +34,16 @@ export const allManifests = {
         ],
     },
 
+    pythonStart: {
+        dictionaries: DictionaryPresets.PROJECT_ONLY,
+        scan_dirs: [
+            'python/',
+            'flutter/',  // For python_health_check_card.dart
+            'server/',   // For python_endpoint.dart
+        ],
+    },
+
 } as const;
 
 export type manifestType = keyof typeof allManifests;
+

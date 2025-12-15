@@ -108,4 +108,13 @@ export class GenerationConfig {
     get coreTablesPath(): string {
         return path.join(this.coreDataLocalPath, 'tables');
     }
+
+    get templPythonProjectPath(): string {
+        return path.join(this.projectsPath, `${this.templProject}`, `${this.templProject}_python`);
+    }
+
+    get targetPythonProjectPath(): string {
+        return path.join(this.projectsPath, `${this.targetProject}`, `${this.targetProject}_python`);
+    }
 }
+
