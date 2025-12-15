@@ -25,7 +25,8 @@ export async function vsCodeExtHandler() {
 async function reinstallExtension() {
     const reinstallExtCmds = [
         'vsce package',
-        'antigravity --install-extension code-generator-0.0.1.vsix --force'
+        'antigravity --install-extension code-generator-0.0.1.vsix --force',
+        'code --install-extension code-generator-0.0.1.vsix --force'
     ];
     await terminalCommands(reinstallExtCmds, getRootWorkspaceFolders());
     window.showInformationMessage('✅ Расширение успешно обновлено!');

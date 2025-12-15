@@ -34,7 +34,7 @@ export class GenerationConfig {
     constructor(config: IGenerationConfig) {
         this.templProject = config.templProject || 't2';
         this.allManifests = config.manifest || [];
-        this.templFeatureName = config.templFeatureName || 'home';
+        this.templFeatureName = config.templFeatureName || 'tasks';
         this.projectsPath = config.projectsPath || 'G:/Projects/Flutter/serverpod';
         this.templEntity = config.templEntity || 'category';
         this.workspacesPath = config.workspacesPath || '';
@@ -43,7 +43,7 @@ export class GenerationConfig {
         this.targetEntity = config.targetEntity || '';
         this.targetEntity1 = config.targetEntity1 || '';
         this.targetEntity2 = config.targetEntity2 || '';
-        this.sourceFeaturePath = config.sourceFeaturePath || `G:/Projects/Flutter/serverpod/${this.templProject}/${this.templProject}_flutter/lib/features/home`;
+        this.sourceFeaturePath = config.sourceFeaturePath || `G:/Projects/Flutter/serverpod/${this.templProject}/${this.templProject}_flutter/lib/features/${this.templFeatureName}`;
     }
 
 
