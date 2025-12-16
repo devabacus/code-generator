@@ -80,6 +80,12 @@ spec:
                 secretKeyRef:
                   name: serverpod-secrets-${appName}
                   key: service-secret
+            - name: GO_SERVICE_URL
+              value: "http://${appName}-go-service:8001"
+            - name: NODE_SERVICE_URL
+              value: "http://${appName}-node-service:8002"
+            - name: PYTHON_SERVICE_URL
+              value: "http://${appName}-python-service:8000"
 
           resources:
             requests:

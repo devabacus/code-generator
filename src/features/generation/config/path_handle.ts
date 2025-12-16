@@ -31,6 +31,7 @@ export function getPathInfo(config: GenerationConfig, dirKey: string): PathInfo 
                 destinationBasePath: config.targetFeaturePath,
             };
 
+        case 'python/':
             return {
                 sourceBasePath: config.templPythonProjectPath,
                 destinationBasePath: config.targetPythonProjectPath,

@@ -60,7 +60,7 @@ export const allManifests = {
             'flutter/',
             'server/',
         ],
-        include_files: ['package-lock.json'],
+        include_files: ['package-lock.json', 'package.json'],
     },
 
 } as const;
