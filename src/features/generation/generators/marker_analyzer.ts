@@ -1,6 +1,6 @@
 import { DictionaryName } from "../replacement/replacement_util";
 
-export type ManifestType = 'ignore' | 'startProject' | 'entity' | 'manyToMany' | 'serverpod' | 'deploy' | 'pythonStart';
+export type ManifestType = 'ignore' | 'startProject' | 'entity' | 'manyToMany' | 'serverpod' | 'deploy' | 'pythonStart' | 'goStart' | 'nodeStart';
 
 export interface FileManifest {
     types: ManifestType[];
