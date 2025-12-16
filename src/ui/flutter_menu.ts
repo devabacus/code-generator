@@ -3,6 +3,7 @@ import { addPythonToProject } from "../features/generation/commands/add_python_t
 import { createDataFilesByReplacement } from "../features/generation/commands/create_data_files_by_replacement";
 import { createNewProject } from "../features/generation/commands/create_new_project";
 import { generateServerpodK8s } from "../features/generation/commands/generate_serverpod_k8s";
+import { generatePythonBridge } from "../features/generation/commands/generate_python_bridge";
 
 export async function flutterHandler() {
     const options: { [key: string]: () => Promise<any> } = {
@@ -10,6 +11,7 @@ export async function flutterHandler() {
         'Add Python to project': () => addPythonToProject(),
         'Create data files from yaml': () => createDataFilesByReplacement(),
         'Generate Serverpod K8s files': () => generateServerpodK8s(),
+        'Generate Python Bridge (OpenAPI)': () => generatePythonBridge(),
     };
 
     const choice = await window.showQuickPick(Object.keys(options), {
