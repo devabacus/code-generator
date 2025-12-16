@@ -116,5 +116,21 @@ export class GenerationConfig {
     get targetPythonProjectPath(): string {
         return path.join(this.projectsPath, `${this.targetProject}`, `${this.targetProject}_python`);
     }
+
+    get templGoProjectPath(): string {
+        return path.join(this.projectsPath, `${this.templProject}`, `${this.templProject}_go`);
+    }
+
+    get targetGoProjectPath(): string {
+        return path.join(this.projectsPath, `${this.targetProject}`, `${this.targetProject}_go`);
+    }
+
+    get templNodeProjectPath(): string {
+        return path.join(this.projectsPath, `${this.templProject}`, `${this.templProject}_node`);
+    }
+
+    get targetNodeProjectPath(): string {
+        return path.join(this.projectsPath, `${this.targetProject}`, `${this.targetProject}_node`);
+    }
 }
 

@@ -43,6 +43,26 @@ export const allManifests = {
         ],
     },
 
+    goStart: {
+        dictionaries: DictionaryPresets.PROJECT_ONLY,
+        scan_dirs: [
+            'go/',
+            'flutter/',
+            'server/',
+        ],
+        include_files: ['go.sum'],
+    },
+
+    nodeStart: {
+        dictionaries: DictionaryPresets.PROJECT_ONLY,
+        scan_dirs: [
+            'node/',
+            'flutter/',
+            'server/',
+        ],
+        include_files: ['package-lock.json'],
+    },
+
 } as const;
 
 export type manifestType = keyof typeof allManifests;

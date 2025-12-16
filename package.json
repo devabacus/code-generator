@@ -37,6 +37,14 @@
         "title": "Code Generator: Add Python to Project"
       },
       {
+        "command": "code-generator.addGo",
+        "title": "Code Generator: Add Go to Project"
+      },
+      {
+        "command": "code-generator.addNode",
+        "title": "Code Generator: Add Node.js to Project"
+      },
+      {
         "command": "code-generator.createDataFiles",
         "title": "Code Generator: Create Data Files from YAML"
       },

@@ -31,10 +31,21 @@ export function getPathInfo(config: GenerationConfig, dirKey: string): PathInfo 
                 destinationBasePath: config.targetFeaturePath,
             };
 
-        case 'python/':
             return {
                 sourceBasePath: config.templPythonProjectPath,
                 destinationBasePath: config.targetPythonProjectPath,
+            };
+
+        case 'go/':
+            return {
+                sourceBasePath: config.templGoProjectPath,
+                destinationBasePath: config.targetGoProjectPath,
+            };
+
+        case 'node/':
+            return {
+                sourceBasePath: config.templNodeProjectPath,
+                destinationBasePath: config.targetNodeProjectPath,
             };
 
         default:
