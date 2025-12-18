@@ -4,6 +4,7 @@ export const allManifests = {
     startProject: {
         dictionaries: DictionaryPresets.PROJECT_ONLY,
         scan_dirs: [
+            'root/',
             'flutter/',
             'server/',
             'admin/',

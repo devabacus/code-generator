@@ -7,6 +7,12 @@ export interface PathInfo {
 
 export function getPathInfo(config: GenerationConfig, dirKey: string): PathInfo {
     switch (dirKey) {
+        case 'root/':
+            return {
+                sourceBasePath: config.monoRepoTemplPath,
+                destinationBasePath: config.monoRepoTargetPath,
+            };
+
         case 'flutter/':
             return {
                 sourceBasePath: config.templFlutterProjectPath,

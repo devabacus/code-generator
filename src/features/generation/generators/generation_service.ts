@@ -50,6 +50,7 @@ export class GenerationService {
 
         // Проверяем, идет ли генерация сущностей (entity) или связей Many-to-Many
         const isEntityBasedGeneration = config.allManifests.includes('entity') || config.allManifests.includes('manyToMany');
+        const processedDestinations = new Set<string>();
 
         for (const dir of directoriesToScan) {
             const pathInfo = getPathInfo(config, dir);
@@ -90,7 +91,13 @@ export class GenerationService {
                 if (!isRelevant) { continue; }
 
                 // Добавляем задачу обработки файла в очередь
-                allPromises.push(this._processFile(config, templateFullPath, templateContent, fileManifest, pathInfo, model));
+                const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
+                const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
+
+                if (processedDestinations.has(destinationPath)) { continue; }
+                processedDestinations.add(destinationPath);
+
+                allPromises.push(this._processFile(config, templateFullPath, templateContent, fileManifest, pathInfo, model, destinationPath));
             }
         }
 
@@ -112,11 +119,12 @@ export class GenerationService {
         templateContent: string,
         fileManifest: FileManifest,
         pathInfo: PathInfo,
-        model?: ServerpodModel
+        model?: ServerpodModel,
+        precomputedDestinationPath?: string
     ): Promise<void> {
         // Вычисляем относительный путь и целевой путь назначения
         const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
-        const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
+        const destinationPath = precomputedDestinationPath || path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
 
         const destinationExists = await this.fileSystem.exists(destinationPath);
         // Проверяем наличие маркера "base", который указывает на то, что нужно объединять контент, а не перезаписывать полностью
