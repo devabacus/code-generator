@@ -13,7 +13,10 @@ import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { RelationPatcher } from './relation_patcher';
 import { scanWithIgnore } from '../../../utils/dir_handle_adv';
 
-
+/**
+ * Сервис для генерации кода.
+ * Отвечает за обход директорий, анализ шаблонов и применение правил замены данных.
+ */
 export class GenerationService {
     private readonly fileSystem: IFileSystem;
     private readonly replacingProcessor: ReplacingFileProcessor;
@@ -27,16 +30,25 @@ export class GenerationService {
         this.relationPatcher = new RelationPatcher(this.fileSystem);
     }
 
+    /**
+     * Основной метод запуска генерации.
+     * @param config Конфигурация генерации (какие фичи генерировать, пути и т.д.)
+     * @param model Опциональная модель Serverpod (используется для генерации сущностей)
+     */
     public async generate(config: GenerationConfig, model?: ServerpodModel): Promise<void> {
 
         const allPromises: Promise<void>[] = [];
         const directoriesToScan = new Set<string>();
+
+        // Собираем все директории, которые нужно просканировать исходя из выбранных манифестов
         for (const _manifest of config.allManifests) {
             const manifest = allManifests[_manifest as manifestType];
             if (manifest?.scan_dirs) {
                 manifest.scan_dirs.forEach(dir => directoriesToScan.add(dir));
             }
         }
+
+        // Проверяем, идет ли генерация сущностей (entity) или связей Many-to-Many
         const isEntityBasedGeneration = config.allManifests.includes('entity') || config.allManifests.includes('manyToMany');
 
         for (const dir of directoriesToScan) {
@@ -44,14 +56,21 @@ export class GenerationService {
             const fullDirSourcePath = pathInfo.sourceBasePath;
             if (!await this.fileSystem.exists(fullDirSourcePath)) { continue; }
 
+            // Рекурсивно сканируем файлы в директории с учетом правил игнорирования
             const filesInDir = await scanWithIgnore(fullDirSourcePath, this.fileSystem);
 
             for (const templateFullPath of filesInDir) {
+                // Фильтрация файлов: если генерируем конкретную сущность, пропускаем файлы, не относящиеся к ней
                 if (isEntityBasedGeneration && !config.allManifests.includes('manyToMany') && !templateFullPath.includes(config.templEntity)) { continue; }
+
+                // Пропускаем уже сгенерированные файлы (например, .g.dart или .freezed.dart)
                 if (templateFullPath.includes('.g.') || templateFullPath.includes('.freezed.')) { continue; }
+
                 const templateContent = await this.fileSystem.readFile(templateFullPath);
+                // Анализируем маркеры внутри файла (например, @manifest, @dictionary)
                 const fileManifest = MarkerAnalyzer.analyze(templateContent);
 
+                // Если файл помечен как 'ignore', проверяем, не включен ли он явно в какой-либо манифест
                 if (fileManifest.types.includes('ignore')) {
                     const fileName = path.basename(templateFullPath);
                     for (const mName of config.allManifests) {
@@ -63,21 +82,30 @@ export class GenerationService {
                     }
                 }
 
+                // Если файл всё еще в игноре — пропускаем
                 if (fileManifest.types.includes('ignore')) { continue; }
+
+                // Проверяем, релевантен ли файл для текущего набора активированных фич
                 const isRelevant = config.allManifests.some(feature => fileManifest.types.includes(feature as any));
                 if (!isRelevant) { continue; }
 
+                // Добавляем задачу обработки файла в очередь
                 allPromises.push(this._processFile(config, templateFullPath, templateContent, fileManifest, pathInfo, model));
             }
         }
 
+        // Ждем завершения обработки всех файлов
         await Promise.all(allPromises);
 
+        // Если есть модель и в ней найдены связи many-to-one, применяем патчер связей
         if (model && RelationAnalyzer.manyToOneFields(model.fields).length > 0) {
             await this.relationPatcher.patch(config, model);
         }
     }
 
+    /**
+     * Обрабатывает отдельный файл шаблона.
+     */
     private async _processFile(
         config: GenerationConfig,
         templateFullPath: string,
@@ -86,13 +114,16 @@ export class GenerationService {
         pathInfo: PathInfo,
         model?: ServerpodModel
     ): Promise<void> {
+        // Вычисляем относительный путь и целевой путь назначения
         const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
         const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
 
         const destinationExists = await this.fileSystem.exists(destinationPath);
+        // Проверяем наличие маркера "base", который указывает на то, что нужно объединять контент, а не перезаписывать полностью
         const hasBaseMarker = /(?:\/\/|#) === generated_start:base ===/.test(templateContent);
 
-        // --- STRATEGY 1: MERGE ---
+        // --- СТРАТЕГИЯ 1: СЛИЯНИЕ (MERGE) ---
+        // Используется, если файл уже существует и в шаблоне есть блок "base"
         if (destinationExists && hasBaseMarker) {
             const destinationContent = await this.fileSystem.readFile(destinationPath);
             const newContent = this._mergeBaseContent(templateContent, destinationContent, fileManifest, config);
@@ -100,23 +131,31 @@ export class GenerationService {
             return;
         }
 
-        // --- STRATEGY 2: FULL REPLACE ---
+        // --- СТРАТЕГИЯ 2: ПОЛНАЯ ЗАМЕНА (FULL REPLACE) ---
+        // Определяем словари для замены (либо из файла, либо дефолтные из манифеста)
         const dictionaries = fileManifest.dictionaries.length > 0 ? fileManifest.dictionaries : allManifests[config.allManifests[0]]?.dictionaries || [];
         const rules = getDictionaryRules(dictionaries, config);
 
         let newContent = templateContent;
+        // Применяем текстовые замены на основе словарей
         for (const rule of rules) {
             newContent = newContent.replace(new RegExp(rule.from, 'g'), rule.to);
         }
 
+        // Если файл является шаблонизированным (секции [FOR_EACH_FIELD] и т.д.) и есть модель
         if (fileManifest.isTemplated && model) {
             newContent = this.sectionReplacer.process(newContent, config, model);
         }
 
+        // Создаем папку (если нет) и записываем итоговый файл
         await this.fileSystem.createFolder(path.dirname(destinationPath));
         await this.fileSystem.createFile(destinationPath, newContent);
     }
 
+    /**
+     * Сливает обновленный базовый блок из шаблона в существующий файл.
+     * Это позволяет сохранять кастомные изменения пользователя вне базового блока.
+     */
     private _mergeBaseContent(
         templateContent: string,
         destinationContent: string,
@@ -131,6 +170,7 @@ export class GenerationService {
         }
         let newBlockContent = templateMatch[2];
 
+        // К содержимому базового блока также применяем правила замены словарей
         const dictionaries = fileManifest.dictionaries.length > 0 ? fileManifest.dictionaries : allManifests[config.allManifests[0]]?.dictionaries || [];
         const rules = getDictionaryRules(dictionaries, config);
 
@@ -138,6 +178,7 @@ export class GenerationService {
             newBlockContent = newBlockContent.replace(new RegExp(rule.from, 'g'), rule.to);
         }
 
+        // Заменяем блок в существующем файле на новый обработанный блок из шаблона
         const finalContent = destinationContent.replace(
             baseBlockRegex,
             `$1${newBlockContent}$3`
@@ -146,9 +187,14 @@ export class GenerationService {
         return finalContent;
     }
 
+    /**
+     * Преобразует относительный путь шаблона в путь назначения,
+     * заменяя плейсхолдеры сущности и проекта на реальные имена.
+     */
     private _getDestinationPath(relativePath: string, config: GenerationConfig): string {
         let destinationRelativePath = relativePath.replaceAll(config.templEntity, config.targetEntity);
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
         return destinationRelativePath;
     }
 }
+
