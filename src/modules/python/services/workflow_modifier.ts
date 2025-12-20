@@ -175,5 +175,113 @@ export class WorkflowModifier {
             await this.fileSystem.createFile(deploymentPath, content);
         }
     }
+
+    /**
+     * Копирует Flutter health check виджет из шаблона t115 в текущий проект.
+     * @param workspacePath Корень monorepo
+     * @param serviceName Имя микросервиса (например, python1)
+     * @param templatesPath Путь к шаблонам (G:\Templates)
+     */
+    async copyFlutterHealthCheckWidget(
+        workspacePath: string,
+        serviceName: string,
+        templatesPath: string
+    ): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const flutterPath = path.join(workspacePath, `${projectName}_flutter`);
+
+        // Проверяем что Flutter проект существует
+        if (!await this.fileSystem.exists(flutterPath)) {
+            return;
+        }
+
+        // 1. Копируем shared_health_check_widgets.dart если не существует
+        const sharedWidgetsDir = path.join(flutterPath, 'lib', 'features', 'developer_tools', 'presentation', 'widgets');
+        const sharedWidgetsPath = path.join(sharedWidgetsDir, 'shared_health_check_widgets.dart');
+
+        if (!await this.fileSystem.exists(sharedWidgetsPath)) {
+            const sourceSharedWidgets = path.join(templatesPath, 'flutter', 't115', 't115_flutter', 'lib', 'features', 'developer_tools', 'presentation', 'widgets', 'shared_health_check_widgets.dart');
+            if (await this.fileSystem.exists(sourceSharedWidgets)) {
+                await this.fileSystem.createFolder(sharedWidgetsDir);
+                let content = await this.fileSystem.readFile(sourceSharedWidgets);
+                content = content.replace(/t115/g, projectName);
+                await this.fileSystem.createFile(sharedWidgetsPath, content);
+            }
+        }
+
+        // 2. Копируем python_health_check_card.dart → {serviceName}_health_check_card.dart
+        const sourceWidget = path.join(templatesPath, 'flutter', 't115', 't115_flutter', 'lib', 'features', 'python', 'presentation', 'widgets', 'python_health_check_card.dart');
+
+        if (!await this.fileSystem.exists(sourceWidget)) {
+            return;
+        }
+
+        const targetWidgetDir = path.join(flutterPath, 'lib', 'features', serviceName, 'presentation', 'widgets');
+        const targetWidgetPath = path.join(targetWidgetDir, `${serviceName}_health_check_card.dart`);
+
+        // Проверяем не существует ли уже
+        if (await this.fileSystem.exists(targetWidgetPath)) {
+            return;
+        }
+
+        await this.fileSystem.createFolder(targetWidgetDir);
+
+        // Читаем и заменяем
+        let content = await this.fileSystem.readFile(sourceWidget);
+        content = content.replace(/t115/g, projectName);
+        content = content.replace(/python/g, serviceName);
+        content = content.replace(/Python/g, this.toPascalCase(serviceName));
+
+        await this.fileSystem.createFile(targetWidgetPath, content);
+    }
+
+    /**
+     * Копирует Serverpod endpoint из шаблона t115 в текущий проект.
+     * @param workspacePath Корень monorepo
+     * @param serviceName Имя микросервиса (например, python1)
+     * @param templatesPath Путь к шаблонам (G:\Templates)
+     */
+    async copyServerpodEndpoint(
+        workspacePath: string,
+        serviceName: string,
+        templatesPath: string
+    ): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const serverPath = path.join(workspacePath, `${projectName}_server`);
+
+        // Проверяем что сервер существует
+        if (!await this.fileSystem.exists(serverPath)) {
+            return;
+        }
+
+        // Копируем python_endpoint.dart → {serviceName}_endpoint.dart
+        const sourceEndpoint = path.join(templatesPath, 'flutter', 't115', 't115_server', 'lib', 'src', 'endpoints', 'python_endpoint.dart');
+
+        if (!await this.fileSystem.exists(sourceEndpoint)) {
+            return;
+        }
+
+        const targetEndpointDir = path.join(serverPath, 'lib', 'src', 'endpoints');
+        const targetEndpointPath = path.join(targetEndpointDir, `${serviceName}_endpoint.dart`);
+
+        // Проверяем не существует ли уже
+        if (await this.fileSystem.exists(targetEndpointPath)) {
+            return;
+        }
+
+        await this.fileSystem.createFolder(targetEndpointDir);
+
+        // Читаем и заменяем
+        let content = await this.fileSystem.readFile(sourceEndpoint);
+        content = content.replace(/python/g, serviceName);
+        content = content.replace(/Python/g, this.toPascalCase(serviceName));
+        content = content.replace(/PYTHON/g, serviceName.toUpperCase());
+
+        await this.fileSystem.createFile(targetEndpointPath, content);
+    }
+
+    private toPascalCase(str: string): string {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
 }
 

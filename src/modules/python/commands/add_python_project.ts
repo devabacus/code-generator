@@ -123,6 +123,15 @@ export async function addPythonProject(): Promise<void> {
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
             await workflowModifier.updateK8sManifests(targetPath, projectName);
             await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
+            await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
+            await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
+
+            // Запускаем serverpod generate
+            const projectBaseName = path.basename(workspacePath);
+            const serverPath = path.join(workspacePath, `${projectBaseName}_server`);
+            window.showInformationMessage('⏳ Running serverpod generate...');
+            await executeCommand('serverpod generate --experimental-features=all', serverPath);
+
             window.showInformationMessage(`📋 Workflow moved to .github/workflows/deployment-${projectName}.yml`);
         }
 
