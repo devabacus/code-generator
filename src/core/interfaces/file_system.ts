@@ -8,4 +8,5 @@ export interface IFileSystem {
     readDirectory(path: string): Promise<string[]>;
     readDirectoryRecursive(path: string): Promise<string[]>;
     isDirectory(path: string): Promise<boolean>;
+    deleteDirectory(path: string): Promise<void>;
 }

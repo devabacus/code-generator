@@ -247,13 +247,24 @@ function schemaToType(schema: OpenApiSchemaRef, spec: OpenApiSpec): string {
 
 function cleanOperationId(opId: string): string {
     // e.g. "process_text_api_v1_process_text_post" → "processText"
+    // e.g. "calculate_square_square_api_v1_square_get" → "calculateSquare"
+    // e.g. "analyze_image_analyze_api_v1_analyze_image_post" → "analyzeImage"
     const parts = opId.split('_');
-    // Take first meaningful parts before api/v1/post/get
+    // Remove api/v1/post/get etc
     const meaningful = parts.filter(p =>
         !['api', 'v1', 'v2', 'post', 'get', 'put', 'delete'].includes(p)
     );
+    // Remove ALL duplicates (keep first occurrence only)
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const part of meaningful) {
+        if (!seen.has(part)) {
+            seen.add(part);
+            unique.push(part);
+        }
+    }
     // Take first 2-3 meaningful words
-    const name = meaningful.slice(0, 3).join('_');
+    const name = unique.slice(0, 3).join('_');
     return snakeToCamel(name);
 }
 

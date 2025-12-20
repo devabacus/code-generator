@@ -63,6 +63,14 @@
       {
         "command": "code-generator.addGoProject",
         "title": "Code Generator: Add Go Project from Template"
+      },
+      {
+        "command": "code-generator.importMicroservice",
+        "title": "Code Generator: Import Existing Microservice to Monorepo"
+      },
+      {
+        "command": "code-generator.setupCICD",
+        "title": "Code Generator: Setup CI/CD (Terraform)"
       }
     ],
     "configuration": {

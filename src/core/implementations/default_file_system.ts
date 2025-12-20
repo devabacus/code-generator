@@ -1,5 +1,6 @@
 import { copyFile as utilCopyFile, fileExists, readFile, createFile as utilCreateFile, createFolder as utilCreateFolder, readDirectory, readDirectoryRecursive, isDirectory } from "../../utils";
 import { IFileSystem } from "../interfaces/file_system";
+import fs from 'fs/promises';
 
 export class DefaultFileSystem implements IFileSystem {
 
@@ -33,5 +34,13 @@ export class DefaultFileSystem implements IFileSystem {
 
     isDirectory(path: string): Promise<boolean> {
         return isDirectory(path);
+    }
+
+    async deleteDirectory(path: string): Promise<void> {
+        try {
+            await fs.rm(path, { recursive: true, force: true });
+        } catch {
+            // Игнорируем ошибки если папка не существует
+        }
     }
 }

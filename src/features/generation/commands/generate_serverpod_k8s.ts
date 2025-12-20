@@ -19,9 +19,13 @@ import { EnvGenerator } from "../generators/flutter/env_generator";
 import { getRootWorkspaceFolders } from "../../../utils/path_util";
 import { window } from "vscode";
 
-export async function generateServerpodK8s(): Promise<void> {
+/**
+ * Генерирует K8s манифесты, Terraform файлы и .env для Serverpod проекта.
+ * @param workspacePathOverride Опциональный путь. Если не указан — берёт текущий workspace.
+ */
+export async function generateServerpodK8s(workspacePathOverride?: string): Promise<void> {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
-    const workspacePath = getRootWorkspaceFolders();
+    const workspacePath = workspacePathOverride ?? getRootWorkspaceFolders();
 
     if (!workspacePath) {
         window.showErrorMessage('No workspace folder found');
@@ -69,10 +73,8 @@ export async function generateServerpodK8s(): Promise<void> {
             await generator.generate(workspacePath, undefined, serverData);
         }
 
-        window.showInformationMessage(`K8s files generated successfully for ${projectName}`);
+        window.showInformationMessage(`✅ K8s files generated for ${projectName}`);
     } catch (error) {
         window.showErrorMessage(`Error generating K8s files: ${error}`);
     }
 }
-
-

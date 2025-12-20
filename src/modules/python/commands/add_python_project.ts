@@ -127,7 +127,7 @@ export async function addPythonProject(): Promise<void> {
         // Инициализируем Python проект
         await initializer.initialize(targetPath);
 
-        // Git init для standalone проектов
+        // Git init и открытие в IDE для standalone проектов
         if (destination.type === 'standalone') {
             // Спрашиваем про настройку CI/CD
             const setupCICD = await window.showQuickPick(
@@ -139,11 +139,17 @@ export async function addPythonProject(): Promise<void> {
             );
 
             await gitInit(targetPath, projectName, { setupCICD: setupCICD?.value ?? false });
-        }
 
-        // Открываем проект в IDE
-        const openCommand = `antigravity -g "${targetPath}"`;
-        await executeCommand(openCommand, targetPath);
+            // Открываем в отдельном окне только standalone проекты
+            const openCommand = `antigravity -g "${targetPath}"`;
+            await executeCommand(openCommand, targetPath);
+        } else {
+            // Для microservices показываем подсказку про Python Bridge
+            window.showInformationMessage(
+                `✅ Python microservice "${projectName}" added! ` +
+                `To create Serverpod bridge: 1) Run service locally 2) Execute "Generate Python Bridge"`
+            );
+        }
 
         window.showInformationMessage(`✅ Python project "${projectName}" created successfully!`);
 

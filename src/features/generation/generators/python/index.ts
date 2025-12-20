@@ -1,2 +1,2 @@
 export { PythonEndpointGenerator } from './python_endpoint_generator';
-export { PythonModelsGenerator } from './python_models_generator';
+// Models no longer generated - use Freezed in Flutter instead

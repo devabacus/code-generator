@@ -2,9 +2,13 @@ import * as path from 'path';
 import { IFileSystem } from '../../../../core/interfaces/file_system';
 import { ParsedModel, camelToSnake } from '../../parsers/openapi_parser';
 
+// Типы не поддерживаемые Serverpod
+const UNSUPPORTED_TYPES = ['dynamic', 'Map<String, dynamic>', 'Object'];
+
 /**
  * Generates Serverpod .spy.yaml model files from OpenAPI schemas.
  * Creates DTO models (no database table).
+ * Skips models with unsupported types.
  */
 export class PythonModelsGenerator {
     constructor(private fileSystem: IFileSystem) { }
@@ -26,6 +30,11 @@ export class PythonModelsGenerator {
         await this.fileSystem.createFolder(modelsPath);
 
         for (const model of models) {
+            // Пропускаем модели с неподдерживаемыми типами
+            if (this.hasUnsupportedTypes(model)) {
+                continue;
+            }
+
             const fileName = `${camelToSnake(model.name)}.spy.yaml`;
             const filePath = path.join(modelsPath, fileName);
             const content = this.buildModelYaml(model);
@@ -35,6 +44,20 @@ export class PythonModelsGenerator {
         }
 
         return generated;
+    }
+
+    /**
+     * Проверяет есть ли в модели типы не поддерживаемые Serverpod
+     */
+    private hasUnsupportedTypes(model: ParsedModel): boolean {
+        for (const field of model.fields) {
+            for (const unsupported of UNSUPPORTED_TYPES) {
+                if (field.type.includes(unsupported)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private buildModelYaml(model: ParsedModel): string {

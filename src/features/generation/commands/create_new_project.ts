@@ -1,11 +1,12 @@
+import path from "path";
 import { ServiceLocator } from "../../../core/services/service_locator";
+import { gitInit } from "../../../utils/git_init";
+import { startAppFix } from "../../../utils/start_app_fix";
 import { executeCommand } from "../../../utils/terminal_handle";
 import { getUserInput } from "../../../utils/ui/ui_ask_folder";
+import { GenerationConfig } from "../config/generation_config";
 import { AppDatabaseGenerator } from "../generators/app_database_generator";
 import { GenerationService } from "../generators/generation_service";
-import { GenerationConfig } from "../config/generation_config";
-import { startAppFix } from "../../../utils/start_app_fix";
-import { gitInit } from "../../../utils/git_init";
 
 const SERVERPOD_GENERATE = 'serverpod generate --experimental-features=all';
 const SERVERPOD_CREATE_MIGRATION = 'serverpod create-migration --experimental-features=all --force';
@@ -34,6 +35,11 @@ export async function createNewProject(): Promise<void> {
     // Create admin app
     await executeCommand(`flutter create ${targetProject}_admin`, monoRepoPath);
 
+    // Удаляем демо-папки созданные serverpod (мы используем свою архитектуру)
+    const flutterLibPath = path.join(config.targetFlutterProjectPath, 'lib');
+    await fileSystem.deleteDirectory(path.join(flutterLibPath, 'screens'));
+    await fileSystem.deleteDirectory(path.join(flutterLibPath, 'config'));
+
     // Main generation service
     const generationService = new GenerationService(fileSystem);
     await generationService.generate(config);
@@ -42,7 +48,7 @@ export async function createNewProject(): Promise<void> {
     const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
     await appDatabaseGenerator.generate();
 
-    // Fix common Flutter project issues and init git
+    // Fix common Flutter project issues
     startAppFix(config.targetFlutterProjectPath);
     gitInit(monoRepoPath, targetProject);
 
