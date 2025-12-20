@@ -6,7 +6,7 @@ export async function gitInit(path: string, projectName: string, githubUsername:
     const gitInitSet = [
         'git init',
         'git add .',
-        'git commit -m "init"',
+        'git commit -m "init [skip ci]"',
         `gh repo create ${projectName} --private`,
         `git remote add origin https://github.com/${githubUsername}/${projectName}.git`,
         'git push -u origin master'

@@ -34,15 +34,15 @@
       },
       {
         "command": "code-generator.addPython",
-        "title": "Code Generator: Add Python to Project"
+        "title": "Code Generator: Add Python to Serverpod Project"
       },
       {
         "command": "code-generator.addGo",
-        "title": "Code Generator: Add Go to Project"
+        "title": "Code Generator: Add Go to Serverpod Project"
       },
       {
         "command": "code-generator.addNode",
-        "title": "Code Generator: Add Node.js to Project"
+        "title": "Code Generator: Add Node.js to Serverpod Project"
       },
       {
         "command": "code-generator.createDataFiles",
@@ -51,8 +51,35 @@
       {
         "command": "code-generator.generateK8s",
         "title": "Code Generator: Generate Serverpod K8s Files"
+      },
+      {
+        "command": "code-generator.addPythonProject",
+        "title": "Code Generator: Add Python Project from Template"
+      },
+      {
+        "command": "code-generator.addNodeProject",
+        "title": "Code Generator: Add Node.js Project from Template"
+      },
+      {
+        "command": "code-generator.addGoProject",
+        "title": "Code Generator: Add Go Project from Template"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Code Generator",
+      "properties": {
+        "codeGenerator.templatesPath": {
+          "type": "string",
+          "default": "G:/Templates",
+          "description": "Path to templates folder (e.g., G:/Templates with subfolders python/, node/, go/)"
+        },
+        "codeGenerator.pythonProjectsPath": {
+          "type": "string",
+          "default": "G:/Projects/Python",
+          "description": "Default path for standalone Python projects"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

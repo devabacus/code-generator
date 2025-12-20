@@ -4,24 +4,25 @@ import {
 } from "vscode";
 import { flutterHandler } from "./ui/flutter_menu";
 import { vsCodeExtHandler } from "./utils/vs_code_menu";
-import { createNewProject } from "./features/generation/commands/create_new_project";
-import { addPythonToProject } from "./features/generation/commands/add_python_to_project";
-import { addGoToProject } from "./features/generation/commands/add_go_to_project";
-import { addNodeToProject } from "./features/generation/commands/add_node_to_project";
-import { createDataFilesByReplacement } from "./features/generation/commands/create_data_files_by_replacement";
-import { generateServerpodK8s } from "./features/generation/commands/generate_serverpod_k8s";
+
+// Модули
+import { registerFlutterCommands } from "./modules/flutter";
+import { registerPythonCommands } from "./modules/python";
+import { registerNodeCommands } from "./modules/node";
+import { registerGoCommands } from "./modules/go";
 
 export function activate(context: ExtensionContext) {
+	// Legacy команды (UI меню)
 	context.subscriptions.push(
 		commands.registerCommand("code-generator.flutter-handler", flutterHandler),
 		commands.registerCommand("code-generator.vsCodeExtHandler", vsCodeExtHandler),
-		commands.registerCommand("code-generator.createNewProject", createNewProject),
-		commands.registerCommand("code-generator.addPython", addPythonToProject),
-		commands.registerCommand("code-generator.addGo", addGoToProject),
-		commands.registerCommand("code-generator.addNode", addNodeToProject),
-		commands.registerCommand("code-generator.createDataFiles", createDataFilesByReplacement),
-		commands.registerCommand("code-generator.generateK8s", generateServerpodK8s),
 	);
+
+	// Модули
+	context.subscriptions.push(...registerFlutterCommands());
+	context.subscriptions.push(...registerPythonCommands());
+	context.subscriptions.push(...registerNodeCommands());
+	context.subscriptions.push(...registerGoCommands());
 }
 
 export function deactivate() { }
