@@ -330,6 +330,52 @@ export class WorkflowModifier {
         await this.fileSystem.createFile(pagePath, content);
     }
 
+    /**
+     * Удаляет переменную окружения из deployment.yaml Serverpod.
+     */
+    async removeServerpodDeploymentEnv(workspacePath: string, serviceName: string): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
+
+        if (!await this.fileSystem.exists(deploymentPath)) {
+            return;
+        }
+
+        let content = await this.fileSystem.readFile(deploymentPath);
+        const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
+
+        // Удаляем блок переменной окружения
+        const envPattern = new RegExp(`\\s+-\\s+name:\\s+${envVarName}\\n\\s+value:\\s+".*?"`, 'g');
+        content = content.replace(envPattern, '');
+
+        await this.fileSystem.createFile(deploymentPath, content);
+    }
+
+    /**
+     * Удаляет импорт и виджет из developer_tools_page.dart.
+     */
+    async unpatchDeveloperToolsPage(workspacePath: string, serviceName: string): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const pagePath = path.join(workspacePath, `${projectName}_flutter`, 'lib', 'features', 'developer_tools', 'presentation', 'pages', 'developer_tools_page.dart');
+
+        if (!await this.fileSystem.exists(pagePath)) {
+            return;
+        }
+
+        let content = await this.fileSystem.readFile(pagePath);
+        const pascalName = this.toPascalCase(serviceName);
+
+        // 1. Удаляем импорт
+        const importPattern = new RegExp(`import\\s+'\\.\\.\\/\\.\\.\\/\\.\\.\\/${serviceName}\\/presentation\\/widgets\\/${serviceName}_health_check_card\\.dart';\\n?`, 'g');
+        content = content.replace(importPattern, '');
+
+        // 2. Удаляем виджет и SizedBox после него
+        const widgetPattern = new RegExp(`\\s+${pascalName}HealthCheckCard\\(client: client\\),\\n\\s+const SizedBox\\(height: 16\\),`, 'g');
+        content = content.replace(widgetPattern, '');
+
+        await this.fileSystem.createFile(pagePath, content);
+    }
+
     private toPascalCase(str: string): string {
         return str.charAt(0).toUpperCase() + str.slice(1);
     }

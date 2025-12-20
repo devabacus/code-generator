@@ -71,6 +71,10 @@
       {
         "command": "code-generator.setupCICD",
         "title": "Code Generator: Setup CI/CD (Terraform)"
+      },
+      {
+        "command": "code-generator.removeMicroservice",
+        "title": "Code Generator: Remove Microservice from Project"
       }
     ],
     "configuration": {
