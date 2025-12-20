@@ -75,6 +75,10 @@ export class WorkflowModifier {
             );
         }
 
+        // 5. Заменяем __SERVICE_NAME__ на реальное имя сервиса
+        const serviceName = `${projectName}-service`;
+        content = content.replace(/__SERVICE_NAME__/g, serviceName);
+
         // Сохраняем модифицированный workflow
         await this.fileSystem.createFile(workflowPath, content);
 
@@ -114,5 +118,24 @@ export class WorkflowModifier {
 
         // Записываем в корень репо
         await this.fileSystem.createFile(targetFile, content);
+    }
+
+    /**
+     * Обновляет K8s манифесты с реальным именем сервиса.
+     * Заменяет __SERVICE_NAME__ на {projectName}-service
+     */
+    async updateK8sManifests(projectPath: string, projectName: string): Promise<void> {
+        const k8sDir = path.join(projectPath, 'k8s');
+        const serviceName = `${projectName}-service`;
+        const files = ['deployment.yaml', 'service.yaml', 'configmap.yaml'];
+
+        for (const file of files) {
+            const filePath = path.join(k8sDir, file);
+            if (await this.fileSystem.exists(filePath)) {
+                let content = await this.fileSystem.readFile(filePath);
+                content = content.replace(/__SERVICE_NAME__/g, serviceName);
+                await this.fileSystem.createFile(filePath, content);
+            }
+        }
     }
 }

@@ -121,6 +121,7 @@ export async function addPythonProject(): Promise<void> {
         if (isMonorepo && workspacePath) {
             await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
+            await workflowModifier.updateK8sManifests(targetPath, projectName);
             window.showInformationMessage(`📋 Workflow moved to .github/workflows/deployment-${projectName}.yml`);
         }
 

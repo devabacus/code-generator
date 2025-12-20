@@ -4,9 +4,11 @@ import { ServiceLocator } from '../../../core/services/service_locator';
 import { getRootWorkspaceFolders } from '../../../utils/path_util';
 import { parseOpenApi } from '../parsers/openapi_parser';
 import { PythonEndpointGenerator } from '../generators/python';
+import { terminalCommands } from '../../../utils/terminal_handle';
 
 let terminal: Terminal | undefined;
 const PYTHON_SERVICE_URL = 'http://localhost:8000';
+const SERVERPOD_GENERATE = 'serverpod generate --experimental-features=all';
 
 interface MicroserviceInfo {
     name: string;
@@ -227,13 +229,9 @@ async function startPythonServer(pythonPath: string): Promise<void> {
 }
 
 async function runServerpodGenerate(serverPath: string): Promise<void> {
-    const serverpodTerminal = window.createTerminal({
-        name: 'Serverpod Generate',
-        cwd: serverPath,
-    });
-    serverpodTerminal.show();
-    serverpodTerminal.sendText(`cd "${serverPath}"`);
-    serverpodTerminal.sendText('serverpod generate');
+    window.showInformationMessage('⏳ Running serverpod generate...');
+    await terminalCommands([SERVERPOD_GENERATE], serverPath);
+    window.showInformationMessage('✅ serverpod generate completed!');
 }
 
 function sleep(ms: number): Promise<void> {
