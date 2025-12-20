@@ -2,8 +2,8 @@ import * as path from 'path';
 import { IFileSystem } from '../../../../core/interfaces/file_system';
 import { ParsedEndpoint } from '../../parsers/openapi_parser';
 
-const MARKER_START = '// === generated_start:pythonMethods ===';
-const MARKER_END = '// === generated_end:pythonMethods ===';
+const MARKER_START = '// === generated_start:methods ===';
+const MARKER_END = '// === generated_end:methods ===';
 
 /**
  * Converts camelCase to PascalCase
@@ -20,8 +20,9 @@ function toSnakeCase(str: string): string {
 }
 
 /**
- * Generates Python endpoint methods for Serverpod from OpenAPI spec.
- * Supports multiple microservices with custom naming.
+ * Generates microservice endpoint methods for Serverpod from OpenAPI spec.
+ * Creates endpoints that extend MicroserviceEndpoint base class.
+ * Supports Python, Node, Go and other services.
  */
 export class PythonEndpointGenerator {
   constructor(private fileSystem: IFileSystem) { }
@@ -55,7 +56,7 @@ export class PythonEndpointGenerator {
     }
 
     // Generate methods block
-    const methodsBlock = this.buildMethodsBlock(endpoints, serviceName);
+    const methodsBlock = this.buildMethodsBlock(endpoints);
 
     // Replace between markers
     const updated = existing.replace(
@@ -68,20 +69,26 @@ export class PythonEndpointGenerator {
 
   /**
    * Создаёт начальный {serviceName}_endpoint.dart с маркерами для генерации.
+   * Использует MicroserviceEndpoint как базовый класс.
    */
   private async createInitialFile(filePath: string, serviceName: string): Promise<void> {
     const className = `${toPascalCase(serviceName)}Endpoint`;
-    const serviceUrlVar = `_${serviceName}ServiceUrl`;
-    const envVarName = `${serviceName.toUpperCase()}_SERVICE_URL`;
+    const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
 
-    const content = `import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:serverpod/serverpod.dart';
+    const content = `import 'package:serverpod/serverpod.dart';
+import 'shared/microservice_endpoint.dart';
 
-class ${className} extends Endpoint {
-  // URL сервиса (из ConfigMap в K8s или localhost для dev)
-  static const String ${serviceUrlVar} = 
-      String.fromEnvironment('${envVarName}', defaultValue: 'http://localhost:8000');
+/// Endpoint для ${serviceName} микросервиса.
+/// Автоматически сгенерирован. Методы между маркерами перезаписываются.
+class ${className} extends MicroserviceEndpoint {
+  @override
+  String get serviceUrl => const String.fromEnvironment(
+    '${envVarName}',
+    defaultValue: 'http://localhost:8000',
+  );
+
+  @override
+  String get serviceName => '${serviceName}';
 
   ${MARKER_START}
   // Auto-generated from OpenAPI spec
@@ -96,8 +103,7 @@ class ${className} extends Endpoint {
     await this.fileSystem.createFile(filePath, content);
   }
 
-  private buildMethodsBlock(endpoints: ParsedEndpoint[], serviceName: string): string {
-    const serviceUrlVar = `_${serviceName}ServiceUrl`;
+  private buildMethodsBlock(endpoints: ParsedEndpoint[]): string {
     const lines: string[] = [
       `  ${MARKER_START}`,
       '  // Auto-generated from OpenAPI spec',
@@ -106,7 +112,7 @@ class ${className} extends Endpoint {
     ];
 
     for (const ep of endpoints) {
-      lines.push(this.buildMethod(ep, serviceName, serviceUrlVar));
+      lines.push(this.buildMethod(ep));
       lines.push('');
     }
 
@@ -114,66 +120,53 @@ class ${className} extends Endpoint {
     return lines.join('\n');
   }
 
-  private buildMethod(ep: ParsedEndpoint, serviceName: string, serviceUrlVar: string): string {
+  private buildMethod(ep: ParsedEndpoint): string {
     // Parameters: always Session first, then request fields
     const params = ['Session session'];
+    const bodyParams: string[] = [];
+
     for (const f of ep.requestFields) {
       const nullMark = f.nullable ? '?' : '';
       params.push(`${f.type}${nullMark} ${f.name}`);
+
+      // Build body map entries
+      if (f.nullable) {
+        bodyParams.push(`      if (${f.name} != null) '${f.originalName}': ${f.name}`);
+      } else {
+        bodyParams.push(`      '${f.originalName}': ${f.name}`);
+      }
     }
 
-    // Body JSON fields
-    const bodyFields = ep.requestFields.map(f => {
-      if (f.nullable) {
-        return `          if (${f.name} != null) '${f.originalName}': ${f.name},`;
-      }
-      return `          '${f.originalName}': ${f.name},`;
-    });
-
-    const bodyCode = bodyFields.length > 0
-      ? `body: jsonEncode({\n${bodyFields.join('\n')}\n            }),`
-      : '';
-
-    const desc = ep.description || `Call ${serviceName} ${ep.name} endpoint`;
+    const desc = ep.description || `Call ${ep.name} endpoint`;
     const httpMethod = ep.method.toLowerCase();
 
+    // Simple one-liner for methods with base class
     if (httpMethod === 'get') {
       return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) async {
-    try {
-      final response = await http
-          .get(Uri.parse('\$${serviceUrlVar}${ep.path}'))
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      throw Exception('${serviceName} error: \${response.statusCode}');
-    } catch (e) {
-      session.log('${serviceName} ${ep.name}: \$e', level: LogLevel.error);
-      rethrow;
+  Future<String> ${ep.name}(${params.join(', ')}) =>
+      callGet(session, '${ep.path}');`;
     }
-  }`;
+
+    if (httpMethod === 'delete') {
+      return `  /// ${desc}
+  Future<String> ${ep.name}(${params.join(', ')}) =>
+      callDelete(session, '${ep.path}');`;
+    }
+
+    // POST/PUT with body
+    const methodCall = httpMethod === 'put' ? 'callPut' : 'callPost';
+
+    if (bodyParams.length === 0) {
+      return `  /// ${desc}
+  Future<String> ${ep.name}(${params.join(', ')}) =>
+      ${methodCall}(session, '${ep.path}');`;
     }
 
     return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('\$${serviceUrlVar}${ep.path}'),
-            headers: {'Content-Type': 'application/json'},
-            ${bodyCode}
-          )
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) {
-        return response.body;
-      }
-      throw Exception('${serviceName} error: \${response.statusCode}');
-    } catch (e) {
-      session.log('${serviceName} ${ep.name}: \$e', level: LogLevel.error);
-      rethrow;
-    }
-  }`;
+  Future<String> ${ep.name}(${params.join(', ')}) =>
+      ${methodCall}(session, '${ep.path}', {
+${bodyParams.join(',\n')},
+      });`;
   }
 
   private escapeRegex(str: string): string {
