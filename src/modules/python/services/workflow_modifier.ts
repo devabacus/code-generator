@@ -311,18 +311,20 @@ export class WorkflowModifier {
             content = content.replace(lastImport, `${lastImport}\n${importLine}`);
         }
 
-        // 2. Добавляем widget после последнего HealthCheckCard
+        // 2. Добавляем widget в начало списка (после описания секции)
         const widgetLine = `\n            ${pascalName}HealthCheckCard(client: client),\n            const SizedBox(height: 16),`;
-        const widgetPattern = /(\w+HealthCheckCard\(client: client\),)/g;
-        const widgetMatches = [...content.matchAll(widgetPattern)];
+        const anchor = '// Microservice Health Check Cards';
 
-        if (widgetMatches.length > 0) {
-            const lastMatch = widgetMatches[widgetMatches.length - 1];
-            const lastWidget = lastMatch[0];
-            const lastIndex = lastMatch.index! + lastWidget.length;
-
-            // Вставляем после последнего виджета
-            content = content.slice(0, lastIndex) + widgetLine + content.slice(lastIndex);
+        if (content.includes(anchor)) {
+            content = content.replace(anchor, `${anchor}${widgetLine}`);
+        } else {
+            // Фолбэк если комментария нет - ищем по описанию секции
+            const fallbackPattern = /'Test connectivity and performance of backend microservices\.',\s+style: TextStyle\(color: Colors\.grey\),\s+\),\s+const SizedBox\(height: 16\),/g;
+            const match = fallbackPattern.exec(content);
+            if (match) {
+                const insertIndex = match.index + match[0].length;
+                content = content.slice(0, insertIndex) + widgetLine + content.slice(insertIndex);
+            }
         }
 
         await this.fileSystem.createFile(pagePath, content);

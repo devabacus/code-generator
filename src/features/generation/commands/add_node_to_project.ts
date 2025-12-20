@@ -39,17 +39,19 @@ export async function addNodeToProject(): Promise<void> {
     }
 
     try {
+        const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
         const config = new GenerationConfig({
             templProject: TEMPL_PROJECT,
             workspacesPath: workspacePath,
             manifest: ['nodeStart'],
+            templatesPath: templatesPath
         });
 
         const generationService = new GenerationService(fileSystem);
         await generationService.generate(config);
 
         // Copy CI workflow to .github/workflows/
-        await copyCIWorkflow(fileSystem, config.projectsPath, projectName, workspacePath);
+        await copyCIWorkflow(fileSystem, config.templatesPath, projectName, workspacePath);
 
         // Run serverpod generate to create client code for node_endpoint
         await executeCommand(SERVERPOD_GENERATE, serverPath);
@@ -68,12 +70,12 @@ export async function addNodeToProject(): Promise<void> {
  */
 async function copyCIWorkflow(
     fileSystem: any,
-    projectsPath: string,
+    templatesPath: string,
     projectName: string,
     workspacePath: string
 ): Promise<void> {
     const ciSourcePath = path.join(
-        projectsPath, TEMPL_PROJECT, '.github', 'workflows', 'deployment-node.yml'
+        templatesPath, 'flutter', TEMPL_PROJECT, '.github', 'workflows', 'deployment-node.yml'
     );
     const ciDestPath = path.join(
         workspacePath, '.github', 'workflows', 'deployment-node.yml'

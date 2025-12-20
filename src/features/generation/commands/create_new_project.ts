@@ -21,10 +21,13 @@ export async function createNewProject(): Promise<void> {
         return;
     }
 
+    const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
+
     const config = new GenerationConfig({
         templProject: 't115',
         targetProject: targetProject,
-        manifest: ['startProject']
+        manifest: ['startProject'],
+        templatesPath: templatesPath
     });
 
     // Create serverpod app

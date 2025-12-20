@@ -16,6 +16,7 @@ export async function createDataFilesByReplacement() {
 
     const workspacePath = getRootWorkspaceFolders();
 
+    const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
     const config = new GenerationConfig({
         templProject: 't115',
         workspacesPath: workspacePath,
@@ -24,7 +25,8 @@ export async function createDataFilesByReplacement() {
         targetEntity: model.tableName,
         targetEntity1: model.entity1,
         targetEntity2: model.entity2,
-        manifest: features
+        manifest: features,
+        templatesPath: templatesPath
     });
 
     const featurePath = await pickPath("Select feature", config.featuresPath);
