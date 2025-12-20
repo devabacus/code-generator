@@ -121,7 +121,7 @@ export class WorkflowModifier {
 
     /**
      * Обновляет K8s манифесты с реальным именем сервиса.
-     * Заменяет __SERVICE_NAME__ на {projectName}-service
+     * Заменяет 'python-fastapi' на {projectName}
      */
     async updateK8sManifests(projectPath: string, projectName: string): Promise<void> {
         const k8sDir = path.join(projectPath, 'k8s');
