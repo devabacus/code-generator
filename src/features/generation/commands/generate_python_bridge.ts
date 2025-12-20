@@ -225,7 +225,7 @@ async function startPythonServer(pythonPath: string): Promise<void> {
     }
     terminal.show();
     terminal.sendText(`cd "${pythonPath}"`);
-    terminal.sendText('uv run main.py');
+    terminal.sendText('uv run uvicorn app.main:app --reload');
 }
 
 async function runServerpodGenerate(serverPath: string): Promise<void> {

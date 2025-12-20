@@ -136,4 +136,44 @@ export class WorkflowModifier {
             }
         }
     }
+
+    /**
+     * Обновляет Serverpod deployment.yaml, добавляя env var для микросервиса.
+     * Добавляет: {SERVICENAME}_SERVICE_URL = http://{servicename}-service:8000
+     * @param workspacePath Корень monorepo
+     * @param serviceName Имя микросервиса (например, python1)
+     */
+    async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
+
+        if (!await this.fileSystem.exists(deploymentPath)) {
+            return; // K8s манифесты не существуют
+        }
+
+        let content = await this.fileSystem.readFile(deploymentPath);
+
+        // Формируем env var
+        const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
+        const envVarValue = `http://${serviceName}-service:8000`;
+
+        // Проверяем, не добавлен ли уже
+        if (content.includes(envVarName)) {
+            return; // Уже есть
+        }
+
+        // Ищем последнюю env переменную с _SERVICE_URL и добавляем после неё
+        const envPattern = /(- name: \w+_SERVICE_URL\n\s+value: "[^"]+"\n)/g;
+        const matches = [...content.matchAll(envPattern)];
+
+        if (matches.length > 0) {
+            const lastMatch = matches[matches.length - 1];
+            const lastEnvVar = lastMatch[0];
+            const newEnvVar = `- name: ${envVarName}\n              value: "${envVarValue}"\n`;
+
+            content = content.replace(lastEnvVar, lastEnvVar + '            ' + newEnvVar);
+            await this.fileSystem.createFile(deploymentPath, content);
+        }
+    }
 }
+
