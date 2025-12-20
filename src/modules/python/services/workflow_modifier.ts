@@ -75,9 +75,8 @@ export class WorkflowModifier {
             );
         }
 
-        // 5. Заменяем __SERVICE_NAME__ на реальное имя сервиса
-        const serviceName = `${projectName}-service`;
-        content = content.replace(/__SERVICE_NAME__/g, serviceName);
+        // 5. Заменяем python-fastapi на реальное имя проекта
+        content = content.replace(/python-fastapi/g, projectName);
 
         // Сохраняем модифицированный workflow
         await this.fileSystem.createFile(workflowPath, content);
@@ -126,14 +125,13 @@ export class WorkflowModifier {
      */
     async updateK8sManifests(projectPath: string, projectName: string): Promise<void> {
         const k8sDir = path.join(projectPath, 'k8s');
-        const serviceName = `${projectName}-service`;
         const files = ['deployment.yaml', 'service.yaml', 'configmap.yaml'];
 
         for (const file of files) {
             const filePath = path.join(k8sDir, file);
             if (await this.fileSystem.exists(filePath)) {
                 let content = await this.fileSystem.readFile(filePath);
-                content = content.replace(/__SERVICE_NAME__/g, serviceName);
+                content = content.replace(/python-fastapi/g, projectName);
                 await this.fileSystem.createFile(filePath, content);
             }
         }
