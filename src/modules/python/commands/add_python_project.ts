@@ -129,7 +129,16 @@ export async function addPythonProject(): Promise<void> {
 
         // Git init для standalone проектов
         if (destination.type === 'standalone') {
-            await gitInit(targetPath, projectName);
+            // Спрашиваем про настройку CI/CD
+            const setupCICD = await window.showQuickPick(
+                [
+                    { label: '$(check) Да, настроить CI/CD сейчас', description: 'Запустит terraform для GitHub Secrets', value: true },
+                    { label: '$(x) Нет, настрою позже', description: 'Запущу apply.ps1 вручную', value: false }
+                ],
+                { placeHolder: 'Настроить GitHub Secrets для CI/CD?' }
+            );
+
+            await gitInit(targetPath, projectName, { setupCICD: setupCICD?.value ?? false });
         }
 
         // Открываем проект в IDE
