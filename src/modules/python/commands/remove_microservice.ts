@@ -93,8 +93,17 @@ export async function removeMicroservice(): Promise<void> {
             // Шаг 1: Kubernetes
             progress.report({ message: 'Удаление ресурсов из Kubernetes (kubectl)...' });
             try {
-                // Пытаемся удалить все ресурсы с меткой app=serviceName
-                await executeCommand(`kubectl delete all -l app=${serviceName}`, workspacePath);
+                const projectName = path.basename(workspacePath);
+                const k8sDir = path.join(fullTargetPath, 'k8s');
+
+                // 1. Попытка удаления по манифестам (если папка еще есть)
+                if (await fileSystem.exists(k8sDir)) {
+                    await executeCommand(`kubectl delete -f k8s/ -n ${projectName}`, fullTargetPath);
+                }
+
+                // 2. Добиваем по меткам (на всякий случай и для старых версий)
+                await executeCommand(`kubectl delete all,configmap,ingress,secret -l app=${serviceName}-service -n ${projectName}`, workspacePath);
+                await executeCommand(`kubectl delete all,configmap,ingress,secret -l app=${serviceName} -n ${projectName}`, workspacePath);
             } catch (e) {
                 console.warn('Kubectl delete failed, maybe resources don\'t exist.');
             }
