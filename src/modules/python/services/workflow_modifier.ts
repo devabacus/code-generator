@@ -254,22 +254,36 @@ export class WorkflowModifier {
             return;
         }
 
-        // Копируем python_endpoint.dart → {serviceName}_endpoint.dart
+        const endpointsDir = path.join(serverPath, 'lib', 'src', 'endpoints');
+
+        // 1. Копируем shared/microservice_endpoint.dart если не существует
+        const sharedDir = path.join(endpointsDir, 'shared');
+        const sharedDestPath = path.join(sharedDir, 'microservice_endpoint.dart');
+
+        if (!await this.fileSystem.exists(sharedDestPath)) {
+            const sharedSourcePath = path.join(templatesPath, 'flutter', 't115', 't115_server', 'lib', 'src', 'endpoints', 'shared', 'microservice_endpoint.dart');
+            if (await this.fileSystem.exists(sharedSourcePath)) {
+                await this.fileSystem.createFolder(sharedDir);
+                const sharedContent = await this.fileSystem.readFile(sharedSourcePath);
+                await this.fileSystem.createFile(sharedDestPath, sharedContent);
+            }
+        }
+
+        // 2. Копируем python_endpoint.dart → {serviceName}_endpoint.dart
         const sourceEndpoint = path.join(templatesPath, 'flutter', 't115', 't115_server', 'lib', 'src', 'endpoints', 'python_endpoint.dart');
 
         if (!await this.fileSystem.exists(sourceEndpoint)) {
             return;
         }
 
-        const targetEndpointDir = path.join(serverPath, 'lib', 'src', 'endpoints');
-        const targetEndpointPath = path.join(targetEndpointDir, `${serviceName}_endpoint.dart`);
+        const targetEndpointPath = path.join(endpointsDir, `${serviceName}_endpoint.dart`);
 
         // Проверяем не существует ли уже
         if (await this.fileSystem.exists(targetEndpointPath)) {
             return;
         }
 
-        await this.fileSystem.createFolder(targetEndpointDir);
+        await this.fileSystem.createFolder(endpointsDir);
 
         // Читаем и заменяем
         let content = await this.fileSystem.readFile(sourceEndpoint);
