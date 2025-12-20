@@ -125,6 +125,7 @@ export async function addPythonProject(): Promise<void> {
             await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
             await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
             await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
+            await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);
 
             // Запускаем serverpod generate
             const projectBaseName = path.basename(workspacePath);

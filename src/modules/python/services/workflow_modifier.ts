@@ -280,6 +280,54 @@ export class WorkflowModifier {
         await this.fileSystem.createFile(targetEndpointPath, content);
     }
 
+    /**
+     * Патчит developer_tools_page.dart, добавляя import и widget для нового микросервиса.
+     * @param workspacePath Корень monorepo
+     * @param serviceName Имя микросервиса (например, python1)
+     */
+    async patchDeveloperToolsPage(workspacePath: string, serviceName: string): Promise<void> {
+        const projectName = path.basename(workspacePath);
+        const pagePath = path.join(workspacePath, `${projectName}_flutter`, 'lib', 'features', 'developer_tools', 'presentation', 'pages', 'developer_tools_page.dart');
+
+        if (!await this.fileSystem.exists(pagePath)) {
+            return;
+        }
+
+        let content = await this.fileSystem.readFile(pagePath);
+        const pascalName = this.toPascalCase(serviceName);
+
+        // Проверяем, не добавлен ли уже
+        if (content.includes(`${pascalName}HealthCheckCard`)) {
+            return;
+        }
+
+        // 1. Добавляем import после последнего health_check_card импорта
+        const importLine = `import '../../../${serviceName}/presentation/widgets/${serviceName}_health_check_card.dart';`;
+        const importPattern = /(import '\.\.\/\.\.\/\.\.\/\w+\/presentation\/widgets\/\w+_health_check_card\.dart';)/g;
+        const importMatches = [...content.matchAll(importPattern)];
+
+        if (importMatches.length > 0) {
+            const lastImport = importMatches[importMatches.length - 1][0];
+            content = content.replace(lastImport, `${lastImport}\n${importLine}`);
+        }
+
+        // 2. Добавляем widget после последнего HealthCheckCard
+        const widgetLine = `\n            ${pascalName}HealthCheckCard(client: client),\n            const SizedBox(height: 16),`;
+        const widgetPattern = /(\w+HealthCheckCard\(client: client\),)/g;
+        const widgetMatches = [...content.matchAll(widgetPattern)];
+
+        if (widgetMatches.length > 0) {
+            const lastMatch = widgetMatches[widgetMatches.length - 1];
+            const lastWidget = lastMatch[0];
+            const lastIndex = lastMatch.index! + lastWidget.length;
+
+            // Вставляем после последнего виджета
+            content = content.slice(0, lastIndex) + widgetLine + content.slice(lastIndex);
+        }
+
+        await this.fileSystem.createFile(pagePath, content);
+    }
+
     private toPascalCase(str: string): string {
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
