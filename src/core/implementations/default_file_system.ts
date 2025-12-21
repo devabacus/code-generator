@@ -43,4 +43,12 @@ export class DefaultFileSystem implements IFileSystem {
             // Игнорируем ошибки если папка не существует
         }
     }
+
+    async deleteFile(path: string): Promise<void> {
+        try {
+            await fs.unlink(path);
+        } catch {
+            // Игнорируем ошибки если файл не существует
+        }
+    }
 }

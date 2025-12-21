@@ -9,4 +9,5 @@ export interface IFileSystem {
     readDirectoryRecursive(path: string): Promise<string[]>;
     isDirectory(path: string): Promise<boolean>;
     deleteDirectory(path: string): Promise<void>;
+    deleteFile(path: string): Promise<void>;
 }

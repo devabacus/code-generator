@@ -12,6 +12,75 @@ export class WorkflowModifier {
     constructor(private readonly fileSystem: IFileSystem) { }
 
     /**
+     * Обновляет workflow и K8s манифесты для standalone проекта.
+     * Заменяет 'python-fastapi' на реальное имя проекта.
+     * НЕ добавляет monorepo-специфичные изменения (paths filter, working-directory).
+     */
+    async updateForStandalone(projectPath: string, projectName: string): Promise<void> {
+        const workflowDir = path.join(projectPath, '.github', 'workflows');
+        const workflowPath = path.join(workflowDir, 'deployment.yml');
+
+        if (await this.fileSystem.exists(workflowPath)) {
+            let content = await this.fileSystem.readFile(workflowPath);
+
+            // Заменяем python-fastapi на реальное имя проекта
+            content = content.replace(/python-fastapi/g, projectName);
+
+            // Переименовываем workflow файл
+            const newWorkflowPath = path.join(workflowDir, `deployment-${projectName}.yml`);
+            await this.fileSystem.createFile(newWorkflowPath, content);
+
+            // Удаляем старый deployment.yml
+            await this.fileSystem.deleteFile(workflowPath);
+        }
+
+        // Обновляем K8s манифесты
+        await this.updateK8sManifests(projectPath, projectName);
+
+        // Обновляем .env.example
+        await this.updateEnvExample(projectPath, projectName);
+    }
+
+    /**
+     * Обновляет .env.example с реальным именем сервиса.
+     */
+    async updateEnvExample(projectPath: string, projectName: string): Promise<void> {
+        const envPath = path.join(projectPath, '.env.example');
+
+        if (await this.fileSystem.exists(envPath)) {
+            let content = await this.fileSystem.readFile(envPath);
+            content = content.replace(/python-service/g, `${projectName}-service`);
+            await this.fileSystem.createFile(envPath, content);
+        }
+    }
+
+    /**
+     * Ищет workflow файл в директории.
+     * Сначала ищет deployment-*.yml (standalone), потом deployment.yml.
+     */
+    private async findWorkflowFile(workflowDir: string): Promise<string | null> {
+        if (!await this.fileSystem.exists(workflowDir)) {
+            return null;
+        }
+
+        const files = await this.fileSystem.readDirectory(workflowDir);
+
+        // Сначала ищем deployment-*.yml (standalone проекты)
+        const renamedWorkflow = files.find(f => f.startsWith('deployment-') && f.endsWith('.yml'));
+        if (renamedWorkflow) {
+            return path.join(workflowDir, renamedWorkflow);
+        }
+
+        // Затем ищем deployment.yml (оригинальный шаблон)
+        const defaultWorkflow = path.join(workflowDir, 'deployment.yml');
+        if (await this.fileSystem.exists(defaultWorkflow)) {
+            return defaultWorkflow;
+        }
+
+        return null;
+    }
+
+    /**
      * Модифицирует workflow для использования в монорепо.
      * @param projectPath Путь к скопированному проекту (например, .../microservices/my-service)
      * @param projectName Имя проекта (например, my-service)
@@ -23,9 +92,10 @@ export class WorkflowModifier {
         relativePath: string
     ): Promise<void> {
         const workflowDir = path.join(projectPath, '.github', 'workflows');
-        const workflowPath = path.join(workflowDir, 'deployment.yml');
 
-        if (!await this.fileSystem.exists(workflowPath)) {
+        // Ищем workflow файл: сначала deployment-*.yml (standalone), потом deployment.yml
+        let workflowPath = await this.findWorkflowFile(workflowDir);
+        if (!workflowPath) {
             return; // Нет workflow файла
         }
 
@@ -102,12 +172,13 @@ export class WorkflowModifier {
         const repoWorkflowDir = path.join(repoRootPath, '.github', 'workflows');
         const workflowFileName = `deployment-${projectName}.yml`;
 
-        const sourceFile = path.join(projectWorkflowDir, 'deployment.yml');
-        const targetFile = path.join(repoWorkflowDir, workflowFileName);
-
-        if (!await this.fileSystem.exists(sourceFile)) {
+        // Ищем workflow файл (может быть deployment.yml или deployment-*.yml)
+        const sourceFile = await this.findWorkflowFile(projectWorkflowDir);
+        if (!sourceFile) {
             return;
         }
+
+        const targetFile = path.join(repoWorkflowDir, workflowFileName);
 
         // Создаём папку если не существует
         await this.fileSystem.createFolder(repoWorkflowDir);

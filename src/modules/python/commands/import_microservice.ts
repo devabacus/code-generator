@@ -3,13 +3,18 @@ import path from 'path';
 import { ServiceLocator } from '../../../core/services/service_locator';
 import { getRootWorkspaceFolders } from '../../../utils/path_util';
 import { WorkflowModifier } from '../services/workflow_modifier';
+import { getTemplatesPath } from '../ui/project_picker';
+import { executeCommand } from '../../../utils';
 
 /**
  * Команда импорта существующего микросервиса в монорепо.
- * 1. Выбирает папку с существующим сервисом
+ * 1. Выбирает папку с существующим сервисом (по умолчанию G:\Projects\Python)
  * 2. Копирует в microservices/ (без .git)
  * 3. Модифицирует workflow для монорепо
- * 4. Перемещает workflow в корень репо
+ * 4. Создаёт Serverpod endpoint и Flutter виджет
+ * 5. Добавляет env var в deployment.yaml
+ * 6. Патчит developer_tools_page.dart
+ * 7. Запускает serverpod generate
  */
 export async function importMicroservice(): Promise<void> {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
@@ -22,11 +27,22 @@ export async function importMicroservice(): Promise<void> {
         return;
     }
 
+    // Получаем путь к шаблонам
+    const templatesPath = getTemplatesPath();
+    if (!templatesPath) {
+        window.showErrorMessage('Templates path not configured. Set codeGenerator.templatesPath in settings.');
+        return;
+    }
+
+    // Дефолтный путь для Python проектов
+    const defaultPythonProjectsPath = 'G:\\Projects\\Python';
+
     // Выбираем папку с существующим сервисом
     const sourceFolder = await window.showOpenDialog({
         canSelectFolders: true,
         canSelectFiles: false,
         canSelectMany: false,
+        defaultUri: Uri.file(defaultPythonProjectsPath),
         openLabel: 'Выбрать сервис для импорта',
         title: 'Выберите папку с существующим микросервисом'
     });
@@ -36,24 +52,13 @@ export async function importMicroservice(): Promise<void> {
     }
 
     const sourcePath = sourceFolder[0].fsPath;
-    const serviceName = path.basename(sourcePath);
+    const projectName = path.basename(sourcePath).toLowerCase().replace(/_/g, '-');
 
-    // Подтверждаем имя или запрашиваем новое
-    const projectName = await window.showInputBox({
-        prompt: 'Имя сервиса в microservices/',
-        value: serviceName.toLowerCase().replace(/_/g, '-'),
-        validateInput: (value) => {
-            if (!value || value.trim().length === 0) {
-                return 'Name cannot be empty';
-            }
-            if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(value)) {
-                return 'Name must be lowercase, use only letters, numbers and hyphens';
-            }
-            return null;
-        }
-    });
-
-    if (!projectName) {
+    // Валидация имени
+    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(projectName)) {
+        window.showErrorMessage(
+            `Invalid project name "${projectName}". Name must be lowercase, use only letters, numbers and hyphens.`
+        );
         return;
     }
 
@@ -72,37 +77,61 @@ export async function importMicroservice(): Promise<void> {
     }
 
     try {
-        window.showInformationMessage(`📦 Importing ${serviceName} to microservices/${projectName}...`);
+        await window.withProgress({
+            location: 15, // Notification
+            title: `Импорт микросервиса ${projectName}`,
+            cancellable: false
+        }, async (progress) => {
 
-        // Копируем папку (без .git, node_modules и т.д.)
-        await copyDirectoryWithExclusions(fileSystem, sourcePath, targetPath, [
-            '.git',
-            'node_modules',
-            '__pycache__',
-            '.venv',
-            '.pytest_cache',
-            '.ruff_cache',
-            '.terraform',
-            'terraform.tfstate',
-            'terraform.tfstate.backup',
-            '.terraform.lock.hcl'
-        ]);
+            // Шаг 1: Копирование
+            progress.report({ message: 'Копирование файлов...' });
+            await copyDirectoryWithExclusions(fileSystem, sourcePath, targetPath, [
+                '.git',
+                'node_modules',
+                '__pycache__',
+                '.venv',
+                '.pytest_cache',
+                '.ruff_cache',
+                '.terraform',
+                'terraform.tfstate',
+                'terraform.tfstate.backup',
+                '.terraform.lock.hcl'
+            ]);
 
-        // Модифицируем workflow для монорепо
-        await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+            // Шаг 2: Модификация workflow
+            progress.report({ message: 'Настройка CI/CD workflow...' });
+            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+            await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
 
-        // Перемещаем workflow в корень репо
-        await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
+            // Удаляем .github из импортированного сервиса (теперь он в корне)
+            const importedGithubDir = path.join(targetPath, '.github');
+            if (await fileSystem.exists(importedGithubDir)) {
+                await fileSystem.deleteDirectory(importedGithubDir);
+            }
 
-        // Удаляем .github из импортированного сервиса (теперь он в корне)
-        const importedGithubDir = path.join(targetPath, '.github');
-        if (await fileSystem.exists(importedGithubDir)) {
-            await deleteDirectory(fileSystem, importedGithubDir);
-        }
+            // Шаг 3: Обновление K8s манифестов
+            progress.report({ message: 'Обновление K8s манифестов...' });
+            await workflowModifier.updateK8sManifests(targetPath, projectName);
+
+            // Шаг 4: Serverpod интеграция
+            progress.report({ message: 'Создание Serverpod endpoint...' });
+            await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
+            await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
+            await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
+            await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);
+
+            // Шаг 5: Serverpod generate
+            progress.report({ message: 'Запуск serverpod generate...' });
+            const projectBaseName = path.basename(workspacePath);
+            const serverPath = path.join(workspacePath, `${projectBaseName}_server`);
+            await executeCommand('serverpod generate --experimental-features=all', serverPath);
+        });
 
         window.showInformationMessage(
             `✅ Microservice "${projectName}" imported successfully!\n` +
-            `📋 Workflow: .github/workflows/deployment-${projectName}.yml`
+            `📋 Workflow: .github/workflows/deployment-${projectName}.yml\n` +
+            `🔌 Endpoint: ${projectName}_endpoint.dart\n` +
+            `💚 Widget: ${projectName}_health_check_card.dart`
         );
 
     } catch (error) {
@@ -136,27 +165,6 @@ async function copyDirectoryWithExclusions(
         } else {
             const content = await fileSystem.readFile(sourcePath);
             await fileSystem.createFile(destPath, content);
-        }
-    }
-}
-
-/**
- * Удаляет директорию рекурсивно
- */
-async function deleteDirectory(fileSystem: any, dirPath: string): Promise<void> {
-    if (!await fileSystem.exists(dirPath)) {
-        return;
-    }
-
-    const entries = await fileSystem.readDirectory(dirPath);
-
-    for (const entry of entries) {
-        const entryPath = path.join(dirPath, entry);
-        if (await fileSystem.isDirectory(entryPath)) {
-            await deleteDirectory(fileSystem, entryPath);
-        } else {
-            // Примечание: нужен метод deleteFile в IFileSystem
-            // Пока пропускаем удаление файлов
         }
     }
 }
