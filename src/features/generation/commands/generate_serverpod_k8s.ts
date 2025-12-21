@@ -66,7 +66,6 @@ export async function generateServerpodK8s(workspacePathOverride?: string): Prom
             new TerraformTfvarsExampleGenerator(fileSystem),
             new TerraformApplyScriptGenerator(fileSystem),
             // Flutter generators
-            new EnvGenerator(fileSystem),
         ];
 
         for (const generator of generators) {

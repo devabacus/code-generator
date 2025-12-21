@@ -144,10 +144,9 @@ function parseOperation(
     op: OpenApiOperation,
     spec: OpenApiSpec
 ): ParsedEndpoint | null {
-    // Method name from operationId or path
-    const name = op.operationId
-        ? cleanOperationId(op.operationId)
-        : pathToMethodName(path);
+    // Always use path for method name - it's more reliable than operationId
+    // operationId depends on Python function name which may not match the path
+    const name = pathToMethodName(path);
 
     // Request fields
     const requestFields: ParsedField[] = [];
@@ -246,24 +245,42 @@ function schemaToType(schema: OpenApiSchemaRef, spec: OpenApiSpec): string {
 }
 
 function cleanOperationId(opId: string): string {
+    // FastAPI operationId format: "{function_name}_{path_segments}_{method}"
     // e.g. "process_text_api_v1_process_text_post" → "processText"
-    // e.g. "calculate_square_square_api_v1_square_get" → "calculateSquare"
-    // e.g. "analyze_image_analyze_api_v1_analyze_image_post" → "analyzeImage"
+    // e.g. "process_text_text1_api_v1_process_text1_post" → "processText1"
+
     const parts = opId.split('_');
-    // Remove api/v1/post/get etc
+
+    // Find where "api" starts - everything before is the function name
+    const apiIndex = parts.findIndex(p => p === 'api');
+
+    if (apiIndex > 0) {
+        // Take function name part (before "api")
+        const funcParts = parts.slice(0, apiIndex);
+        // Remove consecutive duplicates only (not all duplicates)
+        const cleaned: string[] = [];
+        for (const part of funcParts) {
+            if (cleaned.length === 0 || cleaned[cleaned.length - 1] !== part) {
+                cleaned.push(part);
+            }
+        }
+        return snakeToCamel(cleaned.join('_'));
+    }
+
+    // Fallback: remove method and technical parts
     const meaningful = parts.filter(p =>
         !['api', 'v1', 'v2', 'post', 'get', 'put', 'delete'].includes(p)
     );
-    // Remove ALL duplicates (keep first occurrence only)
-    const seen = new Set<string>();
+
+    // Remove consecutive duplicates
     const unique: string[] = [];
     for (const part of meaningful) {
-        if (!seen.has(part)) {
-            seen.add(part);
+        if (unique.length === 0 || unique[unique.length - 1] !== part) {
             unique.push(part);
         }
     }
-    // Take first 2-3 meaningful words
+
+    // Take first 3 meaningful words
     const name = unique.slice(0, 3).join('_');
     return snakeToCamel(name);
 }

@@ -1,0 +1,55 @@
+/**
+ * Интерфейс для языка микросервиса.
+ * Определяет специфику работы с Python, Node.js, Go и другими языками.
+ */
+export interface MicroserviceLanguage {
+    /** Идентификатор языка: 'python', 'node', 'go' */
+    readonly name: string;
+
+    /** Отображаемое имя: 'Python', 'Node.js', 'Go' */
+    readonly displayName: string;
+
+    /** Папка в templates/: 'python', 'node', 'go' */
+    readonly templateCategory: string;
+
+    /** Плейсхолдер шаблона для замены: 'python-fastapi',  */
+    readonly templatePlaceholder: string;
+
+    /** Порт по умолчанию: 8000, 3000, 8080 */
+    readonly defaultPort: number;
+
+    /**
+     * Инициализация проекта после копирования шаблона.
+     * Например: uv sync, npm install, go mod tidy
+     */
+    initialize(projectPath: string): Promise<void>;
+
+    /**
+     * Директории/файлы для исключения при копировании.
+     * Например: ['__pycache__', '.venv'] или ['node_modules']
+     */
+    getExclusions(): string[];
+
+    /**
+     * URL для OpenAPI спецификации.
+     * Например: http://localhost:8000/openapi.json
+     */
+    getOpenApiUrl(port?: number): string;
+}
+
+/**
+ * Метаданные шаблона, создаётся при добавлении микросервиса.
+ */
+export interface TemplateMetadata {
+    /** Язык микросервиса */
+    language: string;
+    /** Имя исходного шаблона */
+    templateName: string;
+    /** Дата создания */
+    createdAt: string;
+}
+
+/**
+ * Тип языка микросервиса.
+ */
+export type LanguageType = 'python' | 'node' | 'go';
