@@ -64,7 +64,7 @@ export class MicroserviceService {
         }
 
         // 5. Инициализация специфичная для языка
-        await this.language.initialize(targetPath);
+        await this.language.initialize(targetPath, templateName, projectName);
     }
 
     /**
@@ -89,7 +89,7 @@ export class MicroserviceService {
         await this.workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
 
         // 3. Инициализация
-        await this.language.initialize(targetPath);
+        await this.language.initialize(targetPath, projectName, projectName);
     }
 
     /**

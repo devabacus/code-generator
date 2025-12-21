@@ -21,8 +21,11 @@ export interface MicroserviceLanguage {
     /**
      * Инициализация проекта после копирования шаблона.
      * Например: uv sync, npm install, go mod tidy
+     * @param projectPath Путь к проекту
+     * @param templateName Имя шаблона (опционально, для замены в go.mod и т.д.)
+     * @param projectName Имя проекта (опционально)
      */
-    initialize(projectPath: string): Promise<void>;
+    initialize(projectPath: string, templateName?: string, projectName?: string): Promise<void>;
 
     /**
      * Директории/файлы для исключения при копировании.

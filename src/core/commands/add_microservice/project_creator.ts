@@ -55,5 +55,5 @@ export async function createProject(options: CreateProjectOptions): Promise<void
     }
 
     // Инициализируем проект (uv sync / npm install / go mod tidy)
-    await language.initialize(targetPath);
+    await language.initialize(targetPath, template.name, projectName);
 }

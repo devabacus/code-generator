@@ -1,5 +1,7 @@
 import { MicroserviceLanguage } from '../../core/interfaces/microservice_language';
-import { executeCommand } from '../../utils/terminal_handle';
+import { GoInitializer } from './services/go_initializer';
+
+const goInitializer = new GoInitializer();
 
 /**
  * Реализация MicroserviceLanguage для Go.
@@ -11,12 +13,8 @@ export const goLanguage: MicroserviceLanguage = {
     templatePlaceholder: 'go-fiber',
     defaultPort: 8080,
 
-    async initialize(projectPath: string): Promise<void> {
-        try {
-            await executeCommand('go mod tidy', projectPath);
-        } catch {
-            // Игнорируем если нет go.mod
-        }
+    async initialize(projectPath: string, templateName?: string, projectName?: string): Promise<void> {
+        await goInitializer.initialize(projectPath, templateName, projectName);
     },
 
     getExclusions(): string[] {
