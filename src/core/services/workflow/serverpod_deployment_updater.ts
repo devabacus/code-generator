@@ -6,11 +6,13 @@ import { WorkflowDependencies } from './types';
 
 /**
  * Обновляет Serverpod deployment.yaml, добавляя env var для микросервиса.
+ * @param port Порт сервиса (по умолчанию 8000)
  */
 export async function updateServerpodDeploymentEnv(
     deps: WorkflowDependencies,
     workspacePath: string,
-    serviceName: string
+    serviceName: string,
+    port: number = 8000
 ): Promise<void> {
     const projectName = path.basename(workspacePath);
     const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
@@ -22,7 +24,7 @@ export async function updateServerpodDeploymentEnv(
     let content = await deps.fileSystem.readFile(deploymentPath);
 
     const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
-    const envVarValue = `http://${serviceName}-service:8000`;
+    const envVarValue = `http://${serviceName}-service:${port}`;
 
     if (content.includes(envVarName)) {
         return;

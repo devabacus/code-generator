@@ -39,7 +39,7 @@ export async function createProject(options: CreateProjectOptions): Promise<void
         await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, template.name);
         await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
         await workflowModifier.updateK8sManifests(targetPath, projectName, template.name);
-        await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
+        await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName, language.defaultPort);
         await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
         await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
         await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);

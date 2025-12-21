@@ -267,11 +267,12 @@ export class WorkflowModifier {
 
     /**
      * Обновляет Serverpod deployment.yaml, добавляя env var для микросервиса.
-     * Добавляет: {SERVICENAME}_SERVICE_URL = http://{servicename}-service:8000
+     * Добавляет: {SERVICENAME}_SERVICE_URL = http://{servicename}-service:{port}
      * @param workspacePath Корень monorepo
      * @param serviceName Имя микросервиса (например, python1)
+     * @param port Порт сервиса (по умолчанию 8000)
      */
-    async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string): Promise<void> {
+    async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string, port: number = 8000): Promise<void> {
         const projectName = path.basename(workspacePath);
         const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
 
@@ -283,7 +284,7 @@ export class WorkflowModifier {
 
         // Формируем env var
         const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
-        const envVarValue = `http://${serviceName}-service:8000`;
+        const envVarValue = `http://${serviceName}-service:${port}`;
 
         // Проверяем, не добавлен ли уже
         if (content.includes(envVarName)) {

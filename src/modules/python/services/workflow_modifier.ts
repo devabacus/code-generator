@@ -36,8 +36,8 @@ export class WorkflowModifier {
         return workflow.updateK8sManifests(this.deps, projectPath, projectName, templateName);
     }
 
-    async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string): Promise<void> {
-        return workflow.updateServerpodDeploymentEnv(this.deps, workspacePath, serviceName);
+    async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string, port: number = 8000): Promise<void> {
+        return workflow.updateServerpodDeploymentEnv(this.deps, workspacePath, serviceName, port);
     }
 
     async copyFlutterHealthCheckWidget(workspacePath: string, serviceName: string, templatesPath: string): Promise<void> {
