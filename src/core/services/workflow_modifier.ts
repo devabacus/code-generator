@@ -292,10 +292,15 @@ export class WorkflowModifier {
         let insertIndex = -1;
         const indent = '            ';
 
-        // Сначала ищем последнюю _SERVICE_URL
+        // Сначала ищем последнюю _SERVICE_URL (value на следующей строке)
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].includes('_SERVICE_URL')) {
-                insertIndex = i + 1; // после строки с value
+                // Если это строка с name:, нужно пропустить и следующую строку с value:
+                if (lines[i].includes('- name:')) {
+                    insertIndex = i + 2; // после строки с name и value
+                } else {
+                    insertIndex = i + 1;
+                }
             }
         }
 
