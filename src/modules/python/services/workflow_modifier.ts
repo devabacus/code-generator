@@ -55,6 +55,59 @@ export class WorkflowModifier {
     }
 
     /**
+     * Убирает monorepo-специфичные модификации из workflow.
+     * Используется при экспорте микросервиса из монорепо в standalone.
+     */
+    async revertToStandalone(projectPath: string, projectName: string): Promise<void> {
+        const workflowDir = path.join(projectPath, '.github', 'workflows');
+        const workflowPath = await this.findWorkflowFile(workflowDir);
+
+        if (!workflowPath) {
+            return;
+        }
+
+        let content = await this.fileSystem.readFile(workflowPath);
+
+        // 1. Убираем paths filter
+        content = content.replace(
+            /on:\s*\n\s+push:\s*\n\s+branches:\s*\[([^\]]+)\]\s*\n\s+paths:\s*\n\s+- '[^']+'\s*\n\s+- '[^']+'/,
+            `on:\n  push:\n    branches: [$1]`
+        );
+
+        // 2. Убираем working-directory
+        content = content.replace(
+            /\n\s+defaults:\s*\n\s+run:\s*\n\s+working-directory:\s*[^\n]+/g,
+            ''
+        );
+
+        // 3. Заменяем пути context и file обратно на локальные
+        content = content.replace(
+            /context:\s*\.\/microservices\/[^\/\n]+/g,
+            'context: .'
+        );
+        content = content.replace(
+            /file:\s*\.\/microservices\/[^\/\n]+\/Dockerfile\.prod/g,
+            'file: ./Dockerfile.prod'
+        );
+
+        // 4. Заменяем пути к k8s манифестам
+        content = content.replace(
+            /microservices\/[^\/\n]+\/k8s\/configmap\.yaml/g,
+            'k8s/configmap.yaml'
+        );
+        content = content.replace(
+            /microservices\/[^\/\n]+\/k8s\/service\.yaml/g,
+            'k8s/service.yaml'
+        );
+        content = content.replace(
+            /microservices\/[^\/\n]+\/k8s\/deployment\.yaml/g,
+            'k8s/deployment.yaml'
+        );
+
+        await this.fileSystem.createFile(workflowPath, content);
+    }
+
+    /**
      * Ищет workflow файл в директории.
      * Сначала ищет deployment-*.yml (standalone), потом deployment.yml.
      */
@@ -151,11 +204,12 @@ export class WorkflowModifier {
         // Сохраняем модифицированный workflow
         await this.fileSystem.createFile(workflowPath, content);
 
-        // 5. Переименовываем файл workflow
+        // 6. Переименовываем файл workflow
         const newWorkflowPath = path.join(workflowDir, `deployment-${projectName}.yml`);
         if (workflowPath !== newWorkflowPath) {
             await this.fileSystem.createFile(newWorkflowPath, content);
-            // Удаляем старый файл (если есть метод delete, иначе оставляем)
+            // Удаляем старый файл
+            await this.fileSystem.deleteFile(workflowPath);
         }
     }
 
