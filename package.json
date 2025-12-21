@@ -45,6 +45,10 @@
         "title": "Code Generator: Add Node.js to Serverpod Project"
       },
       {
+        "command": "code-generator.addMicroservice",
+        "title": "Code Generator: Add Microservice from Template"
+      },
+      {
         "command": "code-generator.createDataFiles",
         "title": "Code Generator: Create Data Files from YAML"
       },

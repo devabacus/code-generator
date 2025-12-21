@@ -4,9 +4,17 @@
 import path from 'path';
 import { WorkflowDependencies } from './types';
 
+/** Плейсхолдеры шаблонов для разных языков (base names without -service) */
+const TEMPLATE_PLACEHOLDERS = [
+    'python-fastapi',
+    'node-fastify',
+    'go-fiber',
+    't115-node'
+];
+
 /**
  * Обновляет K8s манифесты с реальным именем сервиса.
- * Заменяет 'python-fastapi' на {projectName}
+ * Заменяет плейсхолдеры шаблонов на {projectName}
  */
 export async function updateK8sManifests(
     deps: WorkflowDependencies,
@@ -20,7 +28,9 @@ export async function updateK8sManifests(
         const filePath = path.join(k8sDir, file);
         if (await deps.fileSystem.exists(filePath)) {
             let content = await deps.fileSystem.readFile(filePath);
-            content = content.replace(/python-fastapi/g, projectName);
+            for (const placeholder of TEMPLATE_PLACEHOLDERS) {
+                content = content.replace(new RegExp(placeholder, 'g'), projectName);
+            }
             await deps.fileSystem.createFile(filePath, content);
         }
     }
@@ -39,6 +49,8 @@ export async function updateEnvExample(
     if (await deps.fileSystem.exists(envPath)) {
         let content = await deps.fileSystem.readFile(envPath);
         content = content.replace(/python-service/g, `${projectName}-service`);
+        content = content.replace(/node-service/g, `${projectName}-service`);
+        content = content.replace(/go-service/g, `${projectName}-service`);
         await deps.fileSystem.createFile(envPath, content);
     }
 }

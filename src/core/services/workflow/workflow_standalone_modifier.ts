@@ -6,9 +6,12 @@ import { WorkflowDependencies } from './types';
 import { findWorkflowFile } from './workflow_file_finder';
 import { updateK8sManifests, updateEnvExample } from './k8s_manifest_updater';
 
+/** Плейсхолдеры шаблонов для разных языков */
+const TEMPLATE_PLACEHOLDERS = ['python-fastapi', 'node-fastify', 'go-fiber', 'go-gin'];
+
 /**
  * Обновляет workflow и K8s манифесты для standalone проекта.
- * Заменяет 'python-fastapi' на реальное имя проекта.
+ * Заменяет плейсхолдеры шаблонов на реальное имя проекта.
  */
 export async function updateForStandalone(
     deps: WorkflowDependencies,
@@ -20,7 +23,9 @@ export async function updateForStandalone(
 
     if (await deps.fileSystem.exists(workflowPath)) {
         let content = await deps.fileSystem.readFile(workflowPath);
-        content = content.replace(/python-fastapi/g, projectName);
+        for (const placeholder of TEMPLATE_PLACEHOLDERS) {
+            content = content.replace(new RegExp(placeholder, 'g'), projectName);
+        }
 
         const newWorkflowPath = path.join(workflowDir, `deployment-${projectName}.yml`);
         await deps.fileSystem.createFile(newWorkflowPath, content);
