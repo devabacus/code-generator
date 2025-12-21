@@ -8,7 +8,6 @@ export const pythonLanguage: MicroserviceLanguage = {
     name: 'python',
     displayName: 'Python',
     templateCategory: 'python',
-    templatePlaceholder: 'python-fastapi',
     defaultPort: 8000,
 
     async initialize(projectPath: string): Promise<void> {

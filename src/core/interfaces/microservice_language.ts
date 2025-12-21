@@ -12,9 +12,6 @@ export interface MicroserviceLanguage {
     /** Папка в templates/: 'python', 'node', 'go' */
     readonly templateCategory: string;
 
-    /** Плейсхолдер шаблона для замены: 'python-fastapi',  */
-    readonly templatePlaceholder: string;
-
     /** Порт по умолчанию: 8000, 3000, 8080 */
     readonly defaultPort: number;
 

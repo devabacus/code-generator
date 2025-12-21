@@ -8,7 +8,6 @@ export const nodeLanguage: MicroserviceLanguage = {
     name: 'node',
     displayName: 'Node.js',
     templateCategory: 'node',
-    templatePlaceholder: 'node-fastify',
     defaultPort: 3000,
 
     async initialize(projectPath: string): Promise<void> {
