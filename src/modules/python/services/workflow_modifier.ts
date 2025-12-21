@@ -24,8 +24,8 @@ export class WorkflowModifier {
         return workflow.revertToStandalone(this.deps, projectPath, projectName);
     }
 
-    async modifyForMonorepo(projectPath: string, projectName: string, relativePath: string): Promise<void> {
-        return workflow.modifyForMonorepo(this.deps, projectPath, projectName, relativePath);
+    async modifyForMonorepo(projectPath: string, projectName: string, relativePath: string, templateName: string): Promise<void> {
+        return workflow.modifyForMonorepo(this.deps, projectPath, projectName, relativePath, templateName);
     }
 
     async moveWorkflowToRepoRoot(projectPath: string, repoRootPath: string, projectName: string): Promise<void> {

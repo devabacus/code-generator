@@ -36,7 +36,7 @@ export async function createProject(options: CreateProjectOptions): Promise<void
 
     // Модифицируем workflow для монорепо
     if (isMonorepo && workspacePath) {
-        await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+        await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, template.name);
         await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
         await workflowModifier.updateK8sManifests(targetPath, projectName, template.name);
         await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);

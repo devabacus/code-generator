@@ -119,7 +119,7 @@ export async function addPythonProject(): Promise<void> {
 
         // Модифицируем workflow для монорепо
         if (isMonorepo && workspacePath) {
-            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, selectedTemplate.name);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
             await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
             await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);

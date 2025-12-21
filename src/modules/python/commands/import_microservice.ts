@@ -100,7 +100,7 @@ export async function importMicroservice(): Promise<void> {
 
             // Шаг 2: Модификация workflow
             progress.report({ message: 'Настройка CI/CD workflow...' });
-            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, projectName);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
 
             // Удаляем .github из импортированного сервиса (теперь он в корне)

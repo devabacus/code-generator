@@ -104,7 +104,7 @@ export async function addNodeProject(): Promise<void> {
         await templateService.copyTemplate(selectedTemplate.path, targetPath);
 
         if (isMonorepo && workspacePath) {
-            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
+            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, selectedTemplate.name);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
             await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
         } else {

@@ -7,12 +7,14 @@ import { findWorkflowFile } from './workflow_file_finder';
 
 /**
  * Модифицирует workflow для использования в монорепо.
+ * @param templateName Имя шаблона (папка шаблона)
  */
 export async function modifyForMonorepo(
     deps: WorkflowDependencies,
     projectPath: string,
     projectName: string,
-    relativePath: string
+    relativePath: string,
+    templateName: string
 ): Promise<void> {
     const workflowDir = path.join(projectPath, '.github', 'workflows');
     const workflowPath = await findWorkflowFile(deps, workflowDir);
@@ -46,8 +48,8 @@ export async function modifyForMonorepo(
         );
     }
 
-    // Заменяем python-fastapi на реальное имя
-    content = content.replace(/python-fastapi/g, projectName);
+    // Заменяем имя шаблона на реальное имя проекта (SERVICE_NAME и т.д.)
+    content = content.replace(new RegExp(templateName, 'g'), projectName);
 
     await deps.fileSystem.createFile(workflowPath, content);
 

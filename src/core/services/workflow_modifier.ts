@@ -139,11 +139,13 @@ export class WorkflowModifier {
      * @param projectPath Путь к скопированному проекту (например, .../microservices/my-service)
      * @param projectName Имя проекта (например, my-service)
      * @param relativePath Относительный путь от корня репо (например, microservices/my-service)
+     * @param templateName Имя шаблона (папка шаблона)
      */
     async modifyForMonorepo(
         projectPath: string,
         projectName: string,
-        relativePath: string
+        relativePath: string,
+        templateName: string
     ): Promise<void> {
         const workflowDir = path.join(projectPath, '.github', 'workflows');
 
@@ -199,8 +201,8 @@ export class WorkflowModifier {
             );
         }
 
-        // 5. Заменяем python-fastapi на реальное имя проекта
-        content = content.replace(/python-fastapi/g, projectName);
+        // 5. Заменяем имя шаблона на реальное имя проекта (SERVICE_NAME и т.д.)
+        content = content.replace(new RegExp(templateName, 'g'), projectName);
 
         // Сохраняем модифицированный workflow
         await this.fileSystem.createFile(workflowPath, content);
