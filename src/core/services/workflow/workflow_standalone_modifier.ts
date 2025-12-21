@@ -6,26 +6,25 @@ import { WorkflowDependencies } from './types';
 import { findWorkflowFile } from './workflow_file_finder';
 import { updateK8sManifests, updateEnvExample } from './k8s_manifest_updater';
 
-/** Плейсхолдеры шаблонов для разных языков */
-const TEMPLATE_PLACEHOLDERS = ['python-fastapi', 'node-fastify', 'go-fiber', 'go-gin'];
-
 /**
  * Обновляет workflow и K8s манифесты для standalone проекта.
- * Заменяет плейсхолдеры шаблонов на реальное имя проекта.
+ * Заменяет имя шаблона на реальное имя проекта.
+ * 
+ * @param templateName - имя папки шаблона (например, 'node-fastify'), используется как плейсхолдер
  */
 export async function updateForStandalone(
     deps: WorkflowDependencies,
     projectPath: string,
-    projectName: string
+    projectName: string,
+    templateName: string
 ): Promise<void> {
     const workflowDir = path.join(projectPath, '.github', 'workflows');
     const workflowPath = path.join(workflowDir, 'deployment.yml');
 
     if (await deps.fileSystem.exists(workflowPath)) {
         let content = await deps.fileSystem.readFile(workflowPath);
-        for (const placeholder of TEMPLATE_PLACEHOLDERS) {
-            content = content.replace(new RegExp(placeholder, 'g'), projectName);
-        }
+        // Заменяем имя шаблона на имя проекта
+        content = content.replace(new RegExp(templateName, 'g'), projectName);
 
         const newWorkflowPath = path.join(workflowDir, `deployment-${projectName}.yml`);
         await deps.fileSystem.createFile(newWorkflowPath, content);

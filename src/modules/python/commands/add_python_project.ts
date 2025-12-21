@@ -142,7 +142,7 @@ export async function addPythonProject(): Promise<void> {
         // Git init и открытие в IDE для standalone проектов
         if (destination.type === 'standalone') {
             // Обновляем workflow и K8s манифесты с реальным именем проекта
-            await workflowModifier.updateForStandalone(targetPath, projectName);
+            await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);
 
             // Спрашиваем про настройку CI/CD
             const setupCICD = await window.showQuickPick(

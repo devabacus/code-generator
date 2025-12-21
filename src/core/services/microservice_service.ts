@@ -56,7 +56,7 @@ export class MicroserviceService {
 
         // 4. Модифицируем для монорепо или standalone
         if (destinationType === 'standalone') {
-            await this.workflowModifier.updateForStandalone(targetPath, projectName);
+            await this.workflowModifier.updateForStandalone(targetPath, projectName, path.basename(templatePath));
         } else if (workspacePath && relativePath) {
             await this.workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
             await this.workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);

@@ -109,7 +109,7 @@ export async function addGoProject(): Promise<void> {
             await workflowModifier.updateK8sManifests(targetPath, projectName);
         } else {
             // Standalone — обновляем workflow и K8s манифесты
-            await workflowModifier.updateForStandalone(targetPath, projectName);
+            await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);
         }
 
         await initializer.initialize(targetPath);

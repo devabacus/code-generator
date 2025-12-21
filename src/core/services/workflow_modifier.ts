@@ -13,18 +13,18 @@ export class WorkflowModifier {
 
     /**
      * Обновляет workflow и K8s манифесты для standalone проекта.
-     * Заменяет 'python-fastapi' на реальное имя проекта.
-     * НЕ добавляет monorepo-специфичные изменения (paths filter, working-directory).
+     * Заменяет имя шаблона на реальное имя проекта.
+     * @param templateName - имя папки шаблона (например, 'node-fastify')
      */
-    async updateForStandalone(projectPath: string, projectName: string): Promise<void> {
+    async updateForStandalone(projectPath: string, projectName: string, templateName: string): Promise<void> {
         const workflowDir = path.join(projectPath, '.github', 'workflows');
         const workflowPath = path.join(workflowDir, 'deployment.yml');
 
         if (await this.fileSystem.exists(workflowPath)) {
             let content = await this.fileSystem.readFile(workflowPath);
 
-            // Заменяем python-fastapi на реальное имя проекта
-            content = content.replace(/python-fastapi/g, projectName);
+            // Заменяем имя шаблона на реальное имя проекта
+            content = content.replace(new RegExp(templateName, 'g'), projectName);
 
             // Переименовываем workflow файл
             const newWorkflowPath = path.join(workflowDir, `deployment-${projectName}.yml`);

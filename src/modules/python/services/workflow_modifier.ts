@@ -12,8 +12,8 @@ export class WorkflowModifier {
         this.deps = { fileSystem };
     }
 
-    async updateForStandalone(projectPath: string, projectName: string): Promise<void> {
-        return workflow.updateForStandalone(this.deps, projectPath, projectName);
+    async updateForStandalone(projectPath: string, projectName: string, templateName: string): Promise<void> {
+        return workflow.updateForStandalone(this.deps, projectPath, projectName, templateName);
     }
 
     async updateEnvExample(projectPath: string, projectName: string): Promise<void> {

@@ -51,7 +51,7 @@ export async function createProject(options: CreateProjectOptions): Promise<void
         await executeCommand('serverpod generate --experimental-features=all', serverPath);
     } else {
         // Standalone — обновляем workflow и K8s
-        await workflowModifier.updateForStandalone(targetPath, projectName);
+        await workflowModifier.updateForStandalone(targetPath, projectName, template.name);
     }
 
     // Инициализируем проект (uv sync / npm install / go mod tidy)
