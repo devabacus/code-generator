@@ -112,7 +112,7 @@ export async function addGoProject(): Promise<void> {
             await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);
         }
 
-        await initializer.initialize(targetPath);
+        await initializer.initialize(targetPath, selectedTemplate.name, projectName);
         window.showInformationMessage(`✅ Go project "${projectName}" created successfully!`);
     } catch (error) {
         window.showErrorMessage(`Error creating Go project: ${error}`);
