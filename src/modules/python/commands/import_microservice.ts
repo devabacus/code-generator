@@ -109,11 +109,7 @@ export async function importMicroservice(): Promise<void> {
                 await fileSystem.deleteDirectory(importedGithubDir);
             }
 
-            // Шаг 3: Обновление K8s манифестов
-            progress.report({ message: 'Обновление K8s манифестов...' });
-            await workflowModifier.updateK8sManifests(targetPath, projectName);
-
-            // Шаг 4: Serverpod интеграция
+            // Шаг 3: Serverpod интеграция (K8s манифесты уже содержат правильные имена в импортируемом проекте)
             progress.report({ message: 'Создание Serverpod endpoint...' });
             await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
             await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);

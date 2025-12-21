@@ -31,8 +31,8 @@ export async function updateForStandalone(
         await deps.fileSystem.deleteFile(workflowPath);
     }
 
-    await updateK8sManifests(deps, projectPath, projectName);
-    await updateEnvExample(deps, projectPath, projectName);
+    await updateK8sManifests(deps, projectPath, projectName, templateName);
+    await updateEnvExample(deps, projectPath, projectName, templateName);
 }
 
 /**

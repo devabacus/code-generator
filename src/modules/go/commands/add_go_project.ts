@@ -106,7 +106,7 @@ export async function addGoProject(): Promise<void> {
         if (isMonorepo && workspacePath) {
             await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
-            await workflowModifier.updateK8sManifests(targetPath, projectName);
+            await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
         } else {
             // Standalone — обновляем workflow и K8s манифесты
             await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);

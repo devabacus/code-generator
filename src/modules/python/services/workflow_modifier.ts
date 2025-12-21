@@ -16,8 +16,8 @@ export class WorkflowModifier {
         return workflow.updateForStandalone(this.deps, projectPath, projectName, templateName);
     }
 
-    async updateEnvExample(projectPath: string, projectName: string): Promise<void> {
-        return workflow.updateEnvExample(this.deps, projectPath, projectName);
+    async updateEnvExample(projectPath: string, projectName: string, templateName: string): Promise<void> {
+        return workflow.updateEnvExample(this.deps, projectPath, projectName, templateName);
     }
 
     async revertToStandalone(projectPath: string, projectName: string): Promise<void> {
@@ -32,8 +32,8 @@ export class WorkflowModifier {
         return workflow.moveWorkflowToRepoRoot(this.deps, projectPath, repoRootPath, projectName);
     }
 
-    async updateK8sManifests(projectPath: string, projectName: string): Promise<void> {
-        return workflow.updateK8sManifests(this.deps, projectPath, projectName);
+    async updateK8sManifests(projectPath: string, projectName: string, templateName: string): Promise<void> {
+        return workflow.updateK8sManifests(this.deps, projectPath, projectName, templateName);
     }
 
     async updateServerpodDeploymentEnv(workspacePath: string, serviceName: string): Promise<void> {

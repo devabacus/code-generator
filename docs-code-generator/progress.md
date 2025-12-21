@@ -105,6 +105,28 @@
 
 ---
 
+### 2025-12-22 03:25 — Рефакторинг плейсхолдеров шаблонов
+**Статус**: ✅ Успех
+
+Убраны хардкоды `TEMPLATE_PLACEHOLDERS`. Теперь имя шаблона передаётся динамически:
+
+**Изменённые файлы:**
+- `workflow_standalone_modifier.ts` — принимает `templateName`
+- `k8s_manifest_updater.ts` — принимает `templateName`
+- Фасады и команды: `add_python/node/go_project.ts`, `project_creator.ts`
+- `import_microservice.ts` — убран ненужный `updateK8sManifests`
+
+**Проверено в кластере:**
+
+| Сервис | Namespace | /health |
+|--------|-----------|---------|
+| python222 | python222 | ✅ |
+| node333 | node333 | ✅ |
+| gogin222 | gogin222 | ✅ |
+| gofiber222 | gofiber222 | ✅ |
+
+---
+
 ## Формат записей
 
 ```

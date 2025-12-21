@@ -35,21 +35,22 @@ export class WorkflowModifier {
         }
 
         // Обновляем K8s манифесты
-        await this.updateK8sManifests(projectPath, projectName);
+        await this.updateK8sManifests(projectPath, projectName, templateName);
 
         // Обновляем .env.example
-        await this.updateEnvExample(projectPath, projectName);
+        await this.updateEnvExample(projectPath, projectName, templateName);
     }
 
     /**
      * Обновляет .env.example с реальным именем сервиса.
+     * @param templateName - имя папки шаблона
      */
-    async updateEnvExample(projectPath: string, projectName: string): Promise<void> {
+    async updateEnvExample(projectPath: string, projectName: string, templateName: string): Promise<void> {
         const envPath = path.join(projectPath, '.env.example');
 
         if (await this.fileSystem.exists(envPath)) {
             let content = await this.fileSystem.readFile(envPath);
-            content = content.replace(/python-service/g, `${projectName}-service`);
+            content = content.replace(new RegExp(templateName, 'g'), projectName);
             await this.fileSystem.createFile(envPath, content);
         }
     }
@@ -246,9 +247,9 @@ export class WorkflowModifier {
 
     /**
      * Обновляет K8s манифесты с реальным именем сервиса.
-     * Заменяет 'python-fastapi' на {projectName}
+     * @param templateName - имя папки шаблона
      */
-    async updateK8sManifests(projectPath: string, projectName: string): Promise<void> {
+    async updateK8sManifests(projectPath: string, projectName: string, templateName: string): Promise<void> {
         const k8sDir = path.join(projectPath, 'k8s');
         const files = ['deployment.yaml', 'service.yaml', 'configmap.yaml'];
 
@@ -256,7 +257,7 @@ export class WorkflowModifier {
             const filePath = path.join(k8sDir, file);
             if (await this.fileSystem.exists(filePath)) {
                 let content = await this.fileSystem.readFile(filePath);
-                content = content.replace(/python-fastapi/g, projectName);
+                content = content.replace(new RegExp(templateName, 'g'), projectName);
                 await this.fileSystem.createFile(filePath, content);
             }
         }

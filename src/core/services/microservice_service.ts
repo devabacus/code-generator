@@ -51,8 +51,9 @@ export class MicroserviceService {
         await this.createTemplateJson(targetPath, projectName, templatePath);
 
         // 3. Обновляем K8s манифесты (заменяем placeholder на реальное имя)
-        await this.workflowModifier.updateK8sManifests(targetPath, projectName);
-        await this.workflowModifier.updateEnvExample(targetPath, projectName);
+        const templateName = path.basename(templatePath);
+        await this.workflowModifier.updateK8sManifests(targetPath, projectName, templateName);
+        await this.workflowModifier.updateEnvExample(targetPath, projectName, templateName);
 
         // 4. Модифицируем для монорепо или standalone
         if (destinationType === 'standalone') {
