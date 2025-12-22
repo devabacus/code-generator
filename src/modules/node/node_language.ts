@@ -24,5 +24,9 @@ export const nodeLanguage: MicroserviceLanguage = {
 
     getOpenApiUrl(port?: number): string {
         return `http://localhost:${port ?? this.defaultPort}/swagger.json`;
+    },
+
+    getDevServerCommand(): string {
+        return 'npm run dev';
     }
 };

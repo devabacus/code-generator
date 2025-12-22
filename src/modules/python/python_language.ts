@@ -30,5 +30,9 @@ export const pythonLanguage: MicroserviceLanguage = {
 
     getOpenApiUrl(port?: number): string {
         return `http://localhost:${port ?? this.defaultPort}/openapi.json`;
+    },
+
+    getDevServerCommand(): string {
+        return 'uv run uvicorn app.main:app --reload';
     }
 };

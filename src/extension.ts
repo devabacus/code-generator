@@ -11,6 +11,7 @@ import { registerPythonCommands } from "./modules/python";
 import { registerNodeCommands } from "./modules/node";
 import { registerGoCommands } from "./modules/go";
 import { addMicroservice } from "./core/commands/add_microservice";
+import { generateOpenApiBridge } from "./core/commands/generate_openapi_bridge";
 
 export function activate(context: ExtensionContext) {
 	// Legacy команды (UI меню)
@@ -19,9 +20,10 @@ export function activate(context: ExtensionContext) {
 		commands.registerCommand("code-generator.vsCodeExtHandler", vsCodeExtHandler),
 	);
 
-	// Unified addMicroservice command
+	// Unified commands
 	context.subscriptions.push(
-		commands.registerCommand("code-generator.addMicroservice", addMicroservice)
+		commands.registerCommand("code-generator.addMicroservice", addMicroservice),
+		commands.registerCommand("code-generator.generateOpenApiBridge", generateOpenApiBridge)
 	);
 
 	// Модули

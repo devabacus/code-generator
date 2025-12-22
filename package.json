@@ -83,6 +83,10 @@
       {
         "command": "code-generator.removeMicroservice",
         "title": "Code Generator: Remove Microservice from Project"
+      },
+      {
+        "command": "code-generator.generateOpenApiBridge",
+        "title": "Code Generator: Generate OpenAPI Bridge (Serverpod Endpoint)"
       }
     ],
     "configuration": {

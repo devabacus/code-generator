@@ -35,6 +35,12 @@ export interface MicroserviceLanguage {
      * Например: http://localhost:8000/openapi.json
      */
     getOpenApiUrl(port?: number): string;
+
+    /**
+     * Команда для запуска dev-сервера.
+     * Например: 'uv run uvicorn app.main:app --reload'
+     */
+    getDevServerCommand(): string;
 }
 
 /**

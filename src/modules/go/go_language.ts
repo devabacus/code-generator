@@ -22,5 +22,9 @@ export const goLanguage: MicroserviceLanguage = {
 
     getOpenApiUrl(port?: number): string {
         return `http://localhost:${port ?? this.defaultPort}/swagger/doc.json`;
+    },
+
+    getDevServerCommand(): string {
+        return 'go run main.go';
     }
 };
