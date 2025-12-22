@@ -59,10 +59,16 @@ export async function revertToStandalone(
         `on:\n  push:\n    branches: [$1]`
     );
 
-    // Убираем working-directory
+    // Убираем defaults.run.working-directory
     content = content.replace(
         /\n\s+defaults:\s*\n\s+run:\s*\n\s+working-directory:\s*[^\n]+/g,
         ''
+    );
+
+    // Убираем working-directory из golangci-lint-action (Go проекты)
+    content = content.replace(
+        /\s+working-directory:\s*microservices\/[^\n]+\n/g,
+        '\n'
     );
 
     // Заменяем пути обратно на локальные

@@ -157,6 +157,24 @@
 
 ---
 
+### 2025-12-22 09:10 — Унифицированная генерация OpenAPI Bridge
+**Статус**: ✅ Успех
+
+Создана унифицированная команда генерации Serverpod endpoint из OpenAPI для всех языков.
+
+**Выполненные работы:**
+- [x] **Интерфейс `getDevServerCommand()`**: Добавлен в `MicroserviceLanguage` для запуска dev-сервера.
+- [x] **Реализация для всех языков**:
+  - Python: `uv run uvicorn app.main:app --reload`
+  - Node.js: `npm run dev`
+  - Go: `go run main.go`
+- [x] **Унифицированная команда**: `generateOpenApiBridge` автоопределяет язык, использует правильный OpenAPI URL и порт.
+- [x] **Автозапуск сервера**: Если сервер не запущен — предлагает запустить.
+
+**Команда**: `Code Generator: Generate OpenAPI Bridge (Serverpod Endpoint)`
+
+---
+
 ## Формат записей
 
 ```
