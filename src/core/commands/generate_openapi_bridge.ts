@@ -75,7 +75,7 @@ export async function generateOpenApiBridge(): Promise<void> {
 
         // Generate endpoint methods
         const endpointGen = new PythonEndpointGenerator(fileSystem);
-        await endpointGen.generate(workspacePath, parsed.endpoints, serviceName);
+        await endpointGen.generate(workspacePath, parsed.endpoints, serviceName, language.defaultPort);
 
         // Show success
         window.showInformationMessage(

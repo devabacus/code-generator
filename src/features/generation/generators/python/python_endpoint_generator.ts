@@ -37,12 +37,12 @@ export class PythonEndpointGenerator {
    * Update {serviceName}_endpoint.dart with methods from OpenAPI endpoints.
    * Creates the file if it doesn't exist.
    */
-  async generate(basePath: string, endpoints: ParsedEndpoint[], serviceName: string = 'python'): Promise<void> {
+  async generate(basePath: string, endpoints: ParsedEndpoint[], serviceName: string = 'python', defaultPort: number = 8000): Promise<void> {
     const filePath = this.getPath(basePath, serviceName);
 
     // Создаём файл если не существует
     if (!await this.fileSystem.exists(filePath)) {
-      await this.createInitialFile(filePath, serviceName);
+      await this.createInitialFile(filePath, serviceName, defaultPort);
     }
 
     const existing = await this.fileSystem.readFile(filePath);
@@ -71,7 +71,7 @@ export class PythonEndpointGenerator {
    * Создаёт начальный {serviceName}_endpoint.dart с маркерами для генерации.
    * Использует MicroserviceEndpoint как базовый класс.
    */
-  private async createInitialFile(filePath: string, serviceName: string): Promise<void> {
+  private async createInitialFile(filePath: string, serviceName: string, defaultPort: number): Promise<void> {
     const className = `${toPascalCase(serviceName)}Endpoint`;
     const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_SERVICE_URL`;
 
@@ -84,7 +84,7 @@ class ${className} extends MicroserviceEndpoint {
   @override
   String get serviceUrl => const String.fromEnvironment(
     '${envVarName}',
-    defaultValue: 'http://localhost:8000',
+    defaultValue: 'http://localhost:${defaultPort}',
   );
 
   @override
@@ -111,8 +111,32 @@ class ${className} extends MicroserviceEndpoint {
       '',
     ];
 
+    // Detect duplicate names and add HTTP method suffix
+    const nameCounts = new Map<string, number>();
     for (const ep of endpoints) {
-      lines.push(this.buildMethod(ep));
+      nameCounts.set(ep.name, (nameCounts.get(ep.name) || 0) + 1);
+    }
+
+    const usedNames = new Set<string>();
+    for (const ep of endpoints) {
+      let methodName = ep.name;
+
+      // If duplicate name, append HTTP method suffix
+      if (nameCounts.get(ep.name)! > 1) {
+        methodName = `${ep.name}${toPascalCase(ep.method.toLowerCase())}`;
+      }
+
+      // If still duplicate (shouldn't happen), add counter
+      if (usedNames.has(methodName)) {
+        let counter = 1;
+        while (usedNames.has(`${methodName}${counter}`)) {
+          counter++;
+        }
+        methodName = `${methodName}${counter}`;
+      }
+
+      usedNames.add(methodName);
+      lines.push(this.buildMethod(ep, methodName));
       lines.push('');
     }
 
@@ -120,7 +144,7 @@ class ${className} extends MicroserviceEndpoint {
     return lines.join('\n');
   }
 
-  private buildMethod(ep: ParsedEndpoint): string {
+  private buildMethod(ep: ParsedEndpoint, methodName: string): string {
     // Parameters: always Session first, then request fields
     const params = ['Session session'];
     const bodyParams: string[] = [];
@@ -143,13 +167,13 @@ class ${className} extends MicroserviceEndpoint {
     // Simple one-liner for methods with base class
     if (httpMethod === 'get') {
       return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) =>
+  Future<String> ${methodName}(${params.join(', ')}) =>
       callGet(session, '${ep.path}');`;
     }
 
     if (httpMethod === 'delete') {
       return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) =>
+  Future<String> ${methodName}(${params.join(', ')}) =>
       callDelete(session, '${ep.path}');`;
     }
 
@@ -158,12 +182,12 @@ class ${className} extends MicroserviceEndpoint {
 
     if (bodyParams.length === 0) {
       return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) =>
+  Future<String> ${methodName}(${params.join(', ')}) =>
       ${methodCall}(session, '${ep.path}');`;
     }
 
     return `  /// ${desc}
-  Future<String> ${ep.name}(${params.join(', ')}) =>
+  Future<String> ${methodName}(${params.join(', ')}) =>
       ${methodCall}(session, '${ep.path}', {
 ${bodyParams.join(',\n')},
       });`;
