@@ -92,7 +92,7 @@ export async function importMicroservice(): Promise<void> {
 
             progress.report({ message: 'Integrating with Serverpod...' });
             const templatesPath = workspace.getConfiguration('codeGenerator').get<string>('templatesPath') || 'G:\\Templates';
-            await workflow.updateServerpodDeploymentEnv(deps, workspacePath, projectName);
+            await workflow.updateServerpodDeploymentEnv(deps, workspacePath, projectName, language.defaultPort);
             await workflow.copyServerpodEndpoint(deps, workspacePath, projectName, templatesPath);
             await workflow.copyFlutterHealthCheckWidget(deps, workspacePath, projectName, templatesPath);
             await workflow.patchDeveloperToolsPage(deps, workspacePath, projectName);

@@ -25,36 +25,62 @@ export async function modifyForMonorepo(
 
     let content = await deps.fileSystem.readFile(workflowPath);
 
-    // Добавляем paths фильтр
-    const onPushRegex = /(on:\s*\n)([\t ]*)(push:\s*\n)([\t ]*)(branches:\s*\[[^\]]+\])/;
-    const onPushMatch = content.match(onPushRegex);
-    if (onPushMatch && !content.includes(`- '${relativePath}/**'`)) {
-        const indent = onPushMatch[4]; // Отступ у branches (например, 4 пробела)
-        content = content.replace(
-            onPushRegex,
-            `$1$2$3$4$5\n${indent}paths:\n${indent}  - '${relativePath}/**'\n${indent}  - '.github/workflows/deployment-${projectName}.yml'`
-        );
+    // Добавляем или обновляем paths фильтр
+    const hasPaths = content.includes('paths:');
+    if (!content.includes(`- '${relativePath}/**'`)) {
+        if (hasPaths) {
+            // Если paths уже есть, добавляем нашу строку в начало списка путей
+            const pathsRegex = /(paths:\s*\n)/;
+            content = content.replace(pathsRegex, `$1      - '${relativePath}/**'\n      - '.github/workflows/deployment-${projectName}.yml'\n`);
+        } else {
+            // Если paths нет, добавляем после branches
+            const onPushRegex = /(push:\s*\n)([\t ]*)(branches:\s*\[[^\]]+\])/;
+            const onPushMatch = content.match(onPushRegex);
+            if (onPushMatch) {
+                const indent = onPushMatch[2];
+                content = content.replace(
+                    onPushRegex,
+                    `$1$2$3\n${indent}paths:\n${indent}  - '${relativePath}/**'\n${indent}  - '.github/workflows/deployment-${projectName}.yml'`
+                );
+            }
+        }
     }
 
-    // Обновляем context и file для Docker build
-    content = content.replace(/context:\s*\.\s*\n/g, `context: ./${relativePath}\n`);
-    content = content.replace(/file:\s*\.\/Dockerfile\.prod/g, `file: ./${relativePath}/Dockerfile.prod`);
+    // Обновляем context и file для Docker build (только если они еще не в монорепо формате)
+    if (!content.includes(`context: ./${relativePath}`)) {
+        content = content.replace(/context:\s*\.\s*\n/g, `context: ./${relativePath}\n`);
+    }
+    if (!content.includes(`file: ./${relativePath}/Dockerfile.prod`)) {
+        content = content.replace(/file:\s*\.\/Dockerfile\.prod/g, `file: ./${relativePath}/Dockerfile.prod`);
+    }
 
-    // Обновляем пути к k8s манифестам
-    content = content.replace(/k8s\/configmap\.yaml/g, `${relativePath}/k8s/configmap.yaml`);
-    content = content.replace(/k8s\/service\.yaml/g, `${relativePath}/k8s/service.yaml`);
-    content = content.replace(/k8s\/deployment\.yaml/g, `${relativePath}/k8s/deployment.yaml`);
+    // Обновляем пути к k8s манифестам (только если они не начинаются с microservices/)
+    const k8sFiles = ['configmap.yaml', 'service.yaml', 'deployment.yaml'];
+    for (const file of k8sFiles) {
+        const fileRegex = new RegExp(`(?<!\\/)${file}`, 'g'); // Ищем имя файла, перед которым нет слэша
+        // Или даже более специфично - ищем именно k8s/
+        content = content.replace(new RegExp(`(?<!${relativePath}/)k8s/${file}`, 'g'), `${relativePath}/k8s/${file}`);
+    }
 
     // Добавляем working-directory в задачу test
-    const testJobRegex = /(jobs:\s*\n)([\t ]*)(test:\s*\n)([\t ]*)(runs-on:\s*ubuntu-latest)/;
-    const testMatch = content.match(testJobRegex);
+    const hasWorkingDir = content.includes(`working-directory: ${relativePath}`);
+    if (!hasWorkingDir) {
+        const testJobRegex = /(test:\s*\n)([\t ]*)(runs-on:\s*ubuntu-latest)/;
+        const testMatch = content.match(testJobRegex);
 
-    if (testMatch && !content.includes(`working-directory: ${relativePath}`)) {
-        const indent = testMatch[4]; // Отступ у runs-on
-        content = content.replace(
-            testJobRegex,
-            `$1$2$3$4$5\n${indent}defaults:\n${indent}  run:\n${indent}    working-directory: ${relativePath}`
-        );
+        if (testMatch) {
+            const indent = testMatch[2];
+            // Проверяем, нет ли уже блока defaults
+            if (!content.includes('defaults:')) {
+                content = content.replace(
+                    testJobRegex,
+                    `$1$2$3\n${indent}defaults:\n${indent}  run:\n${indent}    working-directory: ${relativePath}`
+                );
+            } else {
+                // Если defaults есть, но нет нашего working-directory (это сложнее, пока просто добавим, если получится)
+                // Но обычно в шаблонах либо есть всё, либо ничего.
+            }
+        }
     }
 
     // Добавляем working-directory в golangci-lint-action
@@ -62,20 +88,16 @@ export async function modifyForMonorepo(
     const lintMatch = content.match(lintRegex);
     if (lintMatch) {
         const lintBlock = lintMatch[0];
-        // Ищем именно внутри блока lint, есть ли там уже working-directory
-        // Для этого проверим следующие несколько строк после with:
         const afterWith = content.substring(lintMatch.index! + lintBlock.length);
         const firstLineAfterWith = afterWith.split('\n')[0];
 
         if (!lintBlock.includes('working-directory:') && !firstLineAfterWith.includes('working-directory:')) {
             const indentWithLine = lintBlock.match(/([\t ]+)with:/);
             const indentWith = indentWithLine ? indentWithLine[1] : '          ';
-
-            // Пробуем определить отступ первой строки после with:
             const indentMatch = afterWith.match(/^([\t ]+)/);
             const extraIndent = indentMatch ? indentMatch[1] : (indentWith + '  ');
-
             const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+
             content = content.replace(
                 lintRegex,
                 `$1${extraIndent}working-directory: ${relativePath}${lineEnding}`
@@ -84,7 +106,9 @@ export async function modifyForMonorepo(
     }
 
     // Заменяем имя шаблона на реальное имя проекта (SERVICE_NAME и т.д.)
-    content = content.replace(new RegExp(templateName, 'g'), projectName);
+    if (templateName !== projectName) {
+        content = content.replace(new RegExp(templateName, 'g'), projectName);
+    }
 
     await deps.fileSystem.createFile(workflowPath, content);
 
