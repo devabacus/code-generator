@@ -4,7 +4,7 @@ import { ServiceLocator } from '../services/service_locator';
 import { MicroserviceService } from '../services/microservice_service';
 import { detectLanguage } from '../services/language_detector';
 import { getLanguage } from '../language_registry';
-import { WorkflowModifier } from '../services/workflow_modifier';
+import * as workflow from '../services/workflow';
 import { getRootWorkspaceFolders } from '../../utils/path_util';
 import { workspace } from 'vscode';
 import { executeCommand } from '../../utils';
@@ -15,7 +15,7 @@ import { executeCommand } from '../../utils';
  */
 export async function importMicroservice(): Promise<void> {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
-    const workflowModifier = new WorkflowModifier(fileSystem);
+    const deps: workflow.WorkflowDependencies = { fileSystem };
 
     // Получаем путь к workspace
     const workspacePath = getRootWorkspaceFolders();
@@ -92,10 +92,10 @@ export async function importMicroservice(): Promise<void> {
 
             progress.report({ message: 'Integrating with Serverpod...' });
             const templatesPath = workspace.getConfiguration('codeGenerator').get<string>('templatesPath') || 'G:\\Templates';
-            await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
-            await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
-            await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
-            await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);
+            await workflow.updateServerpodDeploymentEnv(deps, workspacePath, projectName);
+            await workflow.copyServerpodEndpoint(deps, workspacePath, projectName, templatesPath);
+            await workflow.copyFlutterHealthCheckWidget(deps, workspacePath, projectName, templatesPath);
+            await workflow.patchDeveloperToolsPage(deps, workspacePath, projectName);
 
             // Запускаем serverpod generate
             progress.report({ message: 'Running serverpod generate...' });

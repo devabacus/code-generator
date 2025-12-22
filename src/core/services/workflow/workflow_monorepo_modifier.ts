@@ -26,10 +26,15 @@ export async function modifyForMonorepo(
     let content = await deps.fileSystem.readFile(workflowPath);
 
     // Добавляем paths фильтр
-    content = content.replace(
-        /on:\s*\n\s+push:\s*\n\s+branches:\s*\[([^\]]+)\]/,
-        `on:\n  push:\n    branches: [$1]\n    paths:\n      - '${relativePath}/**'\n      - '.github/workflows/deployment-${projectName}.yml'`
-    );
+    const onPushRegex = /(on:\s*\n)([\t ]*)(push:\s*\n)([\t ]*)(branches:\s*\[[^\]]+\])/;
+    const onPushMatch = content.match(onPushRegex);
+    if (onPushMatch && !content.includes(`- '${relativePath}/**'`)) {
+        const indent = onPushMatch[4]; // Отступ у branches (например, 4 пробела)
+        content = content.replace(
+            onPushRegex,
+            `$1$2$3$4$5\n${indent}paths:\n${indent}  - '${relativePath}/**'\n${indent}  - '.github/workflows/deployment-${projectName}.yml'`
+        );
+    }
 
     // Обновляем context и file для Docker build
     content = content.replace(/context:\s*\.\s*\n/g, `context: ./${relativePath}\n`);
@@ -40,12 +45,42 @@ export async function modifyForMonorepo(
     content = content.replace(/k8s\/service\.yaml/g, `${relativePath}/k8s/service.yaml`);
     content = content.replace(/k8s\/deployment\.yaml/g, `${relativePath}/k8s/deployment.yaml`);
 
-    // Добавляем working-directory
-    if (!content.includes('working-directory:')) {
+    // Добавляем working-directory в задачу test
+    const testJobRegex = /(jobs:\s*\n)([\t ]*)(test:\s*\n)([\t ]*)(runs-on:\s*ubuntu-latest)/;
+    const testMatch = content.match(testJobRegex);
+
+    if (testMatch && !content.includes(`working-directory: ${relativePath}`)) {
+        const indent = testMatch[4]; // Отступ у runs-on
         content = content.replace(
-            /(jobs:\s*\n\s+test:\s*\n\s+runs-on:\s*ubuntu-latest)/,
-            `$1\n    defaults:\n      run:\n        working-directory: ${relativePath}`
+            testJobRegex,
+            `$1$2$3$4$5\n${indent}defaults:\n${indent}  run:\n${indent}    working-directory: ${relativePath}`
         );
+    }
+
+    // Добавляем working-directory в golangci-lint-action
+    const lintRegex = /(uses:\s*golangci\/golangci-lint-action@[v\d.]+[\s\S]*?with:\s*\n)/;
+    const lintMatch = content.match(lintRegex);
+    if (lintMatch) {
+        const lintBlock = lintMatch[0];
+        // Ищем именно внутри блока lint, есть ли там уже working-directory
+        // Для этого проверим следующие несколько строк после with:
+        const afterWith = content.substring(lintMatch.index! + lintBlock.length);
+        const firstLineAfterWith = afterWith.split('\n')[0];
+
+        if (!lintBlock.includes('working-directory:') && !firstLineAfterWith.includes('working-directory:')) {
+            const indentWithLine = lintBlock.match(/([\t ]+)with:/);
+            const indentWith = indentWithLine ? indentWithLine[1] : '          ';
+
+            // Пробуем определить отступ первой строки после with:
+            const indentMatch = afterWith.match(/^([\t ]+)/);
+            const extraIndent = indentMatch ? indentMatch[1] : (indentWith + '  ');
+
+            const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+            content = content.replace(
+                lintRegex,
+                `$1${extraIndent}working-directory: ${relativePath}${lineEnding}`
+            );
+        }
     }
 
     // Заменяем имя шаблона на реальное имя проекта (SERVICE_NAME и т.д.)

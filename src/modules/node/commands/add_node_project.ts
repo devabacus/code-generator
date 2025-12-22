@@ -6,6 +6,8 @@ import { getRootWorkspaceFolders } from '../../../utils/path_util';
 import { getTemplatesPath, getDestinationChoice } from '../../python/ui/project_picker';
 import { NodeInitializer } from '../services/node_initializer';
 import { WorkflowModifier } from '../../python/services/workflow_modifier';
+import { executeCommand } from '../../../utils/terminal_handle';
+import { nodeLanguage } from '../node_language';
 
 /**
  * Команда добавления Node.js проекта из шаблона.
@@ -107,6 +109,16 @@ export async function addNodeProject(): Promise<void> {
             await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, selectedTemplate.name);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
             await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
+            await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName, nodeLanguage.defaultPort);
+            await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
+            await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
+            await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);
+
+            // Запускаем serverpod generate
+            const projectBaseName = path.basename(workspacePath);
+            const serverPath = path.join(workspacePath, `${projectBaseName}_server`);
+            window.showInformationMessage('⏳ Running serverpod generate...');
+            await executeCommand('serverpod generate --experimental-features=all', serverPath);
         } else {
             // Standalone — обновляем workflow и K8s манифесты
             await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);

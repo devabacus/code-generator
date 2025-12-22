@@ -8,6 +8,7 @@ import { PythonInitializer } from '../services/python_initializer';
 import { WorkflowModifier } from '../services/workflow_modifier';
 import { executeCommand } from '../../../utils';
 import { gitInit } from '../../../utils/git_init';
+import { pythonLanguage } from '../python_language';
 
 /**
  * Команда добавления Python проекта из шаблона.
@@ -122,7 +123,7 @@ export async function addPythonProject(): Promise<void> {
             await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, selectedTemplate.name);
             await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
             await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
-            await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
+            await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName, pythonLanguage.defaultPort);
             await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
             await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
             await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);

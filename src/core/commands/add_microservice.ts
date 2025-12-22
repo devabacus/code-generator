@@ -3,7 +3,7 @@ import path from 'path';
 import { ServiceLocator } from '../../core/services/service_locator';
 import { TemplateService, TemplateInfo } from '../../core/services/template_service';
 import { MicroserviceService } from '../../core/services/microservice_service';
-import { WorkflowModifier } from '../../core/services/workflow_modifier';
+import * as workflow from '../../core/services/workflow';
 import { getLanguage, getAllTemplateCategories } from '../../core/language_registry';
 import { getLanguageFromTemplatePath } from '../../core/services/language_detector';
 import { getRootWorkspaceFolders } from '../../utils/path_util';
@@ -128,7 +128,7 @@ export async function addMicroservice(): Promise<void> {
     try {
         // Создаём сервис для нужного языка
         const microserviceService = new MicroserviceService(fileSystem, language);
-        const workflowModifier = new WorkflowModifier(fileSystem);
+        const deps: workflow.WorkflowDependencies = { fileSystem };
 
         await window.withProgress({
             location: 15,
@@ -149,12 +149,12 @@ export async function addMicroservice(): Promise<void> {
             // Для монорепо — интеграция с Serverpod
             if ((destinationType === 'microservices' || destinationType === 'root') && workspacePath) {
                 progress.report({ message: 'Adding Serverpod endpoint...' });
-                await workflowModifier.updateServerpodDeploymentEnv(workspacePath, projectName);
-                await workflowModifier.copyServerpodEndpoint(workspacePath, projectName, templatesPath);
+                await workflow.updateServerpodDeploymentEnv(deps, workspacePath, projectName, language.defaultPort);
+                await workflow.copyServerpodEndpoint(deps, workspacePath, projectName, templatesPath);
 
                 progress.report({ message: 'Adding Flutter widget...' });
-                await workflowModifier.copyFlutterHealthCheckWidget(workspacePath, projectName, templatesPath);
-                await workflowModifier.patchDeveloperToolsPage(workspacePath, projectName);
+                await workflow.copyFlutterHealthCheckWidget(deps, workspacePath, projectName, templatesPath);
+                await workflow.patchDeveloperToolsPage(deps, workspacePath, projectName);
 
                 // Запускаем serverpod generate
                 progress.report({ message: 'Running serverpod generate...' });

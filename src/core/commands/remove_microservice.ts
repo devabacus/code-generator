@@ -1,9 +1,9 @@
 import { window } from 'vscode';
 import path from 'path';
 import { ServiceLocator } from '../services/service_locator';
-import { WorkflowModifier } from '../services/workflow_modifier';
 import { detectLanguage } from '../services/language_detector';
 import { getLanguage } from '../language_registry';
+import * as workflow from '../services/workflow';
 import { getRootWorkspaceFolders } from '../../utils/path_util';
 import { executeCommand } from '../../utils';
 
@@ -12,7 +12,7 @@ import { executeCommand } from '../../utils';
  */
 export async function removeMicroservice(): Promise<void> {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
-    const workflowModifier = new WorkflowModifier(fileSystem);
+    const deps: workflow.WorkflowDependencies = { fileSystem };
 
     const workspacePath = getRootWorkspaceFolders();
     if (!workspacePath) {
@@ -100,8 +100,8 @@ export async function removeMicroservice(): Promise<void> {
 
             // 3. Удаляем Serverpod интеграцию (env var, flutter widget)
             progress.report({ message: 'Removing Serverpod integration...' });
-            await workflowModifier.removeServerpodDeploymentEnv(workspacePath, serviceName);
-            await workflowModifier.unpatchDeveloperToolsPage(workspacePath, serviceName);
+            await workflow.removeServerpodDeploymentEnv(deps, workspacePath, serviceName);
+            await workflow.unpatchDeveloperToolsPage(deps, workspacePath, serviceName);
 
             // 4. Удаляем Flutter widget и feature folder
             progress.report({ message: 'Removing Flutter widget...' });

@@ -10,7 +10,7 @@ export const goLanguage: MicroserviceLanguage = {
     name: 'go',
     displayName: 'Go',
     templateCategory: 'go',
-    defaultPort: 8080,
+    defaultPort: 8001,
 
     async initialize(projectPath: string, templateName?: string, projectName?: string): Promise<void> {
         await goInitializer.initialize(projectPath, templateName, projectName);

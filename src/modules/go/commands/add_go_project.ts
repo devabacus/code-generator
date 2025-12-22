@@ -5,7 +5,9 @@ import { TemplateService, TemplateInfo } from '../../../core/services/template_s
 import { getRootWorkspaceFolders } from '../../../utils/path_util';
 import { getTemplatesPath, getDestinationChoice } from '../../python/ui/project_picker';
 import { GoInitializer } from '../services/go_initializer';
-import { WorkflowModifier } from '../../python/services/workflow_modifier';
+import * as workflow from '../../../core/services/workflow';
+import { executeCommand } from '../../../utils/terminal_handle';
+import { goLanguage } from '../go_language';
 
 /**
  * Команда добавления Go проекта из шаблона.
@@ -14,7 +16,7 @@ export async function addGoProject(): Promise<void> {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
     const templateService = new TemplateService(fileSystem);
     const initializer = new GoInitializer();
-    const workflowModifier = new WorkflowModifier(fileSystem);
+    const deps: workflow.WorkflowDependencies = { fileSystem };
 
     const templatesPath = getTemplatesPath();
     if (!templatesPath) {
@@ -104,12 +106,22 @@ export async function addGoProject(): Promise<void> {
         await templateService.copyTemplate(selectedTemplate.path, targetPath);
 
         if (isMonorepo && workspacePath) {
-            await workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, selectedTemplate.name);
-            await workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
-            await workflowModifier.updateK8sManifests(targetPath, projectName, selectedTemplate.name);
+            await workflow.modifyForMonorepo(deps, targetPath, projectName, relativePath, selectedTemplate.name);
+            await workflow.moveWorkflowToRepoRoot(deps, targetPath, workspacePath, projectName);
+            await workflow.updateK8sManifests(deps, targetPath, projectName, selectedTemplate.name);
+            await workflow.updateServerpodDeploymentEnv(deps, workspacePath, projectName, goLanguage.defaultPort);
+            await workflow.copyServerpodEndpoint(deps, workspacePath, projectName, templatesPath);
+            await workflow.copyFlutterHealthCheckWidget(deps, workspacePath, projectName, templatesPath);
+            await workflow.patchDeveloperToolsPage(deps, workspacePath, projectName);
+
+            // Запускаем serverpod generate
+            const projectBaseName = path.basename(workspacePath);
+            const serverPath = path.join(workspacePath, `${projectBaseName}_server`);
+            window.showInformationMessage('⏳ Running serverpod generate...');
+            await executeCommand('serverpod generate --experimental-features=all', serverPath);
         } else {
             // Standalone — обновляем workflow и K8s манифесты
-            await workflowModifier.updateForStandalone(targetPath, projectName, selectedTemplate.name);
+            await workflow.updateForStandalone(deps, targetPath, projectName, selectedTemplate.name);
         }
 
         await initializer.initialize(targetPath, selectedTemplate.name, projectName);

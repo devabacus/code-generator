@@ -1,7 +1,7 @@
 import path from 'path';
 import { IFileSystem } from '../interfaces/file_system';
 import { MicroserviceLanguage, TemplateMetadata } from '../interfaces/microservice_language';
-import { WorkflowModifier } from './workflow_modifier';
+import * as workflow from './workflow';
 import { TemplateService } from './template_service';
 
 /**
@@ -27,15 +27,16 @@ export interface AddProjectOptions {
  * Предоставляет add/import/export/remove для любого языка.
  */
 export class MicroserviceService {
-    private readonly workflowModifier: WorkflowModifier;
     private readonly templateService: TemplateService;
+    private readonly deps: workflow.WorkflowDependencies;
 
     constructor(
         private readonly fileSystem: IFileSystem,
-        private readonly language: MicroserviceLanguage
+        private readonly language: MicroserviceLanguage,
+        templateService?: TemplateService
     ) {
-        this.workflowModifier = new WorkflowModifier(fileSystem);
-        this.templateService = new TemplateService(fileSystem);
+        this.deps = { fileSystem };
+        this.templateService = templateService || new TemplateService(fileSystem);
     }
 
     /**
@@ -52,15 +53,15 @@ export class MicroserviceService {
 
         // 3. Обновляем K8s манифесты (заменяем placeholder на реальное имя)
         const templateName = path.basename(templatePath);
-        await this.workflowModifier.updateK8sManifests(targetPath, projectName, templateName);
-        await this.workflowModifier.updateEnvExample(targetPath, projectName, templateName);
+        await workflow.updateK8sManifests(this.deps, targetPath, projectName, templateName);
+        await workflow.updateEnvExample(this.deps, targetPath, projectName, templateName);
 
         // 4. Модифицируем для монорепо или standalone
         if (destinationType === 'standalone') {
-            await this.workflowModifier.updateForStandalone(targetPath, projectName, path.basename(templatePath));
+            await workflow.updateForStandalone(this.deps, targetPath, projectName, path.basename(templatePath));
         } else if (workspacePath && relativePath) {
-            await this.workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, templateName);
-            await this.workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
+            await workflow.modifyForMonorepo(this.deps, targetPath, projectName, relativePath, templateName);
+            await workflow.moveWorkflowToRepoRoot(this.deps, targetPath, workspacePath, projectName);
         }
 
         // 5. Инициализация специфичная для языка
@@ -85,8 +86,8 @@ export class MicroserviceService {
         );
 
         // 2. Модифицируем workflow для монорепо
-        await this.workflowModifier.modifyForMonorepo(targetPath, projectName, relativePath, projectName);
-        await this.workflowModifier.moveWorkflowToRepoRoot(targetPath, workspacePath, projectName);
+        await workflow.modifyForMonorepo(this.deps, targetPath, projectName, relativePath, projectName);
+        await workflow.moveWorkflowToRepoRoot(this.deps, targetPath, workspacePath, projectName);
 
         // 3. Инициализация
         await this.language.initialize(targetPath, projectName, projectName);
@@ -120,7 +121,7 @@ export class MicroserviceService {
         }
 
         // 3. Убираем monorepo-специфичные изменения
-        await this.workflowModifier.revertToStandalone(targetPath, projectName);
+        await workflow.revertToStandalone(this.deps, targetPath, projectName);
     }
 
     /**
