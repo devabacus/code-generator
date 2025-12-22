@@ -33,18 +33,6 @@
         "title": "Code Generator: Create New Serverpod Project"
       },
       {
-        "command": "code-generator.addPython",
-        "title": "Code Generator: Add Python to Serverpod Project"
-      },
-      {
-        "command": "code-generator.addGo",
-        "title": "Code Generator: Add Go to Serverpod Project"
-      },
-      {
-        "command": "code-generator.addNode",
-        "title": "Code Generator: Add Node.js to Serverpod Project"
-      },
-      {
         "command": "code-generator.addMicroservice",
         "title": "Code Generator: Add Microservice from Template"
       },
@@ -55,18 +43,6 @@
       {
         "command": "code-generator.generateK8s",
         "title": "Code Generator: Generate Serverpod K8s Files"
-      },
-      {
-        "command": "code-generator.addPythonProject",
-        "title": "Code Generator: Add Python Project from Template"
-      },
-      {
-        "command": "code-generator.addNodeProject",
-        "title": "Code Generator: Add Node.js Project from Template"
-      },
-      {
-        "command": "code-generator.addGoProject",
-        "title": "Code Generator: Add Go Project from Template"
       },
       {
         "command": "code-generator.importMicroservice",
