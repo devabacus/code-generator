@@ -19,7 +19,7 @@ export const nodeLanguage: MicroserviceLanguage = {
     },
 
     getExclusions(): string[] {
-        return ['node_modules', '.npm', 'dist', 'build'];
+        return ['.git', 'node_modules', '.npm', 'dist', 'build'];
     },
 
     getOpenApiUrl(port?: number): string {

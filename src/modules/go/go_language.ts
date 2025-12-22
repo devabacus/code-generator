@@ -17,7 +17,7 @@ export const goLanguage: MicroserviceLanguage = {
     },
 
     getExclusions(): string[] {
-        return ['vendor', 'bin'];
+        return ['.git', 'vendor', 'bin'];
     },
 
     getOpenApiUrl(port?: number): string {

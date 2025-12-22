@@ -2,7 +2,9 @@
  * Модуль обновления Serverpod deployment.
  */
 import path from 'path';
+import { workspace } from 'vscode';
 import { WorkflowDependencies } from './types';
+import { updateServerpodDeploymentEnvYaml, removeServerpodDeploymentEnvYaml } from './yaml_serverpod_updater';
 
 /**
  * Обновляет Serverpod deployment.yaml, добавляя env var для микросервиса.
@@ -14,6 +16,11 @@ export async function updateServerpodDeploymentEnv(
     serviceName: string,
     port: number = 8000
 ): Promise<void> {
+    const patchingMode = workspace.getConfiguration('codeGenerator').get<string>('patchingMode') || 'regex';
+
+    if (patchingMode === 'yaml') {
+        return updateServerpodDeploymentEnvYaml(deps, workspacePath, serviceName, port);
+    }
     const projectName = path.basename(workspacePath);
     const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
 
@@ -72,6 +79,12 @@ export async function removeServerpodDeploymentEnv(
     workspacePath: string,
     serviceName: string
 ): Promise<void> {
+    const patchingMode = workspace.getConfiguration('codeGenerator').get<string>('patchingMode') || 'regex';
+
+    if (patchingMode === 'yaml') {
+        return removeServerpodDeploymentEnvYaml(deps, workspacePath, serviceName);
+    }
+
     const projectName = path.basename(workspacePath);
     const deploymentPath = path.join(workspacePath, `${projectName}_server`, 'k8s', 'deployment.yaml');
 

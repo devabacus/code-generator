@@ -2,8 +2,10 @@
  * Модуль модификации workflow для monorepo.
  */
 import path from 'path';
+import { workspace } from 'vscode';
 import { WorkflowDependencies } from './types';
 import { findWorkflowFile } from './workflow_file_finder';
+import { modifyForMonorepoYaml } from './yaml_monorepo_modifier';
 
 /**
  * Модифицирует workflow для использования в монорепо.
@@ -16,6 +18,11 @@ export async function modifyForMonorepo(
     relativePath: string,
     templateName: string
 ): Promise<void> {
+    const patchingMode = workspace.getConfiguration('codeGenerator').get<string>('patchingMode') || 'regex';
+
+    if (patchingMode === 'yaml') {
+        return modifyForMonorepoYaml(deps, projectPath, projectName, relativePath, templateName);
+    }
     const workflowDir = path.join(projectPath, '.github', 'workflows');
     const workflowPath = await findWorkflowFile(deps, workflowDir);
 
@@ -143,4 +150,14 @@ export async function moveWorkflowToRepoRoot(
     await deps.fileSystem.createFolder(repoWorkflowDir);
     const content = await deps.fileSystem.readFile(sourceFile);
     await deps.fileSystem.createFile(targetFile, content);
+
+    // Удаляем .github из проекта (workflow теперь в корне монорепо)
+    try {
+        const projectGithubDir = path.join(projectPath, '.github');
+        if (await deps.fileSystem.exists(projectGithubDir)) {
+            await deps.fileSystem.deleteDirectory(projectGithubDir);
+        }
+    } catch {
+        // Игнорируем ошибки удаления
+    }
 }

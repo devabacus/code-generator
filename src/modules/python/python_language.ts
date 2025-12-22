@@ -25,7 +25,7 @@ export const pythonLanguage: MicroserviceLanguage = {
     },
 
     getExclusions(): string[] {
-        return ['__pycache__', '.venv', '.pytest_cache', '.ruff_cache', '.mypy_cache'];
+        return ['.git', '__pycache__', '.venv', '.pytest_cache', '.ruff_cache', '.mypy_cache', '.terraform', 'terraform.tfstate', 'terraform.tfstate.backup', '.terraform.lock.hcl'];
     },
 
     getOpenApiUrl(port?: number): string {

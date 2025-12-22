@@ -1,7 +1,7 @@
 // Python module - экспорт всех команд
 import { commands } from 'vscode';
 import { addPythonProject } from './commands/add_python_project';
-import { importMicroservice } from './commands/import_microservice';
+import { importMicroservice } from '../../core/commands/import_microservice';
 import { exportMicroservice } from './commands/export_microservice';
 import { removeMicroservice } from './commands/remove_microservice';
 
