@@ -2,8 +2,8 @@
 import { commands } from 'vscode';
 import { addPythonProject } from './commands/add_python_project';
 import { importMicroservice } from '../../core/commands/import_microservice';
-import { exportMicroservice } from './commands/export_microservice';
-import { removeMicroservice } from './commands/remove_microservice';
+import { exportMicroservice } from '../../core/commands/export_microservice';
+import { removeMicroservice } from '../../core/commands/remove_microservice';
 
 /**
  * Регистрирует все команды модуля Python.
