@@ -7,6 +7,7 @@ export interface ServerpodField {
     defaultValue?: string;
     defaultPersist?: string;
     isRelation?: boolean;
+    isEnum?: boolean;
     relationType?: RelationType;
     relatedModel?: string;
     scope?: string;

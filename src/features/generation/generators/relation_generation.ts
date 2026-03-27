@@ -22,8 +22,13 @@ export function generateServerpodToModelParams(model: ServerpodModel): string {
 
     return fieldsToProcess.map(field => {
         let fieldValue = field.name;
+        // Relations: UuidValue → String
         if ((field.isRelation && field.relationType === 'manyToOne') || field.name === 'customerId') {
             fieldValue = `${field.name}${field.nullable ? '?' : ''}.toString()`;
+        }
+        // Enums: enum → String via .name
+        if (field.isEnum) {
+            fieldValue = field.nullable ? `${field.name}?.name` : `${field.name}.name`;
         }
         return `${field.name}: ${fieldValue}`;
     }).join(',\n      ');
@@ -35,10 +40,17 @@ export function generateEntityToServerpodParams(model: ServerpodModel): string {
 
     return fieldsToProcess.map(field => {
         let fieldValue = field.name;
+        // Relations: String → UuidValue
         if (field.isRelation && field.relationType === 'manyToOne') {
             fieldValue = field.nullable
                 ? `${field.name} == null ? null : serverpod.UuidValue.fromString(${field.name}!)`
                 : `serverpod.UuidValue.fromString(${field.name})`;
+        }
+        // Enums: String → enum via serverpod.EnumType.values.byName()
+        if (field.isEnum) {
+            fieldValue = field.nullable
+                ? `${field.name} != null ? serverpod.${field.type}.values.byName(${field.name}!) : null`
+                : `serverpod.${field.type}.values.byName(${field.name})`;
         }
         return `${field.name}: ${fieldValue}`;
     }).join(',\n      ');

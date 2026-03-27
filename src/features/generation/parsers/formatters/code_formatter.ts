@@ -21,13 +21,18 @@ export class CodeFormatter implements ICodeFormatter {
             let _type = typeString;
             let _name = field.name;
 
+            // Relations (UuidValue → String)
             if (field.isRelation && field.relationType === 'manyToOne') {
-                _type = 'String';
-                _name = `${field.name}`;
+                _type = field.nullable ? 'String?' : 'String';
+            }
+
+            // Enums → String
+            if (field.isEnum) {
+                _type = field.nullable ? 'String?' : 'String';
             }
 
             if (field.nullable) {
-                return `${_type}? ${_name},`;
+                return `${_type} ${_name},`;
             } else {
                 if (_name === 'id') {
                     return `${_type} ${_name},`;
@@ -56,6 +61,10 @@ export class CodeFormatter implements ICodeFormatter {
             if (field.isRelation && field.relationType === 'manyToOne') {
                 _name = field.name.endsWith('Id') ? field.name : `${field.name}Id`;
                 _value = field.name.endsWith('Id') ? `${field.name}.toString()` : `${field.name}`;
+            }
+            // Enums: use .name to convert to String for Drift
+            if (field.isEnum) {
+                _value = field.nullable ? `${field.name}?.name` : `${field.name}.name`;
             }
             return `${_name}: Value(${_value})`;
         });

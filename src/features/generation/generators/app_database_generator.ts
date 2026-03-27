@@ -145,7 +145,7 @@ export class AppDatabaseGenerator {
     }
 
     private updateDatabaseName(content: string, projectName: string): string {
-        const dbNameRegex = /name:\s*'[^']+'/;
+        const dbNameRegex = /name:\s*'[^']+_flutter'/g;
         return content.replace(dbNameRegex, `name: '${projectName}_flutter'`);
     }
 }

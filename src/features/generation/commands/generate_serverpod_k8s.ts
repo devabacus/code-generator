@@ -11,6 +11,8 @@ import { PgProxyPodGenerator } from "../generators/k8s/pg_proxy_pod_generator";
 import { ClusterIssuerGenerator } from "../generators/k8s/cluster_issuer_generator";
 import { DockerfileProdGenerator } from "../generators/k8s/dockerfile_prod_generator";
 import { DeploymentDockerGenerator } from "../generators/k8s/deployment_docker_generator";
+import { DeploymentFlutterWebGenerator } from "../generators/k8s/deployment_flutter_web_generator";
+import { DeploymentAdminWebGenerator } from "../generators/k8s/deployment_admin_web_generator";
 import { TerraformMainGenerator } from "../generators/terraform/terraform_main_generator";
 import { TerraformVariablesGenerator } from "../generators/terraform/terraform_variables_generator";
 import { TerraformTfvarsExampleGenerator } from "../generators/terraform/terraform_tfvars_example_generator";
@@ -60,6 +62,8 @@ export async function generateServerpodK8s(workspacePathOverride?: string): Prom
             new ClusterIssuerGenerator(fileSystem),
             new DockerfileProdGenerator(fileSystem),
             new DeploymentDockerGenerator(fileSystem),
+            new DeploymentFlutterWebGenerator(fileSystem),
+            new DeploymentAdminWebGenerator(fileSystem),
             // Terraform generators
             new TerraformMainGenerator(fileSystem),
             new TerraformVariablesGenerator(fileSystem),

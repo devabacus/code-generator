@@ -55,6 +55,18 @@ export class ServerpodYamlParser {
         );
     }
 
+    private static readonly DART_BUILT_IN_TYPES = new Set([
+        'String', 'int', 'double', 'bool', 'DateTime', 'UuidValue',
+        'Duration', 'ByteData', 'Map', 'List', 'Set',
+    ]);
+
+    private static isEnumType(type: string): boolean {
+        const baseType = type.replace(/[?]$/, '');
+        if (this.DART_BUILT_IN_TYPES.has(baseType)) return false;
+        if (baseType.startsWith('List<') || baseType.startsWith('Map<')) return false;
+        return true;
+    }
+
     private static parseField(name: string, definition: string): ServerpodField {
         const parts = definition.split(',').map(part => part.trim());
         const typePart = parts[0];
@@ -63,12 +75,14 @@ export class ServerpodYamlParser {
         const type = nullable ? typePart.slice(0, -1) : typePart;
 
         const isRelation = parts.toString().includes('relation');
+        const isEnum = !isRelation && this.isEnumType(type);
 
         const field: ServerpodField = {
             name,
             type,
             nullable,
-            isRelation
+            isRelation,
+            isEnum,
         };
 
         if (isRelation) {

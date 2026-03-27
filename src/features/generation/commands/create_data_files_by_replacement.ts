@@ -8,6 +8,10 @@ import { manifestType } from "../generators/manifests";
 import { GenerationConfig } from "../config/generation_config";
 import { ServerpodYamlParser } from "../parsers/server_yaml_parser";
 
+function snakeToCamelCase(str: string): string {
+    return str.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
 export async function createDataFilesByReplacement() {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
 
@@ -22,7 +26,7 @@ export async function createDataFilesByReplacement() {
         workspacesPath: workspacePath,
         templFeatureName: 'tasks',
         targetFeaturePath: 'configuration',
-        targetEntity: model.tableName,
+        targetEntity: snakeToCamelCase(model.tableName),
         targetEntity1: model.entity1,
         targetEntity2: model.entity2,
         manifest: features,

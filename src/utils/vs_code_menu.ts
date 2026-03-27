@@ -1,6 +1,7 @@
-import { window } from "vscode";
+import { commands, Uri, window } from "vscode";
 import { getRootWorkspaceFolders } from "./path_util";
 import { executeInTerminal, terminalCommands } from "./terminal_handle";
+import path from "path";
 
 
 // export type ActionMap = { [key: string]: () => Promise<void> };
@@ -23,13 +24,17 @@ export async function vsCodeExtHandler() {
 
 
 async function reinstallExtension() {
-    const reinstallExtCmds = [
-        'vsce package',
-        'antigravity --install-extension code-generator-0.0.1.vsix --force',
-        'code --install-extension code-generator-0.0.1.vsix --force'
-    ];
-    await terminalCommands(reinstallExtCmds, getRootWorkspaceFolders());
-    window.showInformationMessage('✅ Расширение успешно обновлено!');
+    const workspacePath = getRootWorkspaceFolders();
+
+    // 1. Package
+    await terminalCommands(['vsce package'], workspacePath);
+
+    // 2. Install via VS Code API
+    const vsixUri = Uri.file(path.join(workspacePath, 'code-generator-0.0.1.vsix'));
+    await commands.executeCommand('workbench.extensions.installExtension', vsixUri);
+
+    // 3. Reload
+    await commands.executeCommand('workbench.action.reloadWindow');
 }
 
 
