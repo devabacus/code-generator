@@ -10,7 +10,7 @@ export function generateDriftTableImports(model: ServerpodModel): string {
     if (relationFields.length === 0) { return ''; }
 
     const imports = relationFields.map(field => {
-        const tableFileName = `${toSnakeCase(field.relatedModel!)}_table.dart`;
+        const tableFileName = `${field.relatedModel!}_table.dart`;
         return `import '${tableFileName}';`;
     });
     return [...new Set(imports)].join('\n');

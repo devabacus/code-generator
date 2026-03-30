@@ -60,7 +60,9 @@ export class CodeFormatter implements ICodeFormatter {
             let _value = field.name;
             if (field.isRelation && field.relationType === 'manyToOne') {
                 _name = field.name.endsWith('Id') ? field.name : `${field.name}Id`;
-                _value = field.name.endsWith('Id') ? `${field.name}.toString()` : `${field.name}`;
+                _value = field.name.endsWith('Id')
+                    ? `${field.name}${field.nullable ? '?' : ''}.toString()`
+                    : `${field.name}`;
             }
             // Enums: use .name to convert to String for Drift
             if (field.isEnum) {

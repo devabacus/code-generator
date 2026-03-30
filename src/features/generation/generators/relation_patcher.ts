@@ -92,7 +92,13 @@ export class RelationPatcher {
                         continue;
                     }
 
-                    const destinationContent = await this.fileSystem.readFile(destinationPath);
+                    let destinationContent = await this.fileSystem.readFile(destinationPath);
+
+                    // Skip if already patched (avoid duplicate methods)
+                    if (destinationContent.includes(startMarker)) {
+                        continue;
+                    }
+
                     if (isBlockInClass) {
                         const lastBraceIndex = destinationContent.lastIndexOf('}');
                         if (lastBraceIndex !== -1) {

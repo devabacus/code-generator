@@ -9,6 +9,7 @@ export const GENERATORS = {
     FREEZED_CONSTRUCTOR: 'freezedConstructor',
     DAO_METHODS: 'daoMethods',
     VALUE_WRAPPED_FIELDS: 'valueWrappedFields',
+    VALUE_WRAPPED_FIELDS_MODEL: 'valueWrappedFieldsModel',
     SIMPLE_FIELDS: 'simpleFields',
     SERVERPOD_TO_MODEL_PARAMS: 'serverpodToModelParams',
     ENTITY_TO_SERVERPOD_PARAMS: 'entityToServerpodParams',
@@ -42,6 +43,10 @@ const sectionGeneratorRegistry: Record<string, SectionGenerator> = {
     [GENERATORS.VALUE_WRAPPED_FIELDS]: (model) => {
         const formatter = new CodeFormatter();
         return formatter.formatValueWrappedFields(model.fields);
+    },
+    [GENERATORS.VALUE_WRAPPED_FIELDS_MODEL]: (model) => {
+        const formatter = new CodeFormatter();
+        return formatter.formatInsertCompanionParams(model.fields);
     },
     [GENERATORS.SIMPLE_FIELDS]: (model) => {
         const formatter = new CodeFormatter();
