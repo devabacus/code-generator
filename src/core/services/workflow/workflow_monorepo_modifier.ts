@@ -2,7 +2,6 @@
  * Модуль модификации workflow для monorepo.
  */
 import path from 'path';
-import { workspace } from 'vscode';
 import { WorkflowDependencies } from './types';
 import { findWorkflowFile } from './workflow_file_finder';
 import { modifyForMonorepoYaml } from './yaml_monorepo_modifier';
@@ -16,9 +15,9 @@ export async function modifyForMonorepo(
     projectPath: string,
     projectName: string,
     relativePath: string,
-    templateName: string
+    templateName: string,
+    patchingMode: string = 'regex'
 ): Promise<void> {
-    const patchingMode = workspace.getConfiguration('codeGenerator').get<string>('patchingMode') || 'regex';
 
     if (patchingMode === 'yaml') {
         return modifyForMonorepoYaml(deps, projectPath, projectName, relativePath, templateName);

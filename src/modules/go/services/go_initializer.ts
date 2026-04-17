@@ -1,11 +1,18 @@
 import path from 'path';
-import { executeCommand } from '../../../utils/terminal_handle';
-import { ServiceLocator } from '../../../core/services/service_locator';
+import { execCommand } from '../../../core/utils/exec';
+import { IFileSystem } from '../../../core/interfaces/file_system';
+import { DefaultFileSystem } from '../../../core/implementations/default_file_system';
 
 /**
  * Инициализатор Go проектов.
  */
 export class GoInitializer {
+    private fileSystem: IFileSystem;
+
+    constructor(fileSystem?: IFileSystem) {
+        this.fileSystem = fileSystem || new DefaultFileSystem();
+    }
+
     async initialize(projectPath: string, templateName?: string, projectName?: string): Promise<void> {
         // Если переданы имена, заменяем module в go.mod и import paths в .go файлах
         if (templateName && projectName && templateName !== projectName) {
@@ -13,7 +20,7 @@ export class GoInitializer {
         }
 
         try {
-            await executeCommand('go mod tidy', projectPath);
+            await execCommand('go mod tidy', projectPath);
         } catch {
             // Игнорируем если нет go.mod
         }
@@ -23,7 +30,7 @@ export class GoInitializer {
      * Обновляет имя модуля в go.mod и import paths во всех .go файлах
      */
     private async updateGoModuleName(projectPath: string, templateName: string, projectName: string): Promise<void> {
-        const fileSystem = ServiceLocator.getInstance().getFileSystem();
+        const fileSystem = this.fileSystem;
 
         // Формируем имена модулей
         const oldModuleName = `${templateName}-service`;
@@ -49,7 +56,7 @@ export class GoInitializer {
         oldModuleName: string,
         newModuleName: string
     ): Promise<void> {
-        const fileSystem = ServiceLocator.getInstance().getFileSystem();
+        const fileSystem = this.fileSystem;
         const entries = await fileSystem.readDirectory(dirPath);
 
         for (const name of entries) {

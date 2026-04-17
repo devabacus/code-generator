@@ -1,4 +1,4 @@
-import { executeCommand } from '../../../utils/terminal_handle';
+import { execCommand } from '../../../core/utils/exec';
 
 /**
  * Инициализатор Node.js проектов.
@@ -6,7 +6,7 @@ import { executeCommand } from '../../../utils/terminal_handle';
 export class NodeInitializer {
     async initialize(projectPath: string): Promise<void> {
         try {
-            await executeCommand('npm install', projectPath);
+            await execCommand('npm install', projectPath);
         } catch {
             // Игнорируем если нет package.json
         }

@@ -1,4 +1,3 @@
-import { workspace } from 'vscode';
 import { DefaultFileSystem } from "../implementations/default_file_system";
 import { IFileSystem } from "../interfaces/file_system";
 
@@ -26,8 +25,13 @@ export class ServiceLocator {
         return this.services.get("fileSystem");
     }
 
+    private templatesPath?: string;
+
+    setTemplatesPath(path: string): void {
+        this.templatesPath = path;
+    }
+
     getTemplatesPath(): string | undefined {
-        const config = workspace.getConfiguration('codeGenerator');
-        return config.get<string>('templatesPath');
+        return this.templatesPath;
     }
 }

@@ -1,5 +1,2 @@
-// Экспорт всех унифицированных команд микросервисов
-export { addMicroservice } from './add_microservice';
-export { importMicroservice } from './import_microservice';
-export { exportMicroservice } from './export_microservice';
-export { removeMicroservice } from './remove_microservice';
+// Core commands moved to src/adapters/vscode/commands/
+// This file kept for backwards compatibility of any remaining imports.
