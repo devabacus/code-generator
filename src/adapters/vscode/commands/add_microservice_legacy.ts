@@ -177,7 +177,7 @@ export async function addMicroservice(): Promise<void> {
             await gitInit(targetPath, projectName, { setupCICD: setupCICD?.value ?? false });
 
             // Открываем в отдельном окне
-            const openCommand = `antigravity -g "${targetPath}"`;
+            const openCommand = `code "${targetPath}"`;
             await executeCommand(openCommand, targetPath);
         }
 

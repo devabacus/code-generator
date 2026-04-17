@@ -29,7 +29,7 @@
       },
       {
         "command": "code-generator.vsCodeExtHandler",
-        "title": "AntigravityHandler"
+        "title": "viscode handler"
       },
       {
         "command": "code-generator.createNewProject",

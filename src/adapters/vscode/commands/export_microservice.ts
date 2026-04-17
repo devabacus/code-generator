@@ -131,7 +131,7 @@ export async function exportMicroservice(): Promise<void> {
         );
 
         if (openProject === 'Open in new window') {
-            await executeCommand(`antigravity -g "${targetPath}"`, targetPath);
+            await executeCommand(`code "${targetPath}"`, targetPath);
         }
     } catch (error) {
         window.showErrorMessage(`Error exporting microservice: ${error}`);

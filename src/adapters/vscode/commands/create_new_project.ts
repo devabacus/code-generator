@@ -63,7 +63,7 @@ export async function createNewProject(): Promise<void> {
     startAppFix(config.targetFlutterProjectPath);
     gitInit(monoRepoPath, targetProject);
 
-    const openCommand = `antigravity -g "${monoRepoPath}"`;
+    const openCommand = `code "${monoRepoPath}"`;
 
     // Run flutter pub get for each folder (flutter, server, admin)
     await executeCommand(pubGet, config.targetFlutterProjectPath);
