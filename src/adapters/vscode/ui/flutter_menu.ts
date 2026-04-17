@@ -3,7 +3,7 @@ import { createDataFilesByReplacement } from "../commands/create_data_files_by_r
 import { createNewProject } from "../commands/create_new_project";
 import { generateServerpodK8s } from "../commands/generate_serverpod_k8s";
 import { generateOpenApiBridge } from "../commands/generate_openapi_bridge";
-import { addMicroservice } from "../commands/add_microservice_legacy";
+import { addMicroservice } from "../commands/add_microservice";
 
 export async function flutterHandler() {
     const options: { [key: string]: () => Promise<any> } = {

@@ -8,6 +8,7 @@ import { MicroserviceLanguage } from '../../../../core/interfaces/microservice_l
 import { TemplateService, TemplateInfo } from '../../../../core/services/template_service';
 import { WorkflowModifier } from '../../../../modules/python/services/workflow_modifier';
 import { executeCommand } from '../../utils/terminal_handle';
+import { gitInit } from '../../utils/git_init';
 
 export interface CreateProjectOptions {
     fileSystem: IFileSystem;
@@ -56,4 +57,18 @@ export async function createProject(options: CreateProjectOptions): Promise<void
 
     // Инициализируем проект (uv sync / npm install / go mod tidy)
     await language.initialize(targetPath, template.name, projectName);
+
+    // Standalone — git init + настройка CI/CD и открытие нового окна
+    if (!isMonorepo) {
+        const setupCICD = await window.showQuickPick(
+            [
+                { label: '$(check) Да, настроить CI/CD сейчас', description: 'Запустит terraform для GitHub Secrets', value: true },
+                { label: '$(x) Нет, настрою позже', description: 'Запущу apply.ps1 вручную', value: false }
+            ],
+            { placeHolder: 'Настроить GitHub Secrets для CI/CD?' }
+        );
+
+        await gitInit(targetPath, projectName, { setupCICD: setupCICD?.value ?? false });
+        await executeCommand(`code "${targetPath}"`, targetPath);
+    }
 }
