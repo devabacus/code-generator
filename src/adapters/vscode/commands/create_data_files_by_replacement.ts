@@ -1,3 +1,4 @@
+import { window } from "vscode";
 import { ServiceLocator } from "../../../core/services/service_locator";
 import { getRootWorkspaceFolders } from "../utils/path_util";
 import { pickPath } from "../ui/ui_ask_folder";
@@ -7,6 +8,7 @@ import { GenerationService } from "../../../features/generation/generators/gener
 import { manifestType } from "../../../features/generation/generators/manifests";
 import { GenerationConfig } from "../../../features/generation/config/generation_config";
 import { ServerpodYamlParser } from "../../../features/generation/parsers/server_yaml_parser";
+import { EntityYamlValidator, ValidationError } from "../../../features/generation/parsers/entity_yaml_validator";
 
 function snakeToCamelCase(str: string): string {
     return str.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
@@ -16,6 +18,22 @@ export async function createDataFilesByReplacement() {
     const fileSystem = ServiceLocator.getInstance().getFileSystem();
 
     const model = ServerpodYamlParser.parse(getDocText());
+
+    const errors: ValidationError[] = [];
+    errors.push(...EntityYamlValidator.validate(model));
+    const activeUri = window.activeTextEditor?.document.uri.fsPath;
+    if (activeUri) {
+        errors.push(...EntityYamlValidator.validateSyncEvent(activeUri, model));
+    }
+    if (errors.length > 0) {
+        const action = await window.showErrorMessage(
+            EntityYamlValidator.formatErrors(errors),
+            'Generate anyway',
+            'Cancel',
+        );
+        if (action !== 'Generate anyway') { return; }
+    }
+
     const features: manifestType[] = model.isRelation ? ['manyToMany'] : ['entity'];
 
     const workspacePath = getRootWorkspaceFolders();

@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import fs from 'fs/promises';
 import { ServerpodYamlParser } from '../../../features/generation/parsers/server_yaml_parser';
+import { EntityYamlValidator, ValidationError } from '../../../features/generation/parsers/entity_yaml_validator';
 import { GenerationConfig } from '../../../features/generation/config/generation_config';
 import { GenerationService } from '../../../features/generation/generators/generation_service';
 import { AppDatabaseGenerator } from '../../../features/generation/generators/app_database_generator';
@@ -25,6 +26,7 @@ interface GenerateEntityOptions {
     templFeature: string;
     json: boolean;
     human?: boolean;
+    skipValidation?: boolean;
 }
 
 export function registerGenerateEntity(program: Command): void {
@@ -41,6 +43,7 @@ export function registerGenerateEntity(program: Command): void {
         .option('--templ-feature <name>', 'Template feature name', 'tasks')
         .option('--json', 'Output as JSON (default)', true)
         .option('--human', 'Output as human-readable text')
+        .option('--skip-validation', 'Skip pre-flight validation of YAML (6-field pattern, sync-event)', false)
         .action(async (opts: GenerateEntityOptions) => {
             await handleGenerateEntity(opts);
         });
@@ -67,6 +70,20 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
         const features: manifestType[] = model.isRelation ? ['manyToMany'] : ['entity'];
 
         logger.info(`Entity: ${model.className} (${model.fields.length} fields, relation: ${model.isRelation})`);
+
+        if (!opts.skipValidation) {
+            const errors: ValidationError[] = [];
+            errors.push(...EntityYamlValidator.validate(model));
+            if (opts.yaml) {
+                errors.push(...EntityYamlValidator.validateSyncEvent(opts.yaml, model));
+            }
+            if (errors.length > 0) {
+                logger.error(EntityYamlValidator.formatErrors(errors));
+                logger.error(`Use --skip-validation to bypass at your own risk.`);
+                logger.emitResult('generate-entity', false, startTime);
+                process.exit(1);
+            }
+        }
 
         const config = new GenerationConfig({
             templProject: opts.templProject,
