@@ -1,9 +1,35 @@
 # BUG-002: Имена файлов в camelCase вместо lower_case_with_underscores
 
-**Статус:** Open
+**Статус:** Resolved (2026-04-25, ветка `feature--fix-codegen-regen-bugs`)
 **Обнаружено:** 2026-04-18
 **Источник:** проект weight (Flutter), `dart analyze`
 **Затронутые сущности:** все с составными именами (`CargoType`, `CorrectionButton`, `CustomField`, `WeighingCorrection`, `WeighingPhoto`)
+
+## Resolution
+
+Фикс в трёх местах:
+
+1. `src/features/generation/replacement/replacement_util.ts` — добавлено правило snake_case с lookahead `(?=_|/|\.dart\b)`, которое срабатывает ПЕРЕД camelCase правилом для `d` формы. `category_table.dart` → `correction_button_table.dart` (snake_case path), но `categoryTable` → `correctionButtonTable` (camelCase identifier).
+2. `src/features/generation/generators/generation_service.ts:_getDestinationPath` — путь до файла назначения вычисляется через `toSnakeCase(unCap(targetEntity))`.
+3. `src/features/generation/generators/relation_patcher.ts:_getDestinationPath` — то же самое.
+4. `src/features/generation/generators/app_database_generator.ts` — фильтрация stale-импортов: при regen текущей фичи импорты, указывающие на несуществующие имена файлов в этой фиче (legacy camelCase `correctionButton_table.dart`), удаляются. Импорты других фич сохраняются.
+
+## Покрытие тестами
+
+- `src/test/replacement/replacement_util.test.ts` — 12 тестов (multi-word/single-word/идентификаторы/пути).
+- `src/test/generators/relation_patcher.test.ts` — добавлен тест `multi-word target entity: destination path uses snake_case (BUG-002)`.
+- `src/test/generators/app_database_generator.test.ts` — 3 теста (first gen / stale cleanup / preserves other features).
+
+Прогон 50 passing.
+
+## Проверка на реальном проекте (t140)
+
+- `codegen create-project --name t140` создал монорепо
+- Сгенерированы Gadget (single-word) и CorrectionButton (multi-word)
+- Результат — все файлы snake_case (`correction_button_dao.dart`, `correction_button_table.dart`, etc.)
+- `serverpod generate --experimental-features=all` ✓ (без `Endpoint analysis skipped`)
+- `dart run build_runner build` ✓ (drift, freezed, riverpod_generator всё ок)
+- `flutter analyze`: 0 `file_names` lint warnings для сгенерированного кода (раньше было ~18 на сущность)
 
 ## Симптом
 
