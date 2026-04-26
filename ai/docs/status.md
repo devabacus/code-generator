@@ -36,8 +36,9 @@
 ## Риски / Открытые вопросы
 
 - **BUG-001 (High):** Ref disposed в сгенерированных state_providers — появляется в каждой новой сущности. [ai/bug-reports/001-state-provider-ref-disposed.md](../bug-reports/001-state-provider-ref-disposed.md)
-- **BUG-002 (Medium):** имена файлов в camelCase вместо snake_case — засоряет `dart analyze`. [ai/bug-reports/002-file-names-camelcase.md](../bug-reports/002-file-names-camelcase.md)
-- **BUG-003 part 2 (открыт как backlog):** перезапись `:base` секций при regen теряет custom code — требует архитектурного решения (per-method markers или patch-only mode). Переоформить как BUG-005 когда станет блокером.
+- **BUG-002 (Resolved):** имена файлов в camelCase — закрыто 2026-04-25. [ai/bug-reports/002-file-names-camelcase.md](../bug-reports/002-file-names-camelcase.md)
+- **BUG-005 (Open, High):** AppDatabaseGenerator работает только инкрементально — `database.dart` секции могут стать пустыми → 347 errors в analyze. Workaround: regen каждой фичи. Правильный фикс: scan `features/*/data/datasources/local/tables/`. [ai/bug-reports/005-app-database-generator-incremental-only.md](../bug-reports/005-app-database-generator-incremental-only.md)
+- **BUG-003 part 2 (открыт как backlog):** перезапись `:base` секций при regen теряет custom code — требует архитектурного решения (per-method markers или patch-only mode). Переоформить как BUG-006 когда станет блокером.
 - **Tech debt:** `code_formatter`, `server_yaml_parser`, `app_database_generator` не покрыты тестами
 - **Tech debt:** `project_creator.ts` не покрыт тестами — регрессия в standalone-режиме (gitInit + CI/CD prompt) не будет замечена автоматически
 - **Вопрос User:** нужно ли мержить `feature--create-cli` + `feature--fix-codegen-regen-bugs` в `master`? Накопился большой diff
