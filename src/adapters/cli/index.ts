@@ -10,6 +10,7 @@ import { registerRemoveMicroservice } from './commands/remove_microservice';
 import { registerSetupCicd } from './commands/setup_cicd';
 import { registerGenerateOpenApiBridge } from './commands/generate_openapi_bridge';
 import { registerLocalSetup } from './commands/local_setup';
+import { registerVerify } from './commands/verify';
 
 const program = new Command();
 
@@ -33,5 +34,8 @@ registerRemoveMicroservice(program);
 // Infrastructure
 registerLocalSetup(program);
 registerSetupCicd(program);
+
+// Verification (Definition of Done — обязательно после правок генератора/шаблона)
+registerVerify(program);
 
 program.parse();
