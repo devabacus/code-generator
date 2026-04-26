@@ -171,6 +171,77 @@ class AppDatabase extends _$AppDatabase {
         assert.strictEqual(after1, after2, 'two consecutive generates must produce identical content');
     });
 
+    test('migration: новые ветки append в КОНЕЦ блока (BUG-006)', async () => {
+        // Существующая БД: schemaVersion=3, в migration-блоке две ветки `< 2` и `< 3`
+        // в возрастающем порядке. После добавления новой фичи (newcomer) ожидаем что
+        // ветка `< 4` появится В КОНЦЕ, после `< 3`, а не перед `< 2`.
+        const existingDb = `import 'package:drift/drift.dart';
+import 'tables/sync_metadata_table.dart';
+// === GENERATED_IMPORTS_START ===
+import '../../../../features/alpha/data/datasources/local/tables/alpha_table.dart';
+import '../../../../features/beta/data/datasources/local/tables/beta_table.dart';
+// === GENERATED_IMPORTS_END ===
+
+@DriftDatabase(tables: [
+    SyncMetadataTable,
+// === GENERATED_TABLES_START ===
+AlphaTable,
+    BetaTable,
+// === GENERATED_TABLES_END ===
+])
+class AppDatabase extends _$AppDatabase {
+  int get schemaVersion => 3;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) { return m.createAll(); },
+    onUpgrade: (Migrator m, int from, int to) async {
+        // === GENERATED_MIGRATION_START ===
+        if (from < 2) {
+            await m.createTable(alphaTable);
+        }
+        if (from < 3) {
+            await m.createTable(betaTable);
+        }
+        // === GENERATED_MIGRATION_END ===
+    },
+  );
+}
+`;
+        mockFs.setFile(TARGET_DB_PATH, existingDb);
+
+        // Все три фичи живут на диске: alpha, beta, и новая newcomer
+        const featRoot = `${PROJECTS_PATH}/weight/weight_flutter/lib/features`;
+        mockFs.setFile(`${featRoot}/alpha/data/datasources/local/tables/alpha_table.dart`, '// stub');
+        mockFs.setFile(`${featRoot}/beta/data/datasources/local/tables/beta_table.dart`, '// stub');
+        mockFs.setFile(`${featRoot}/newcomer/data/datasources/local/tables/newcomer_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('newcomer', 'newcomer'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+
+        // schemaVersion бамп
+        assert.ok(result.includes('int get schemaVersion => 4'), 'schemaVersion должен бампнуться до 4');
+
+        // Все три ветки должны быть в правильном (возрастающем) порядке
+        const branchOrderRegex = /if \(from < (\d+)\)/g;
+        const versions: number[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = branchOrderRegex.exec(result)) !== null) {
+            versions.push(parseInt(m[1], 10));
+        }
+        assert.deepStrictEqual(
+            versions,
+            [2, 3, 4],
+            `Ветки должны идти в возрастающем порядке [2, 3, 4], получено [${versions.join(', ')}]`,
+        );
+
+        // Семантическая проверка: alpha (< 2) идёт ДО newcomer (< 4)
+        const alphaIdx = result.indexOf('await m.createTable(alphaTable)');
+        const newcomerIdx = result.indexOf('await m.createTable(newcomerTable)');
+        assert.ok(alphaIdx >= 0 && newcomerIdx >= 0, 'оба createTable должны присутствовать');
+        assert.ok(alphaIdx < newcomerIdx, 'alpha createTable должна быть ДО newcomer createTable');
+    });
+
     test('игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart', async () => {
         const featPath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/tasks/data/datasources/local/tables`;
         mockFs.setFile(`${featPath}/category_table.dart`, '// stub');

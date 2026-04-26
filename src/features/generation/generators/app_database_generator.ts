@@ -181,7 +181,13 @@ export class AppDatabaseGenerator {
             const match = existingContentRegex.exec(content);
             const existingMigrations = match ? match[1] : '';
 
-            const replacement = `${migrationMarker}${newMigrationBlock}${existingMigrations}${migrationEndMarker}`;
+            // Drift migrations выполняются в порядке записи. Новые ветки `if (from < N)`
+            // должны добавляться в КОНЕЦ блока (append), а не в начало (prepend), иначе
+            // более поздние ветки выполнятся ДО ранних, ссылаясь на ещё несозданные
+            // колонки/таблицы и валятся `SqliteException(1): no such column`.
+            // См. BUG-006-migration-order.md
+            const trimmedExisting = existingMigrations.replace(/\s+$/, '');
+            const replacement = `${migrationMarker}${trimmedExisting}${newMigrationBlock}\n        ${migrationEndMarker}`;
             content = content.replace(existingContentRegex, replacement);
         } else {
             const onUpgradeRegex = /onUpgrade: \(Migrator m, int from, int to\) async {([\s\S]*?)}/;
