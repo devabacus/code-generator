@@ -8,8 +8,8 @@
 
 - ✅ **CLI реализован и верифицирован** — 10 команд, `codegen --help` работает, `create-project --name t139` отработала за 193 сек (проект создан в `G:/Projects/Flutter/serverpod/t139/`)
 - ✅ **VS Code декуплен от core** — все 11 команд регистрируются в `extension.ts`, `src/core/*` не импортирует `vscode`
-- ✅ **BUG-002 / BUG-003 / BUG-004 / BUG-005 исправлены** (2026-04-25/26, ветка `feature--fix-codegen-regen-bugs`) — snake_case filenames, relation_patcher идемпотентный, pre-flight валидация YAML, AppDatabaseGenerator scan-based
-- ✅ **Тесты — 61 passing:** `openapi_parser`, `python_endpoint_generator`, `template_service`, `mock_file_system`, **`relation_patcher`**, **`entity_yaml_validator`**, **`replacement_util`**, **`app_database_generator`**, **`verify_analyzer_parser`**
+- ✅ **BUG-002 / BUG-003 / BUG-004 / BUG-005 / BUG-006 исправлены** (2026-04-25/26, ветка `feature--fix-codegen-regen-bugs`) — snake_case filenames, relation_patcher идемпотентный, pre-flight валидация YAML, AppDatabaseGenerator scan-based, migration-ветки append вместо prepend (production-блокер на Android, найден внешними агентами TASK-015 в weight)
+- ✅ **Тесты — 62 passing:** `openapi_parser`, `python_endpoint_generator`, `template_service`, `mock_file_system`, **`relation_patcher`**, **`entity_yaml_validator`**, **`replacement_util`**, **`app_database_generator`**, **`verify_analyzer_parser`**
 - ✅ **End-to-end pipeline проверен на t143** (свежий `create-project`, **с первого раза**): verify PASS errors=0, server поднялся (HTTP 200), все 5 sync-таблиц в Postgres присутствуют
 - ✅ **`codegen verify --name <project>` команда добавлена** (2026-04-26) — Definition of Done гейт. Запускает pub get → serverpod generate → build_runner → flutter analyze, JSON с counts (errors/warnings/infos)
 - ✅ **`autoGenerateTasksFeature` + pubspec post-process в create-project** — сразу после создания проект компилируется и работает с tasks-фичей (Category/Tag/Task/TaskTagMap)
