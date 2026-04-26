@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-04-18
+**Обновлено:** 2026-04-25
 
 ## Что это за проект
 
@@ -16,9 +16,10 @@
 
 - ✅ CLI реализован и работает — 10 команд, `out/adapters/cli/index.js` (см. [status.md](status.md))
 - ✅ VS Code-адаптер декуплен от core, все 11 команд зарегистрированы в `extension.ts`
-- ✅ Частичные тесты: `openapi_parser`, `python_endpoint_generator`, `template_service`
+- ✅ **BUG-003 / BUG-004 закрыты** (2026-04-25): relation_patcher идемпотентный, pre-flight YAML-валидация
+- ✅ Тесты: `openapi_parser`, `python_endpoint_generator`, `template_service`, **`relation_patcher`**, **`entity_yaml_validator`** — 34 passing
 - ⚠️ Открытые баги: [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) (High), [BUG-002](../bug-reports/002-file-names-camelcase.md) (Medium)
-- ⚠️ Нет тестов для entity-генератора (`code_formatter`, `server_yaml_parser`, `relation_generation`)
+- ⚠️ Нет тестов для остальных частей entity-генератора (`code_formatter`, `server_yaml_parser`, `app_database_generator`)
 
 ## Как организована работа
 

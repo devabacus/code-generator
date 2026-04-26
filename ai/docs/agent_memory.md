@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-04-18
+**Последнее обновление:** 2026-04-25
 
 ---
 
@@ -53,9 +53,9 @@ vscode используется через lazy `require('vscode')` в shared ut
 
 ### Тестовое покрытие (важно!)
 
-- **Есть тесты:** `openapi_parser`, `python_endpoint_generator`, `template_service`, `mock_file_system` (использовать как источник моков)
-- **НЕТ тестов:** entity-генератор (`code_formatter`, `server_yaml_parser`, `relation_generation`, `app_database_generator`), workflow-модули, CLI-команды, `project_creator.ts`
-- Запуск: `npm test` (vscode-test)
+- **Есть тесты:** `openapi_parser`, `python_endpoint_generator`, `template_service`, `mock_file_system` (использовать как источник моков), **`relation_patcher`** (TASK-008), **`entity_yaml_validator`** (TASK-009)
+- **НЕТ тестов:** `code_formatter`, `server_yaml_parser`, `app_database_generator`, workflow-модули, CLI-команды, `project_creator.ts`
+- Запуск: `npm test` (vscode-test) — 34 passing (2026-04-25)
 - TASK-004 в roadmap — расширение покрытия
 
 ---
@@ -82,10 +82,40 @@ vscode используется через lazy `require('vscode')` в shared ut
 - `serverpodToModelParams` — Serverpod→Model (enum `.name`, relation `.toString()`)
 - `entityToServerpodParams` — Entity→Serverpod (enum `.values.byName()`, relation `UuidValue.fromString()`)
 
+### relation_patcher (после TASK-008, 2026-04-25)
+
+- Один marker-блок `:oneToManyMethods` на файл — все relation-методы внутри.
+- Patcher идемпотентный: повторный gen с тем же YAML → identical content; добавление relation в YAML → новый метод во всех 8 слоях (endpoint, remote_data_source, usecases, local_datasource_service, local_data_source, dao, repository, repository_impl).
+- Replace через `replace(blockRegexAll, callback)` — первое вхождение заменяется на свежий fullBlock, остальные удаляются (recovery от legacy-дубликатов).
+- НЕ трогает `:base` секции — это отдельная архитектурная проблема (BUG-003 part 2, в backlog).
+
+### entity_yaml_validator (после TASK-009, 2026-04-25)
+
+- 3 hard-required поля: `userId`, `customerId`, `isDeleted`. M2M (junction `*Map`) пропускают.
+- Парный `<table>_sync_event.spy.yaml` обязателен в той же директории (только для `--yaml <path>`, не для stdin).
+- CLI `--skip-validation` — escape hatch.
+- VS Code — диалог с двумя кнопками `Generate anyway` / `Cancel`.
+
 ### Не рерунить длительные CLI-генераторы
 
 - После `create-project` (~3 мин) проверять результат через `ls`/Read, НЕ перезапускать команду «посмотреть лог»
 - Исключение: команда явно упала с ошибкой
+
+### Definition of Done — `codegen verify` обязателен (после 2026-04-26)
+
+Любая правка в `src/features/generation/`, `src/adapters/cli/commands/create_project.ts`, `src/adapters/cli/commands/generate_entity.ts` или в шаблоне `G:/Templates/flutter/t115/` НЕ считается готовой пока:
+
+```bash
+node out/adapters/cli/index.js verify --name <test_project> --human
+```
+
+вернёт `PASS` (или JSON `{ "success": true }`).
+
+`verify` запускает: `dart pub get` (server) → `flutter pub get` → `serverpod generate` → `dart run build_runner build` → `flutter analyze`. JSON-вывод содержит `steps.flutterAnalyze.counts: { errors, warnings, infos }` — эти числа цитировать в ответе пользователю.
+
+Флаги: `--skip-pub-get`, `--skip-serverpod`, `--skip-build-runner` для быстрых итераций (только если уверен что эти шаги не затронуты твоими изменениями).
+
+**Запрещённые формулировки в ответе пользователю** (см. CLAUDE.md → Definition of Done): "скорее всего скомпилируется", "должно работать", "вроде готов". Только цитированные результаты verify или явное "не запускал, потому что: ...".
 
 ---
 
