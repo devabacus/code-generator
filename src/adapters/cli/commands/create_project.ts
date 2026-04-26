@@ -256,6 +256,26 @@ async function autoGenerateTasksFeature(
         const entityGenerationService = new GenerationService(fileSystem);
         await entityGenerationService.generate(entityConfig, model);
     }
+
+    // Копируем hand-written tasks-widgets из шаблона в target.
+    // Эти виджеты нужны home_page.dart (импортирует ../../../tasks/presentation/widgets/...).
+    // Не используем manifest startProject + scan_dir feature/, потому что тот резолвит destination
+    // в `targetFeaturePath` (= 'home' дефолт), а нам нужно `features/tasks/presentation/widgets/`.
+    const tasksWidgetsSrc = path.join(
+        config.templFlutterProjectPath, 'lib', 'features', 'tasks', 'presentation', 'widgets',
+    );
+    if (await fileSystem.exists(tasksWidgetsSrc)) {
+        const tasksWidgetsDst = path.join(targetFeatureDir, 'presentation', 'widgets');
+        await fileSystem.createFolder(tasksWidgetsDst);
+        const widgetFiles = await fs.readdir(tasksWidgetsSrc);
+        for (const widget of widgetFiles.filter(f => f.endsWith('.dart'))) {
+            let content = await fs.readFile(path.join(tasksWidgetsSrc, widget), 'utf-8');
+            // Применяем PROJECT_ONLY словарь: t115 → targetProject (для package: импортов)
+            content = content.replaceAll(config.templProject, config.targetProject);
+            await fileSystem.createFile(path.join(tasksWidgetsDst, widget), content);
+        }
+        logger.info(`  → copied ${widgetFiles.length} tasks/presentation/widgets file(s)`);
+    }
 }
 
 /**
