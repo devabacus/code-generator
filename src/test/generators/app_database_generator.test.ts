@@ -56,105 +56,29 @@ suite('AppDatabaseGenerator Test Suite', () => {
         mockFs.setFile(TEMPLATE_DB_PATH, TEMPLATE_DB_CONTENT);
     });
 
-    test('first generation creates database.dart with feature imports', async () => {
-        // Tablet file для текущей фичи
-        const featurePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/gadget/data/datasources/local/tables`;
-        mockFs.setFile(`${featurePath}/gadget_table.dart`, '// stub');
-
-        const gen = new AppDatabaseGenerator(mockFs, makeConfig('gadget', 'gadget'));
-        await gen.generate();
-
-        const result = await mockFs.readFile(TARGET_DB_PATH);
-        assert.ok(result.includes('gadget_table.dart'), 'should include gadget table import');
-        assert.ok(result.includes('GadgetTable'), 'should include gadget table class');
-    });
-
-    test('regen filters stale imports for the current feature (BUG-002 cleanup)', async () => {
-        // Симулируем существующий database.dart с stale импортом (camelCase до фикса BUG-002)
-        const existingDb = `import 'package:drift/drift.dart';
-import 'tables/sync_metadata_table.dart';
-// === GENERATED_IMPORTS_START ===
-import '../../../../features/correction_button/data/datasources/local/tables/correctionButton_table.dart';
-// === GENERATED_IMPORTS_END ===
-
-@DriftDatabase(tables: [
-    SyncMetadataTable,
-// === GENERATED_TABLES_START ===
-CorrectionbuttonTable,
-// === GENERATED_TABLES_END ===
-])
-class AppDatabase extends _$AppDatabase {
-  int get schemaVersion => 1;
-  MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) { return m.createAll(); },
-    onUpgrade: (Migrator m, int from, int to) async {},
-  );
-}
-`;
-        mockFs.setFile(TARGET_DB_PATH, existingDb);
-
-        // Live файл — теперь snake_case
-        const featurePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/correction_button/data/datasources/local/tables`;
-        mockFs.setFile(`${featurePath}/correction_button_table.dart`, '// stub');
+    test('cold start: scan-based — подключает все таблицы из всех фич сразу (BUG-005)', async () => {
+        // 3 фичи на диске. Конфиг указывает на одну (correction_button), но scan
+        // должен найти все.
+        const featRoot = `${PROJECTS_PATH}/weight/weight_flutter/lib/features`;
+        mockFs.setFile(`${featRoot}/correction_button/data/datasources/local/tables/correction_button_table.dart`, '// stub');
+        mockFs.setFile(`${featRoot}/tasks/data/datasources/local/tables/category_table.dart`, '// stub');
+        mockFs.setFile(`${featRoot}/tasks/data/datasources/local/tables/tag_table.dart`, '// stub');
 
         const gen = new AppDatabaseGenerator(mockFs, makeConfig('correctionButton', 'correction_button'));
         await gen.generate();
 
         const result = await mockFs.readFile(TARGET_DB_PATH);
-        assert.ok(
-            !result.includes('correctionButton_table.dart'),
-            'stale camelCase import must be removed',
-        );
-        assert.ok(
-            result.includes('correction_button_table.dart'),
-            'live snake_case import must be present',
-        );
+        assert.ok(result.includes('correction_button_table.dart'));
+        assert.ok(result.includes('CorrectionButtonTable'));
+        assert.ok(result.includes('category_table.dart'));
+        assert.ok(result.includes('CategoryTable'));
+        assert.ok(result.includes('tag_table.dart'));
+        assert.ok(result.includes('TagTable'));
     });
 
-    test('regen preserves imports from OTHER features (when their files still exist)', async () => {
-        const existingDb = `import 'package:drift/drift.dart';
-import 'tables/sync_metadata_table.dart';
-// === GENERATED_IMPORTS_START ===
-import '../../../../features/gadget/data/datasources/local/tables/gadget_table.dart';
-// === GENERATED_IMPORTS_END ===
-
-@DriftDatabase(tables: [
-    SyncMetadataTable,
-// === GENERATED_TABLES_START ===
-GadgetTable,
-// === GENERATED_TABLES_END ===
-])
-class AppDatabase extends _$AppDatabase {
-  int get schemaVersion => 2;
-  MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) { return m.createAll(); },
-    onUpgrade: (Migrator m, int from, int to) async {},
-  );
-}
-`;
-        mockFs.setFile(TARGET_DB_PATH, existingDb);
-
-        // Gadget файл всё ещё существует на диске → должен сохраниться
-        const gadgetFeaturePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/gadget/data/datasources/local/tables`;
-        mockFs.setFile(`${gadgetFeaturePath}/gadget_table.dart`, '// stub');
-
-        // Регенерируем correction_button
-        const cbFeaturePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/correction_button/data/datasources/local/tables`;
-        mockFs.setFile(`${cbFeaturePath}/correction_button_table.dart`, '// stub');
-
-        const gen = new AppDatabaseGenerator(mockFs, makeConfig('correctionButton', 'correction_button'));
-        await gen.generate();
-
-        const result = await mockFs.readFile(TARGET_DB_PATH);
-        assert.ok(result.includes('gadget_table.dart'), 'other feature import should be preserved (file exists)');
-        assert.ok(result.includes('GadgetTable'), 'other feature class should be preserved');
-        assert.ok(result.includes('correction_button_table.dart'), 'new feature import added');
-    });
-
-    test('regen drops imports + tables + migration lines for DELETED features', async () => {
-        // Симуляция: фича gadget была сгенерирована, в database.dart есть её import,
-        // table-класс и migration-блок. Затем папка фичи удалена пользователем.
-        // На regen другой фичи (correction_button) — gadget полностью вычищается.
+    test('drops imports + tables + migration lines for DELETED features', async () => {
+        // gadget был ранее в database.dart, но папка фичи удалена пользователем.
+        // На regen — gadget полностью вычищается (scan не находит → не подключает).
         const existingDb = `import 'package:drift/drift.dart';
 import 'tables/sync_metadata_table.dart';
 // === GENERATED_IMPORTS_START ===
@@ -183,8 +107,7 @@ class AppDatabase extends _$AppDatabase {
 `;
         mockFs.setFile(TARGET_DB_PATH, existingDb);
 
-        // Gadget файла на диске НЕТ (фича удалена)
-        // Регенерируем correction_button
+        // Gadget на диске НЕТ. Только correction_button.
         const cbFeaturePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/correction_button/data/datasources/local/tables`;
         mockFs.setFile(`${cbFeaturePath}/correction_button_table.dart`, '// stub');
 
@@ -195,6 +118,75 @@ class AppDatabase extends _$AppDatabase {
         assert.ok(!result.includes('gadget_table.dart'), 'stale gadget import must be removed');
         assert.ok(!result.includes('GadgetTable'), 'stale gadget table class must be removed');
         assert.ok(!result.includes('await m.createTable(gadgetTable)'), 'stale gadget migration line must be removed');
-        assert.ok(result.includes('correction_button_table.dart'), 'new feature is added');
+        assert.ok(result.includes('correction_button_table.dart'));
+    });
+
+    test('rejects camelCase legacy imports (filename pattern: snake_case _table.dart)', async () => {
+        const existingDb = `import 'package:drift/drift.dart';
+import 'tables/sync_metadata_table.dart';
+// === GENERATED_IMPORTS_START ===
+import '../../../../features/correction_button/data/datasources/local/tables/correctionButton_table.dart';
+// === GENERATED_IMPORTS_END ===
+
+@DriftDatabase(tables: [
+    SyncMetadataTable,
+// === GENERATED_TABLES_START ===
+CorrectionbuttonTable,
+// === GENERATED_TABLES_END ===
+])
+class AppDatabase extends _$AppDatabase {
+  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) { return m.createAll(); },
+    onUpgrade: (Migrator m, int from, int to) async {},
+  );
+}
+`;
+        mockFs.setFile(TARGET_DB_PATH, existingDb);
+
+        // Live файл — snake_case (после фикса BUG-002)
+        const featurePath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/correction_button/data/datasources/local/tables`;
+        mockFs.setFile(`${featurePath}/correction_button_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('correctionButton', 'correction_button'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+        assert.ok(!result.includes('correctionButton_table.dart'), 'stale camelCase import must be removed');
+        assert.ok(result.includes('correction_button_table.dart'), 'live snake_case import must be present');
+    });
+
+    test('idempotent: повторный gen на одном состоянии даёт identical content', async () => {
+        const featRoot = `${PROJECTS_PATH}/weight/weight_flutter/lib/features`;
+        mockFs.setFile(`${featRoot}/tasks/data/datasources/local/tables/category_table.dart`, '// stub');
+        mockFs.setFile(`${featRoot}/tasks/data/datasources/local/tables/tag_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('category', 'tasks'));
+        await gen.generate();
+        const after1 = await mockFs.readFile(TARGET_DB_PATH);
+
+        await gen.generate();
+        const after2 = await mockFs.readFile(TARGET_DB_PATH);
+
+        assert.strictEqual(after1, after2, 'two consecutive generates must produce identical content');
+    });
+
+    test('игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart', async () => {
+        const featPath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/tasks/data/datasources/local/tables`;
+        mockFs.setFile(`${featPath}/category_table.dart`, '// stub');
+        mockFs.setFile(`${featPath}/category_table.g.dart`, '// gen');
+        mockFs.setFile(`${featPath}/category_table.freezed.dart`, '// freezed');
+        mockFs.setFile(`${featPath}/some_helper.dart`, '// not a table');
+        mockFs.setFile(`${featPath}/extensions/category_table_extension.dart`, '// extension');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('category', 'tasks'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+        assert.ok(result.includes('category_table.dart'));
+        assert.ok(!result.includes('category_table.g.dart'));
+        assert.ok(!result.includes('category_table.freezed.dart'));
+        assert.ok(!result.includes('some_helper.dart'));
+        assert.ok(!result.includes('category_table_extension.dart'));
     });
 });

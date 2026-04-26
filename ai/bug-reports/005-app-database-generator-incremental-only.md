@@ -1,9 +1,22 @@
 # BUG-005: AppDatabaseGenerator работает только инкрементально — пустые секции при «холодном» запуске
 
-**Статус:** Open
+**Статус:** Resolved (2026-04-26, ветка `feature--fix-codegen-regen-bugs`)
 **Обнаружено:** 2026-04-26 (TASK-008/009 follow-up, t140 verify run)
-**Источник:** `codegen verify --name t140` — 347 errors
-**Критичность:** High — на свежем проекте может остаться неподключённой фича → drift не сгенерит `*TableData`/`*Companion` → весь `dart analyze` красный
+**Источник:** `codegen verify --name t140` — 347 errors; повторно проявился на свежем `create-project --name t141` — 327 errors
+**Критичность:** High — на свежем проекте остаётся неподключённой фича → drift не сгенерит `*TableData`/`*Companion` → весь `dart analyze` красный
+
+## Resolution
+
+`AppDatabaseGenerator.generate()` переписан на **scan-based** вместо инкрементального дополнения existing-секций. Теперь сканирует `<flutterLib>/features/*/data/datasources/local/tables/*_table.dart` (исключая `.g.dart`, `.freezed.dart`, не-`*_table.dart`) и собирает imports/tables-list **с нуля** на каждом вызове. Migration остаётся append-only, schemaVersion не понижается.
+
+Фикс убрал зависимость от порядка вызовов `generate-entity` / `AppDatabaseGenerator.generate()`. Раньше можно было получить пустые секции если последний вызов был с config'ом без entity (например финальный шаг в `create-project`); теперь scan находит все живые таблицы независимо от config.
+
+**Тесты** (5 в [`src/test/generators/app_database_generator.test.ts`](../../src/test/generators/app_database_generator.test.ts)):
+1. `cold start: scan-based — подключает все таблицы из всех фич сразу` — corner case BUG-005.
+2. `drops imports + tables + migration lines for DELETED features` — фича удалена → исчезает из database.dart.
+3. `rejects camelCase legacy imports` — BUG-002 cleanup сохраняется.
+4. `idempotent: повторный gen на одном состоянии даёт identical content`.
+5. `игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart` — фильтр scan'а.
 
 ## Симптом
 

@@ -17,18 +17,15 @@ export class AppDatabaseGenerator {
     public async generate(): Promise<void> {
         const destinationDir = this.config.coreDataLocalPath;
         const coreDatabasePath = path.join(destinationDir, 'database.dart');
-        const featureTablesDir = this.config.featureTablesPath;
 
         const templateDatabasePath = path.join(this.config.templFlutterLibPath, 'core', 'data', 'datasources', 'local', 'database.dart');
 
         let existingContent = '';
-        let existingImports: Set<string> = new Set();
         let existingTableClasses: Set<string> = new Set();
         let currentSchemaVersion = 1;
 
         if (await this.fileSystem.exists(coreDatabasePath)) {
             existingContent = await this.fileSystem.readFile(coreDatabasePath);
-            existingImports = this.extractSectionContent(existingContent, '// === GENERATED_IMPORTS_START ===', '// === GENERATED_IMPORTS_END ===');
             existingTableClasses = this.extractSectionContent(existingContent, '// === GENERATED_TABLES_START ===', '// === GENERATED_TABLES_END ===');
             currentSchemaVersion = this.extractSchemaVersion(existingContent);
         } else {
@@ -39,64 +36,43 @@ export class AppDatabaseGenerator {
             existingContent = existingContent.replace(/int get schemaVersion => \d+;/, 'int get schemaVersion => 1;');
         }
 
-        let featureTableFiles: string[] = [];
-        if (await this.fileSystem.exists(featureTablesDir)) {
-            featureTableFiles = (await this.fileSystem.readDirectory(featureTablesDir)).filter(file => file.endsWith('.dart'));
-        }
+        // Сканируем ВСЕ feature-директории и собираем live table files (BUG-005).
+        // Не полагаемся на инкрементальные правки existing-секций — это давало пустые
+        // секции при определённом порядке вызовов.
+        const liveTableFiles = await this.scanAllFeatureTableFiles();
 
-        const newFeatureImports = featureTableFiles.map(file => {
-            const relativeFeaturePath = path.relative(destinationDir, featureTablesDir).replaceAll('\\', '/');
-            return `import '${relativeFeaturePath}/${file}';`;
-        });
+        const allImports = new Set(
+            liveTableFiles.map(({ absolutePath }) => {
+                const rel = path.relative(destinationDir, absolutePath).replaceAll('\\', '/');
+                return `import '${rel}';`;
+            }),
+        );
 
-        // Фильтр 1: убираем все existingImports, файлы по которым больше не существуют
-        // (фича удалена, либо файл переименован — например, после фикса BUG-002 старый
-        // `correctionButton_table.dart` ушёл, остался `correction_button_table.dart`).
-        const filteredExisting = new Set<string>();
-        for (const imp of existingImports) {
-            if (await this.isImportLive(imp, destinationDir)) {
-                filteredExisting.add(imp);
-            }
-        }
-
-        const allImports = new Set([...filteredExisting, ...newFeatureImports]);
-
-        const newFeatureTableClasses = featureTableFiles.map(file => `${snakeToPascalCase(file.split('.')[0])},`);
-
-        // Фильтр 2: класс таблицы остаётся, только если сохранился соответствующий import.
-        // Если import убрали (фича удалена) — table-класс тоже выкидываем из @DriftDatabase.
-        const liveTableClassNames = this.deriveTableClassNamesFromImports(allImports);
-        const filteredExistingClasses = new Set<string>();
-        for (const cls of existingTableClasses) {
-            const clean = cls.replace(/,\s*$/, '');
-            if (liveTableClassNames.has(clean)) {
-                filteredExistingClasses.add(cls);
-            }
-        }
-
-        const allTableClasses = new Set([...filteredExistingClasses, ...newFeatureTableClasses]);
+        const liveTableClassesArr = liveTableFiles.map(({ fileName }) => `${snakeToPascalCase(fileName.replace(/\.dart$/, ''))},`);
+        const allTableClasses = new Set(liveTableClassesArr);
+        const liveTableClassNames = new Set(liveTableClassesArr.map(c => c.replace(/,\s*$/, '')));
 
         let finalContent = this.updateSection(
             existingContent,
             '// === GENERATED_IMPORTS_START ===',
             '// === GENERATED_IMPORTS_END ===',
-            [...allImports].join('\n')
+            [...allImports].join('\n'),
         );
 
         finalContent = this.updateSection(
             finalContent,
             '// === GENERATED_TABLES_START ===',
             '// === GENERATED_TABLES_END ===',
-            [...allTableClasses].join('\n    ')
+            [...allTableClasses].join('\n    '),
         );
 
-        const actuallyNewTables = newFeatureTableClasses.filter(tableClass => !existingTableClasses.has(tableClass));
+        // Migration — append-only: добавляем только реально новые таблицы.
+        const actuallyNewTables = liveTableClassesArr.filter(tableClass => !existingTableClasses.has(tableClass));
         if (actuallyNewTables.length > 0) {
             finalContent = this.updateMigration(finalContent, currentSchemaVersion, actuallyNewTables);
         }
 
-        // Фильтр 3: убираем `await m.createTable(xxx);` для исчезнувших таблиц, чтобы
-        // не было `undefined_identifier`. Schema version не понижаем — миграции — append-only.
+        // Чистим `await m.createTable(xxx);` для исчезнувших таблиц (но schemaVersion не понижаем).
         finalContent = this.removeStaleMigrationLines(finalContent, liveTableClassNames);
 
         finalContent = this.updateDatabaseName(finalContent, this.config.targetProject);
@@ -104,30 +80,35 @@ export class AppDatabaseGenerator {
         await this.fileSystem.createFile(coreDatabasePath, finalContent);
     }
 
-    private async isImportLive(importStatement: string, baseDir: string): Promise<boolean> {
-        const match = importStatement.match(/import\s+['"]([^'"]+)['"]/);
-        if (!match) { return true; }
-        const importPath = match[1];
-        // package:-импорты не трогаем (предполагаем что pub_get их разрешит)
-        if (importPath.startsWith('package:') || importPath.startsWith('dart:')) { return true; }
-        // Используем posix-семантику чтобы не привязываться к разделителям ОС.
-        // path.resolve на Windows бы добавил `C:\` префикс, что не работает с MockFileSystem
-        // в тестах и с forward-slash путями в production.
-        const baseDirPosix = baseDir.replace(/\\/g, '/');
-        const absolutePath = path.posix.normalize(path.posix.join(baseDirPosix, importPath));
-        return await this.fileSystem.exists(absolutePath);
-    }
+    /**
+     * Сканирует все feature-директории и возвращает live `*_table.dart` файлы.
+     * Конвенция t115: `<flutterLib>/features/<feature>/data/datasources/local/tables/*_table.dart`.
+     * `*.g.dart` пропускаются.
+     */
+    private async scanAllFeatureTableFiles(): Promise<{ absolutePath: string; fileName: string }[]> {
+        const featuresDir = path.join(this.config.targetFlutterLibPath, 'features');
+        if (!await this.fileSystem.exists(featuresDir)) { return []; }
 
-    private deriveTableClassNamesFromImports(imports: Set<string>): Set<string> {
-        const liveNames = new Set<string>();
-        for (const imp of imports) {
-            const match = imp.match(/['"]([^'"]+\.dart)['"]/);
-            if (!match) { continue; }
-            const baseName = path.basename(match[1], '.dart');
-            // Паттерн файлов таблиц — `<entity>_table.dart` → класс `<Entity>Table`
-            liveNames.add(snakeToPascalCase(baseName));
+        const featureNames = await this.fileSystem.readDirectory(featuresDir);
+        const result: { absolutePath: string; fileName: string }[] = [];
+
+        for (const featureName of featureNames) {
+            const tablesDir = path.join(featuresDir, featureName, 'data', 'datasources', 'local', 'tables');
+            if (!await this.fileSystem.exists(tablesDir)) { continue; }
+            const files = await this.fileSystem.readDirectory(tablesDir);
+            for (const file of files) {
+                if (!file.endsWith('.dart')) { continue; }
+                if (file.endsWith('.g.dart') || file.endsWith('.freezed.dart')) { continue; }
+                if (!file.endsWith('_table.dart')) { continue; }
+                result.push({
+                    absolutePath: path.join(tablesDir, file),
+                    fileName: file,
+                });
+            }
         }
-        return liveNames;
+        // Стабильный порядок (детерминированный вывод) — алфавитно по имени файла
+        result.sort((a, b) => a.fileName.localeCompare(b.fileName));
+        return result;
     }
 
     private removeStaleMigrationLines(content: string, liveTableClassNames: Set<string>): string {
