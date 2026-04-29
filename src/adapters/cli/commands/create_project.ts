@@ -108,6 +108,12 @@ async function handleCreateProject(opts: CreateProjectOptions): Promise<void> {
         logger.info('Patching pubspec.yaml relative package paths...');
         await patchPubspecPackagePaths(fileSystem, config);
 
+        // 4c. Копирование agent infrastructure (CLAUDE.md, AGENTS.md, ai/scripts/, ai/prompts/)
+        // в свежий проект. Эти файлы — общая инфраструктура для AI-агентов работающих над
+        // любым сгенерированным проектом (task workflow, multi-agent правила, prompts).
+        logger.info('Copying agent infrastructure (CLAUDE.md, AGENTS.md, ai/scripts, ai/prompts)...');
+        await copyAgentInfrastructure(fileSystem, config, logger);
+
         // 5. Create database.dart
         logger.info('Generating AppDatabase...');
         const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
@@ -275,6 +281,98 @@ async function autoGenerateTasksFeature(
             await fileSystem.createFile(path.join(tasksWidgetsDst, widget), content);
         }
         logger.info(`  → copied ${widgetFiles.length} tasks/presentation/widgets file(s)`);
+    }
+}
+
+/**
+ * Копирует agent infrastructure из шаблона в target проект:
+ * - `CLAUDE.md` (агентский guide верхнего уровня) и `AGENTS.md` (правила процесса)
+ * - `ai/scripts/{new_task.py, task.py}` — task management CLI
+ * - `ai/prompts/{executor,teamlead,finalize}.prompt.md` — промпты для ролей
+ * - `ai/guides/`, `ai/discussions/docs/`, `ai/tasks/_template/` — справочники и шаблоны (если есть)
+ *
+ * Применяет PROJECT_ONLY словарь (`<templProject> → <targetProject>`) к содержимому
+ * файлов чтобы плейсхолдеры типа `t115_flutter` стали `<name>_flutter`.
+ *
+ * НЕ использует manifest startProject + scan_dir feature/ — те резолвят destination
+ * через `targetFeaturePath`, что неправильно для root-уровня (CLAUDE.md, AGENTS.md)
+ * и для ai/ директории.
+ */
+async function copyAgentInfrastructure(
+    fileSystem: TrackingFileSystem,
+    config: GenerationConfig,
+    logger: CliLogger,
+): Promise<void> {
+    const sourceRoot = config.monoRepoTemplPath; // G:/Templates/flutter/<templ>
+    const targetRoot = config.monoRepoTargetPath; // G:/Projects/Flutter/serverpod/<name>
+
+    const replaceProjectName = (content: string): string =>
+        content.replaceAll(config.templProject, config.targetProject);
+
+    // 1. Root-level files: CLAUDE.md, AGENTS.md
+    for (const fileName of ['CLAUDE.md', 'AGENTS.md']) {
+        const src = path.join(sourceRoot, fileName);
+        if (!await fileSystem.exists(src)) {
+            logger.info(`  → ${fileName} not in template, skip`);
+            continue;
+        }
+        const dst = path.join(targetRoot, fileName);
+        const content = await fs.readFile(src, 'utf-8');
+        await fileSystem.createFile(dst, replaceProjectName(content));
+        logger.info(`  → ${fileName}`);
+    }
+
+    // 2. ai/ subdirectories — копируем целиком указанные дочерние папки шаблона.
+    // НЕ копируем `ai/tasks/active/` или `ai/tasks/done/` — они project-specific (история).
+    // НЕ копируем `ai/docs/` — будет project-specific документация (TASK-001 заполняет под проект).
+    const aiSubpaths = [
+        'ai/scripts',
+        'ai/prompts',
+        'ai/guides',
+        'ai/discussions/docs',
+        'ai/tasks/_template',
+        'ai/README.md',
+        'ai/version.md',
+    ];
+    for (const subpath of aiSubpaths) {
+        const src = path.join(sourceRoot, subpath);
+        if (!await fileSystem.exists(src)) { continue; }
+        await copyDirOrFileWithReplacements(src, path.join(targetRoot, subpath), replaceProjectName, fileSystem);
+    }
+    logger.info(`  → ai/ infrastructure copied (scripts/prompts/guides/discussions docs/tasks template)`);
+}
+
+async function copyDirOrFileWithReplacements(
+    src: string,
+    dst: string,
+    transform: (content: string) => string,
+    fileSystem: TrackingFileSystem,
+): Promise<void> {
+    const stat = await fs.stat(src);
+    if (stat.isFile()) {
+        const content = await fs.readFile(src, 'utf-8');
+        await fileSystem.createFile(dst, transform(content));
+        return;
+    }
+    if (!stat.isDirectory()) { return; }
+    await fileSystem.createFolder(dst);
+    const entries = await fs.readdir(src, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const dstPath = path.join(dst, entry.name);
+        if (entry.isDirectory()) {
+            await copyDirOrFileWithReplacements(srcPath, dstPath, transform, fileSystem);
+        } else if (entry.isFile()) {
+            // Бинарные файлы (.png, .ico) — текстовая трансформация ломает их. Фильтр по расширениям.
+            const ext = path.extname(entry.name).toLowerCase();
+            const textExtensions = new Set(['.md', '.py', '.dart', '.yaml', '.yml', '.json', '.txt', '.ps1', '.sh', '.gitignore', '']);
+            if (textExtensions.has(ext)) {
+                const content = await fs.readFile(srcPath, 'utf-8');
+                await fileSystem.createFile(dstPath, transform(content));
+            } else {
+                await fileSystem.copyFile(srcPath, dstPath);
+            }
+        }
     }
 }
 
