@@ -2,46 +2,54 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-04-18
+**Обновлено:** 2026-04-26
 
 ---
 
 ## Текущая фаза
 
-**Фаза:** Фаза 1 — Стабилизация
-**Фокус:** починка критических багов генератора, покрытие тестами entity-генератора, документация для AI-агентов
+**Фаза:** Фаза 1 — Стабилизация (около 80% завершена)
+**Фокус:** починка критических багов генератора, расширение тестового покрытия, runtime-DoD-гейт
 **Критерии завершения:**
-- BUG-001 и BUG-002 закрыты
-- Unit-тесты покрывают `code_formatter`, `server_yaml_parser`, `relation_generation`, `app_database_generator`
-- `ai/docs/` заполнен (TASK-001)
-- Вопрос с мержем `feature--create-cli` → `master` закрыт
+- BUG-001 закрыт (BUG-002, 003, 004, 005, 006 уже закрыты на 2026-04-26)
+- TASK-010 закрыта (`codegen verify --runtime` для runtime-гарантий)
+- Unit-тесты покрывают `code_formatter`, `server_yaml_parser` (62 passing — остальные части генератора уже покрыты)
+- Merge `feature--fix-codegen-regen-bugs` → `master`
 
 ---
 
 ## Фазы
 
-### Фаза 1: Стабилизация (текущая)
+### Фаза 1: Стабилизация (текущая, ~80% done)
 
 **Цель:** генератор без известных критических багов, базовое тестовое покрытие, документация.
 
 **Включает:**
 
 - [~] TASK-001 — заполнить базовую документацию (`ai/docs/`) — **in progress, ждёт approval**
-- [ ] TASK-002 — fix BUG-001 (Ref disposed в state_providers) — **High**
-- [ ] TASK-003 — fix BUG-002 (camelCase → snake_case имён файлов) — **Medium**
-- [ ] TASK-004 — unit-тесты для entity-генератора (code_formatter, server_yaml_parser, relation_generation, app_database_generator)
+- [ ] TASK-002 — fix BUG-001 (Ref disposed в state_providers) — **High**, единственный открытый High баг
+- [x] TASK-003 — fix BUG-002 (camelCase → snake_case имён файлов) — закрыта 2026-04-25
+- [x] TASK-008 — fix BUG-003 (relation_patcher идемпотентный) — закрыта 2026-04-25
+- [x] TASK-009 — fix BUG-004 (pre-flight YAML валидация) — закрыта 2026-04-25
+- [x] BUG-005 (AppDatabaseGenerator scan-based) — закрыт 2026-04-26
+- [x] BUG-006 (migration append, найден внешними агентами TASK-015 в weight) — закрыт 2026-04-26
+- [~] TASK-010 — `codegen verify --runtime` + sync_smoke_test шаблон — **active**
+- [ ] TASK-004 — unit-тесты для оставшихся `code_formatter`, `server_yaml_parser`
 - [ ] ADR-0001 (реальный) — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md` в `ai/docs/decisions/` и утвердить
-- [ ] Merge `feature--create-cli` → `master` (или решить, что жить с dev-веткой)
+- [ ] Merge `feature--fix-codegen-regen-bugs` → `master` (14 коммитов)
 
 **Уже сделано до создания этого roadmap:**
 
-- [x] CLI-адаптер + 10 команд (`out/adapters/cli/index.js`)
+- [x] CLI-адаптер + **11 команд** включая `verify` (`out/adapters/cli/index.js`)
 - [x] Decoupling `src/core/*` от vscode (lazy require)
 - [x] Unified `addMicroservice` команда для любого языка
 - [x] Регистрация всех 11 VS Code команд в `extension.ts`
 - [x] Тесты для openapi-bridge, template-service, openapi-parser
 - [x] Замена `antigravity` на `code` для открытия нового окна
 - [x] `.vscode/settings.json` → workspace TypeScript 5.9.3
+- [x] **`autoGenerateTasksFeature` + `patchPubspecPackagePaths`** в `create-project` — свежий проект сразу компилируется
+- [x] **`codegen verify` команда** + Definition of Done в CLAUDE.md
+- [x] **62 passing tests** (relation_patcher, entity_yaml_validator, replacement_util, app_database_generator, verify_analyzer_parser)
 
 ### Фаза 2: Масштабирование микросервисов
 
@@ -84,6 +92,10 @@
 |---|---|---|
 | 2026-04-18 | Создана первая версия roadmap.md (TASK-001) | Заполнение `ai/docs/` |
 | 2026-04-18 | Добавлен блок "Уже сделано" в Фазу 1 | User попросил освежить доки, многое из старого roadmap уже реализовано |
+| 2026-04-25 | TASK-008/009 — закрыты BUG-002/003/004 | Фикс багов генератора, найденных в weight-проекте |
+| 2026-04-26 | BUG-005 (scan-based) и BUG-006 (migration append) закрыты | t141→t142→t143 цикл итераций; BUG-006 найден внешними агентами TASK-015 в weight |
+| 2026-04-26 | Добавлены `codegen verify`, `autoGenerateTasksFeature`, `patchPubspecPackagePaths`, Definition of Done в CLAUDE.md | t143 PASS с первого create-project + runtime HTTP 200 |
+| 2026-04-26 | TASK-010 заведена | Закрыть DoD-дыру для runtime-проверки |
 
 ---
 

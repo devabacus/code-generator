@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-04-25
+**Обновлено:** 2026-04-26
 
 ## Что это за проект
 
@@ -14,12 +14,20 @@
 
 ## Текущее состояние (важное)
 
-- ✅ CLI реализован и работает — 10 команд, `out/adapters/cli/index.js` (см. [status.md](status.md))
+- ✅ CLI реализован и работает — **11 команд** включая `verify` (DoD-гейт), `out/adapters/cli/index.js` (см. [status.md](status.md))
 - ✅ VS Code-адаптер декуплен от core, все 11 команд зарегистрированы в `extension.ts`
-- ✅ **BUG-003 / BUG-004 закрыты** (2026-04-25): relation_patcher идемпотентный, pre-flight YAML-валидация
-- ✅ Тесты: `openapi_parser`, `python_endpoint_generator`, `template_service`, **`relation_patcher`**, **`entity_yaml_validator`** — 34 passing
-- ⚠️ Открытые баги: [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) (High), [BUG-002](../bug-reports/002-file-names-camelcase.md) (Medium)
-- ⚠️ Нет тестов для остальных частей entity-генератора (`code_formatter`, `server_yaml_parser`, `app_database_generator`)
+- ✅ **BUG-002 / BUG-003 / BUG-004 / BUG-005 / BUG-006 закрыты** (2026-04-25/26):
+  - snake_case filenames для multi-word entity (BUG-002)
+  - relation_patcher идемпотентный (BUG-003)
+  - pre-flight YAML-валидация 6-field pattern (BUG-004)
+  - AppDatabaseGenerator scan-based (BUG-005)
+  - migration-ветки append вместо prepend (BUG-006, найден внешними агентами TASK-015 в weight)
+- ✅ **`codegen verify`** — обязательный DoD-гейт перед сдачей user'у. Возвращает structured JSON с counts.
+- ✅ **`autoGenerateTasksFeature` + `patchPubspecPackagePaths`** в `create-project` — свежий проект сразу компилируется (e2e на t143: errors=0, server runtime HTTP 200)
+- ✅ Тесты — **62 passing**
+- ⚠️ Открытые баги: [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) (High), BUG-003 part 2 (`:base` секции перетирают custom code на regen — backlog)
+- 🟡 Активная задача: [TASK-010](../tasks/active/TASK-010-codegen-verify-runtime/task.md) — `codegen verify --runtime` (docker + server + integration test)
+- ⚠️ Нет тестов для `code_formatter`, `server_yaml_parser`, workflow-модулей
 
 ## Как организована работа
 
@@ -65,3 +73,13 @@
 - `src/core/*` НЕ импортирует `vscode` (только lazy `require` с fallback)
 - Windows: CLI использует PowerShell для exec (см. [agent_memory.md](agent_memory.md))
 - Коммиты на русском, Conventional Commits, без `Co-Authored-By`
+
+## Definition of Done (короткая версия — полная в [CLAUDE.md](../../CLAUDE.md))
+
+Любое изменение в `src/features/generation/`, `src/adapters/cli/commands/{create_project,generate_entity}.ts`, или в `G:/Templates/flutter/t115/` НЕ готово к показу user'у пока:
+
+1. `codegen verify --name <test_project>` вернул `success: true` (или прогон вручную: serverpod generate + build_runner + flutter analyze).
+2. **Цитированы реальные числа** в ответе user'у: `errors: N, warnings: M`. Запрещены формулировки "вроде работает", "должно скомпилироваться".
+3. **Не патчены руками** target-проекты чтобы скрыть баг генератора. Если что-то требует ручной правки — это **сигнал бага**, заводить bug-report.
+
+Политика 2026-04-26: каждое исправление генератора → новый тестовый проект `t<N+1>` пока не сработает с первого раза. Реальная история ветки `feature--fix-codegen-regen-bugs`: t141 (327 errors) → fix BUG-005 → t142 (48 errors) → fix widgets → t143 (PASS errors=0).
