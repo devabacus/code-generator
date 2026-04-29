@@ -44,25 +44,25 @@ Executor ведёт прогресс в **трёх секциях самого t
 
 **Spawn через Agent tool разрешён.** Условия:
 
-- **Destructive ops через субагента = STOP-gate.** Любая destructive op (`flutter pub upgrade --major`, destructive Serverpod migration, `git push --force`, массовое удаление файлов) внутри субагента — субагент обязан вернуть управление teamlead'у через секцию "нужно подтверждение", teamlead передаёт user'у, user одобряет, только тогда субагент продолжает.
+- **Destructive ops через субагента = STOP-gate.** Любая destructive op (`npm install <package>@major`, правка шаблона `G:/Templates/flutter/t115/`, удаление test-проектов в `G:/Projects/Flutter/serverpod/t<N>/`, `git push --force`, массовое удаление файлов) внутри субагента — субагент обязан вернуть управление teamlead'у через секцию "нужно подтверждение", teamlead передаёт user'у, user одобряет, только тогда субагент продолжает.
 - **Промпт субагенту** должен явно содержать: "при любой destructive op — записать в report.md `⚠ STOP: <op>, жду ok` и остановиться до моего ответа".
 - **После работы субагента** — teamlead читает его результат (report / diff / CLI вывод), не доверяет слепо. Субагент не видит контекст user'а, может принять неверное решение.
 - **Multi-agent code review:** после implementation сложной задачи — diff отдать двум независимым агентам для review до commit'а. Validated в weight-system (TASK-009/013, нашли 4-5 багов на каждой задаче). Применимо и в этом проекте.
 
 Альтернатива (если нужно изолированное окружение): user запускает executor'а в новом чате с `ai/prompts/executor.prompt.md`. Оба пути валидны, выбор по контексту.
 
-### MCP инструменты — blacklist
+### MCP инструменты — частично blacklist
 
-Запрещено использовать `mcp__dart__*` (N/A для TS-проекта) tools (особенно `analyze_files`) — подвешивают сессию. Всё через Bash:
+`mcp__dart__*` tools — N/A для этого проекта (он TypeScript, не Dart). Всё через Bash из корня репо:
 
 ```bash
-cd <package> && flutter analyze
-cd <package> && flutter test
-cd <package> && dart analyze
-cd <package> && dart test
+npm run compile          # tsc -p ./
+npm test                  # vscode-test (62 passing baseline)
+npm run lint              # eslint
+node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт
 ```
 
-Это правило применяется и к субагентам — в промпте явно указывать "MCP инструменты запрещён, через Bash".
+Это правило применяется и к субагентам — в промпте явно указывать "Dart MCP не использовать, через Bash npm/tsc commands".
 
 ## Workflow на задачу
 
@@ -122,20 +122,21 @@ python ai/scripts/task.py merge -y    # без prompt (для скриптов)
 
 После каждого merge — **не отчитываться "всё ок" пока локальный workspace не зелёный**. Особенно если merged PR трогал:
 
-- `pubspec.yaml` / `pubspec.lock` любого пакета
-- `.gitignore` или `.dart_tool/` (housekeeping автоген-артефактов)
-- сгенерированные файлы (`*.freezed.dart`, `*.g.dart`, Drift, Serverpod protocol)
-- структуру пакета (новый `packages/<X>/`, удаление пакета, переименование экспортов)
+- `package.json` / `package-lock.json` (изменение зависимостей)
+- `src/features/generation/` (генератор)
+- `src/adapters/cli/commands/{create_project,generate_entity}.ts`
+- `G:/Templates/flutter/t115/` (шаблон вне репо)
 
 Чек-лист:
 
 1. `git pull --ff-only` (task.py merge делает это сам).
-2. Для каждого затронутого пакета: `cd <package> && flutter pub get`.
-3. Если merged PR удалил `.dart_tool/` или менял генератор — `dart run build_runner build --delete-conflicting-outputs` в зависимых пакетах (`packages/ble_feature` → `weight_flutter`, и т.п.).
-4. `cd <package> && flutter analyze` — должно быть зелёным или с тем же baseline pre-existing issues, что был до merge. Появление **новых** ошибок = блокер, разбираться сразу.
-5. Только после этого писать пользователю «merged + workspace зелёный».
+2. `npm ci` или `npm install` — если менялся `package.json` / `package-lock.json`.
+3. `npm run compile` — clean compile должен проходить.
+4. `npm test` — все тесты passing (62 passing baseline на 2026-04-26).
+5. **Если merged PR трогал генератор или шаблон t115** — обязательно `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>`. Зафиксировать `errors=N, warnings=M` в финальном отчёте user'у.
+6. Только после п.4-5 писать пользователю «merged + master зелёный».
 
-**Не путать с CI:** CI тестирует то что в master, post-merge verify проверяет что локальное состояние user'а после `git pull` рабочее (потому что часть workspace-state — пере-генерируемые артефакты — не в коммите, и могут отстать).
+**Не путать с CI:** CI тестирует то что в master, post-merge verify проверяет что свежее e2e создание проекта работает (потому что шаблон вне репо может отстать или содержать конфликтующие правки от другого фикса).
 
 С флагом `--force` мержит даже если CI не зелёный (для hotfix):
 ```bash
@@ -186,29 +187,29 @@ python ai/scripts/task.py finish
 
 ## Runtime тестирование
 
-code-generator (TypeScript: VS Code extension + CLI `codegen`) не ESP32: **нет MCP-esp / UART / BLE hardware**. Тестирование через Flutter/Dart CLI.
+code-generator — TypeScript: VS Code extension + CLI `codegen`. Тестирование через npm/tsc + DoD-гейт `codegen verify`.
 
 ### Приоритет инструментов
 
 | Инструмент | Канал | Назначение |
 |-----------|-------|-----------|
-| `npm test` (Bash) | CLI | Unit + widget tests в `weight_flutter`, `weight_admin`, `weight_client` |
-| `npm run lint` (Bash) | CLI | Статический анализ в Flutter-пакетах |
-| `tsc -p ./` (Bash) | CLI | Статический анализ в чистых Dart-пакетах (`shared/`, `packages/*`) |
-| `npm test` (Bash) | CLI | Unit tests в чистых Dart-пакетах |
-| `flutter run` | GUI (device / emulator) | Ручная визуальная проверка — зона user'а |
-| `flutter drive` / `integration_test` | GUI | e2e тесты — зона user'а для запуска |
+| `npm run compile` (Bash) | CLI | tsc — проверка типов TypeScript |
+| `npm test` (Bash) | CLI | Unit-тесты на vscode-test + MockFileSystem (62 passing baseline) |
+| `npm run lint` (Bash) | CLI | eslint статический анализ |
+| `codegen verify --name <X>` (Bash) | CLI | **DoD-гейт**: pub get + serverpod generate + build_runner + flutter analyze на свежем сгенерированном проекте |
+| `codegen create-project` + ручной `flutter run` | GUI | Smoke runtime проверка сгенерированного проекта — зона user'а |
+| Установленный `.vsix` + Command Palette | GUI | Smoke VS Code расширения — зона user'а |
 
-### ⚠ MCP инструменты — НЕ использовать
+### ⚠ MCP инструменты
 
-**Инструменты `mcp__dart__*` (N/A для TS-проекта) в этом проекте запрещены** — `mcp__dart__analyze_files` (N/A для TS) подвешивает сессию. Остальные MCP инструменты tools тоже временно на blacklist (до восстановления стабильности).
+`mcp__dart__*` — N/A для этого проекта (он TypeScript). Не использовать.
 
-**Альтернатива — всегда через Bash:**
+**Всегда через Bash из корня репо:**
 ```bash
-cd weight_flutter && flutter analyze
-cd shared && dart analyze
-cd weight_flutter && flutter test
-cd packages/ble_feature && dart test
+npm run compile
+npm test
+npm run lint
+node out/adapters/cli/index.js verify --name <test_project> --human
 ```
 
 Если агент попробует `mcp__dart__analyze_files` (N/A для TS) — сессия зависнет, прогресс потеряется. Это hard-rule.
@@ -218,51 +219,56 @@ cd packages/ble_feature && dart test
 Полная политика по слоям пирамиды — [`ai/docs/conventions.md → Testing`](ai/docs/conventions.md#testing).
 
 1. **Executor ОБЯЗАН тестировать** в одном PR с кодом:
-   - **Unit-тесты на новый чистый код** (helpers, mappers, parsers, algorithms, use-cases) — ~100% публичного API. **Без исключений.**
-   - **Widget-тест на каждый новый shared widget** (в `lib/core/widgets/` или аналог) — render + основные интеракции.
-   - **Page widget-тесты** — для critical flow (auth, отправка взвешивания, оплата), нетривиальной state-логики, регрессии известного бага. Простые CRUD-списки можно покрыть только smoke user'а.
+   - **Unit-тесты на новый чистый код** (helpers, parsers, generators, mappers, валидаторы) — ~100% публичного API на MockFileSystem. **Без исключений.**
+   - **Расширение existing test-suite** при правке `AppDatabaseGenerator`, `RelationPatcher`, `EntityYamlValidator`, `replacement_util`, `verify` — добавить покрытие изменённого поведения.
+   - **`codegen verify --name t<N+1>` PASS** обязателен для любой правки `src/features/generation/` или шаблона `t115/`. Это **Definition of Done гейт**.
+   - **Runtime-чек** для миграций / runtime-логики сервера: `docker compose up -d` + `serverpod create-migration --force` + `dart bin/main.dart --apply-migrations` + `curl http://localhost:8080/`.
    - **Regression тест на каждый fix** — обязательно.
-   - **Integration tests** — только для critical happy-path или воспроизведения бага.
 
-2. **Принцип:** агент быстро перепишет тесты при изменении фичи; **отсутствие теста через 2-3 месяца при рефакторинге** — реальная регрессия. Лучше написать "лишний" тест.
+2. **Принцип:** агент быстро перепишет тесты при изменении фичи; **отсутствие теста через 2-3 месяца при рефакторинге** — реальная регрессия. Лучше написать "лишний" тест. Без verify-гейта правка генератора **не считается** готовой.
 
-3. **Build + analyze check** обязателен:
+3. **Build + test check** обязателен (из корня репо):
    ```bash
-   cd <package> && flutter pub get
-   cd <package> && flutter analyze
-   cd <package> && flutter test
+   npm run compile          # tsc -p ./
+   npm test                  # vscode-test (62 passing baseline на 2026-04-26)
+   npm run lint              # eslint
+   node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт для генератора
    ```
 
 4. **В `report.md` обязательно** приводить реальный вывод CLI:
    ```
-   [flutter analyze] cd weight_flutter && flutter analyze
-   → No issues found!
+   [npm test] npm test
+   → 62 passing (115ms)
 
-   [flutter test] cd weight_flutter && flutter test
-   → 00:05 +12 -0: All tests passed!
+   [verify] node out/adapters/cli/index.js verify --name t144 --human
+   → PASS: verify t144
+       ✓ flutterAnalyze — 6158ms (errors=0, warnings=2, infos=75)
+       ✓ pubGet — 5262ms
+       ✓ serverpodGenerate — 9932ms
+       ✓ buildRunner — 4726ms
    ```
 
-5. **Executor при блокировке** (тесты падают, анализ не работает и нет очевидного фикса) → НЕ упрощать тесты. `## BLOCKED` в report, ждать решения user'а.
+5. **Executor при блокировке** (тесты падают, verify FAIL и нет очевидного фикса) → НЕ упрощать тесты, **НЕ патчить руками target-проект**. `## BLOCKED` в report, ждать решения user'а.
 
-### Monorepo specifics
+### Структура проекта
 
-Несколько пакетов, каждый со своим `pubspec.yaml`:
-- `weight_flutter/` — Flutter client (Windows/Android/Web)
-- `weight_admin/` — Flutter admin
-- `weight_server/` — Serverpod backend
-- `weight_client/` — generated Serverpod client (не редактировать — из server)
-- `shared/` — Dart package (API spec из weight-system, не редактировать вручную)
-- `packages/ble_feature/` — Dart package
-- `microservices/mqtt-service/` — Python FastAPI
+Не Flutter-монорепо, а TypeScript single-package (`package.json` в корне) с зонами в `src/`:
+- `src/adapters/cli/` — CLI команды
+- `src/adapters/vscode/` — VS Code расширение
+- `src/core/` — доменная логика без vscode
+- `src/features/generation/` — генератор сущностей (parsers, generators, replacement)
+- `src/modules/{flutter,go,node,python}/` — реализации `MicroserviceLanguage`
+- `src/test/` — тесты на `vscode-test` + MockFileSystem
 
-`flutter pub get` / `npm run lint` / `npm test` запускаются **из директории конкретного пакета**. Агент должен делать `cd <package>` перед командой.
+Шаблон проектов **вне репозитория**: `G:/Templates/flutter/t115/`. Любая правка шаблона — это template-уровень, влияет на все будущие `create-project`. STOP-gate.
+
+Сгенерированные test-проекты — в `G:/Projects/Flutter/serverpod/t<N>/`. Создаются через `codegen create-project --name t<N>`. **Не редактировать руками** для скрытия багов генератора (политика "новый t<N+1> при каждом фиксе").
 
 ### Что НЕ покрывается CLI
 
-- Визуальная проверка UI — `flutter run` на device/emulator, зона user'а
-- Проверка на физических устройствах (BLE, MQTT real devices) — зона user'а
-- Performance / latency — ручной профайлинг
-- Integration с Serverpod при реальной БД — ручной запуск стека
+- Визуальная проверка VS Code UI команд (Command Palette) — установка `.vsix` + ручной кликинг
+- Реальный multi-client sync flow (создать сущность → real-time event на другом клиенте) — зона user'а
+- Performance / latency большой генерации (50+ сущностей)
 
 Для этого — секция "Ручные проверки user" в task.md.
 
@@ -295,15 +301,11 @@ cd packages/ble_feature && dart test
 - `ai/discussions/active/` — активные обсуждения
 - `ai/discussions/archive/` — завершённые
 
-## Cross-repo sync (weight-system → этот репо)
+## Code-generator → потребители (weight-system, других проектов)
 
-Файл `shared/api_spec.*` генерируется в weight-system и копируется сюда через:
+Code-generator **управляет шаблоном** `G:/Templates/flutter/t115/` и CLI `codegen`. Этим инструментом создаются конкретные проекты (например weight-system).
 
-```bash
-# Из weight-system:
-python scripts/gen_api_dart.py --copy-to-flutter G:/Projects/Flutter/serverpod/weight
-```
-
-**Правило:** `shared/api_spec.yaml` и `shared/lib/api_spec.dart` **не редактировать вручную в этом репо**. Все изменения идут через weight-system (YAML source of truth + регенерация Dart). После `--copy-to-flutter` — отдельный chore-PR в этом репо для sync + миграция кода если breaking change.
-
-Версии отслеживаются: `shared/pubspec.yaml` pub-версия синхронизируется с `apiSpecVersion` из api_spec.dart (bump при breaking).
+- Любая правка `src/features/generation/` или шаблона t115 имеет blast radius **на все будущие** `create-project` запуски. Учитывать это при scope.
+- Внешние агенты в проектах-потребителях могут найти баг генератора и прислать фикс сюда (реальный кейс: TASK-015 в weight нашла BUG-006 → фикс пришёл в code-generator). Бывает.
+- Шаблон t115 — **не репо**. Изменения в шаблоне `G:/Templates/flutter/t115/` не отслеживаются git'ом этого репо. Учитывать при описании изменений в PR (что именно поменяно в шаблоне).
+- При изменении шаблона — обязательно прогон `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>` чтобы убедиться что шаблон не сломан.

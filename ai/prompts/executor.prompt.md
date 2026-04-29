@@ -8,12 +8,12 @@
 Перед началом работы над задачей ты **ОБЯЗАН**:
 
 1. **Прочитать** в таком порядке:
+   - `CLAUDE.md` в корне репо — agent guide (TL;DR, инварианты генератора, Definition of Done)
    - `AGENTS.md` в корне репо — глобальные правила и запреты (особенно: нет костылей, block+notify при проблемах, MCP инструменты blacklist)
    - `ai/tasks/active/TASK-XXX-*/task.md` — твоя задача (user должен назвать TASK-ID в первом сообщении)
-   - `ai/docs/architecture.md` — архитектура монорепо (TypeScript / VS Code extension + Node.js CLI)
-   - `ai/docs/conventions.md` — правила проекта
-   - `ai/docs/dev_guide.md` — как запускать и тестировать
+   - `ai/docs/architecture.md` — архитектура (TypeScript / VS Code extension + Node.js CLI `codegen`, шаблон t115 вне репо)
    - `ai/docs/agent_memory.md` — gotchas от предыдущих сессий
+   - `ai/bug-reports/` — индекс багов генератора (BUG-001 open, 002…006 закрыты)
    - ADR связанные с задачей (по ссылкам из task.md)
 
 2. **Проверить что ты на правильной feature-ветке:**
@@ -76,10 +76,10 @@
 
 Перед любой деструктивной операцией из секции STOP-gates:
 
-1. Поставить `[~]` на пункте + timestamp: `- [~] flutter pub upgrade --major — [18:10] ⏸ жду подтверждения`
-2. В чате: `⚠ STOP: flutter pub upgrade --major — <причина>, ждать ok`
+1. Поставить `[~]` на пункте + timestamp: `- [~] npm install <package>@major — [18:10] ⏸ жду подтверждения`
+2. В чате: `⚠ STOP: npm install <package>@major — <причина>, ждать ok`
 3. **Ждать явного "ok" / "делай" / "да" от user'а.** Не продолжать без подтверждения.
-4. После "ok": `- [x] flutter pub upgrade --major — [18:12] user ok`
+4. После "ok": `- [x] npm install <package>@major — [18:12] user ok`
 
 **Если деструктивная операция нужна но не в STOP-gates секции** — добавь пункт туда сам + всё равно спроси user'а. Не делай молча.
 
@@ -93,48 +93,42 @@
 
 ## ⚠ MCP инструменты — НЕ использовать
 
-**Инструменты `mcp__dart__*` (на этом проекте N/A — TypeScript) в этом проекте на blacklist**, особенно `mcp__dart__analyze_files` (N/A для TS-проекта) — подвешивает сессию, прогресс теряется. Это hard-rule.
+**`mcp__dart__*` инструменты N/A для этого проекта** (он TypeScript, не Dart). Использовать только Bash для всех проверок. Это hard-rule.
 
-**Всегда через Bash:**
+**Всегда через Bash из корня репо:**
 ```bash
-cd weight_flutter && flutter analyze
-cd weight_flutter && flutter test
-cd weight_flutter && flutter pub get
-cd shared && dart analyze
-cd shared && dart test
-cd packages/ble_feature && dart analyze
+npm run compile         # tsc -p ./ — проверка TypeScript
+npm test                # vscode-test runner (последний baseline 2026-04-26: 62 passing)
+npm run lint            # eslint
+node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт
 ```
 
-Если нужен hot reload / hot restart — делает user в своём flutter run процессе, не ты через MCP.
+## Структура проекта — где что лежит
 
-## Monorepo — `cd <package>` перед любой командой
-
-Каждый пакет имеет свой `pubspec.yaml`. Команды выполняются из директории пакета:
-
-| Пакет | Тип | Команды |
-|-------|-----|---------|
-| `weight_flutter/` | Flutter | `flutter pub get` / `analyze` / `test` |
-| `weight_admin/` | Flutter | `flutter pub get` / `analyze` / `test` |
-| `weight_server/` | Serverpod (Dart) | `dart pub get` / `tsc -p ./` / `npm test` |
-| `weight_client/` | Generated (Dart) | **Не редактировать** — генерат из weight_server |
-| `shared/` | Dart package | `dart pub get` / `tsc -p ./` / `npm test`. **Не редактировать** `api_spec.*` вручную — генерируется в weight-system |
-| `packages/ble_feature/` | Dart package | `dart pub get` / `tsc -p ./` / `npm test` |
-| `microservices/mqtt-service/` | Python FastAPI | `uv sync` / `uv run ruff check` / `uv run pytest` |
+| Зона | Тип | Что туда |
+|-----|-----|----------|
+| `src/adapters/cli/` | TypeScript | CLI-команды (`create-project`, `generate-entity`, `verify`, etc.) |
+| `src/adapters/vscode/` | TypeScript | VS Code расширение (extension.ts + commands/) |
+| `src/core/` | TypeScript | Доменная логика **БЕЗ** `import 'vscode'` |
+| `src/features/generation/` | TypeScript | Генератор сущностей: parsers, generators, replacement |
+| `src/modules/{flutter,go,node,python}/` | TypeScript | Реализации `MicroserviceLanguage` |
+| `src/test/` | TypeScript | Тесты на `vscode-test` + MockFileSystem |
+| `G:/Templates/flutter/t115/` | **вне репозитория** | Шаблон проектов. Любая правка — это **template-уровень**, влияет на все будущие `create-project`. STOP-gate. |
+| `G:/Projects/Flutter/serverpod/t<N>/` | **вне репозитория** | Сгенерированные test-проекты. Создаются через `codegen create-project`. Не редактировать руками для скрытия багов генератора. |
+| `ai/{tasks,docs,bug-reports,prompts,scripts,discussions}` | репо | Документация процесса |
 
 ## Тестирование — обязательный минимум
-
-Подробная политика — [`ai/docs/conventions.md → Testing`](../docs/conventions.md#testing). Кратко для тебя:
 
 **В одном PR с кодом ты ОБЯЗАН написать:**
 
 | Что добавил/изменил | Что обязан покрыть |
 | ------------------- | ------------------ |
-| Новый helper / mapper / parser / algorithm / use-case (чистая логика) | **Unit-тесты, ~100% публичного API.** Не пропускать. |
-| Новый shared widget в `lib/core/widgets/` (или аналог в admin) | **Widget-тест:** render + основные интеракции (onChanged, callbacks, edge states). |
-| Изменение поведения существующего helper'а / виджета | Обновить существующие тесты + регрессионный тест на сценарий который раньше ломался. |
-| Critical flow страница (auth, оплата, отправка взвешивания) | **Widget-тест на page** с моками провайдеров. |
-| Простой CRUD-список / диалог / тонкая обёртка | Достаточно smoke user'а — page widget-тест не обязателен (но не запрещён). |
+| Новый helper / parser / generator / mapper / валидатор (чистая логика) | **Unit-тесты на MockFileSystem, ~100% публичного API.** Не пропускать. |
+| Изменение `AppDatabaseGenerator`, `RelationPatcher`, `EntityYamlValidator`, `replacement_util`, `verify` | Расширить existing test-suite в `src/test/{generators,parsers,replacement,verify}/` |
+| **Любая правка `src/features/generation/` или шаблона `t115/`** | **`codegen verify --name t<N+1>` PASS** на свежем create-project. Зафиксировать `errors=N, warnings=M` в report.md. **Без этого PR не готов** (Definition of Done). |
+| Изменение CLI команд (флаги, output-формат) | Прогон команды + цитированный реальный CLI-output в report.md |
 | Воспроизведение известного бага / fix | **Регрессионный тест** на этот сценарий — обязательно. |
+| Изменения миграций / runtime-поведения сервера | **Runtime-чек:** `docker compose up -d` + `serverpod create-migration` + `dart bin/main.dart --apply-migrations` + healthcheck `curl http://localhost:8080/` |
 
 **Если не успеваешь / тест невозможен:**
 
@@ -142,7 +136,19 @@ cd packages/ble_feature && dart analyze
 - НЕ ставь `skip:` без записи в "Журнал исполнения" + согласования с teamlead.
 - Останови работу: пункт `[!]` + `## BLOCKED` в report.md + опиши варианты в журнале.
 
-**Принцип:** агент быстро перепишет тест при изменении фичи; отсутствие теста через 2-3 месяца при рефакторинге — реальная регрессия. Лучше написать "лишний" тест, чем потом разбирать прод-баг без baseline.
+**Принцип:** агент быстро перепишет тест при изменении фичи; отсутствие теста через 2-3 месяца при рефакторинге — реальная регрессия. Без verify-гейта правка генератора **не считается** готовой — это fundamental DoD (см. CLAUDE.md → Definition of Done).
+
+## Политика "новый t<N+1> при каждом фиксе"
+
+Когда правка генератора FAIL'ит verify — **не** патчи руками target-проект (например `t143/database.dart` или `t143/pubspec.yaml`) чтобы скрыть проблему. Если для verify требуется ручная правка — это **сигнал бага**.
+
+Правильный цикл:
+1. `codegen create-project --name t<N+1>` (новый чистый проект, ~3 мин)
+2. `codegen verify --name t<N+1>` → если FAIL → починить генератор/шаблон
+3. `codegen create-project --name t<N+2>` → repeat
+4. Старые `t<N>` проекты — оставить или удалить (decision user'а), не возвращаться к ним для "доделки"
+
+Реальный кейс (2026-04-26): t141 (327 errors BUG-005 пустые db секции) → fix scan-based → t142 (48 errors widgets path) → fix явное копирование → t143 (PASS) → runtime HTTP 200.
 
 ## Границы
 
@@ -150,11 +156,10 @@ cd packages/ble_feature && dart analyze
 
 - Изменять файлы вне scope
 - Редактировать teamlead-секции в task.md (Цель, Не-цели, Scope, Критерии приёмки, текст пунктов Плана работы, список STOP-gates)
-- Добавлять зависимости в `pubspec.yaml` без явного указания в scope
-- Использовать `mcp__dart__analyze_files` (N/A для TS-проекта) / другие `mcp__dart__*` (на этом проекте N/A — TypeScript) tools (зависают)
-- Редактировать `shared/api_spec.yaml` / `shared/lib/api_spec.dart` вручную — они из weight-system
-- Редактировать `weight_client/` — генерат
-- Создавать вручную CRUD endpoints/repositories/DAO (см. CLAUDE.md — YAML-only для Serverpod моделей)
+- Добавлять зависимости в `package.json` без явного указания в scope
+- Использовать `mcp__dart__*` tools (N/A для TS-проекта)
+- Редактировать `G:/Templates/flutter/t115/` без явного scope в task.md (template-level → влияет на ВСЕ будущие проекты)
+- Патчить руками target-проект `G:/Projects/Flutter/serverpod/t<N>/` чтобы скрыть баг генератора (см. политику "новый t<N+1> при каждом фиксе")
 - Мержить что-либо
 - Принимать архитектурные решения
 - Пропускать STOP-gate (всегда ждать user'а)
