@@ -12,7 +12,6 @@ import { startAppFix } from '../../../utils/start_app_fix';
 import { ServerpodYamlParser } from '../../../features/generation/parsers/server_yaml_parser';
 import { manifestType } from '../../../features/generation/generators/manifests';
 import {
-    autoGenerateTasksFeature as bootstrapAutoGenTasks,
     patchPubspecPackagePaths as bootstrapPatchPubspec,
     copyAgentInfrastructure as bootstrapCopyAgentInfra,
 } from '../../../core/services/project_bootstrapper';
@@ -39,7 +38,6 @@ interface CreateProjectOptions {
     skipServerpodGenerate?: boolean;
     skipGitInit?: boolean;
     localSetup?: boolean;
-    withTasks?: boolean;
     human?: boolean;
 }
 
@@ -55,7 +53,6 @@ export function registerCreateProject(program: Command): void {
         .option('--skip-serverpod-generate', 'Skip serverpod generate and migrations')
         .option('--skip-git-init', 'Skip git init and GitHub setup')
         .option('--local-setup', 'After creation: docker compose up, migrations, run server')
-        .option('--with-tasks', 'Auto-generate starter tasks-фичу (Category/Tag/Task/TaskTagMap) для демо. По умолчанию выключено — голый проект только с settings/auth/configuration.')
         .option('--json', 'Output as JSON (default)', true)
         .option('--human', 'Output as human-readable text')
         .action(async (opts: CreateProjectOptions) => {
@@ -102,17 +99,12 @@ async function handleCreateProject(opts: CreateProjectOptions): Promise<void> {
         const generationService = new GenerationService(fileSystem);
         await generationService.generate(config);
 
-        // 4a/b/c. Bootstrap-шаги вынесены в shared core/services/project_bootstrapper.ts
+        // 4a/b. Bootstrap-шаги вынесены в shared core/services/project_bootstrapper.ts
         // чтобы и CLI, и VS Code адаптер использовали одинаковую логику.
-
-        // tasks-фича — опциональная демо. По умолчанию выключена (голый проект
-        // только с settings/auth/configuration). Включить через --with-tasks.
-        if (opts.withTasks) {
-            logger.info('Auto-generating starter tasks entities (--with-tasks)...');
-            await bootstrapAutoGenTasks(fileSystem, config, logger);
-        } else {
-            logger.info('Skipping tasks-фичу (default). Pass --with-tasks to include Category/Tag/Task/TaskTagMap demo.');
-        }
+        // ВАЖНО: tasks-фичу НЕ генерируем в create-project. Tasks (Category/Tag/Task/
+        // TaskTagMap) — это эталонные шаблоны для entity-генерации по YAML, не
+        // часть нового проекта. Хочешь Task-сущность в своём проекте — пиши свой
+        // `<entity>.spy.yaml` + `codegen generate-entity`.
 
         logger.info('Patching pubspec.yaml relative package paths...');
         await bootstrapPatchPubspec(fileSystem, config);

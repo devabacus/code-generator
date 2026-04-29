@@ -1,5 +1,4 @@
 import path from "path";
-import { window } from "vscode";
 import { ServiceLocator } from "../../../core/services/service_locator";
 import { gitInit } from "../utils/git_init";
 import { startAppFix } from "../../../utils/start_app_fix";
@@ -9,7 +8,6 @@ import { GenerationConfig } from "../../../features/generation/config/generation
 import { AppDatabaseGenerator } from "../../../features/generation/generators/app_database_generator";
 import { GenerationService } from "../../../features/generation/generators/generation_service";
 import {
-    autoGenerateTasksFeature,
     patchPubspecPackagePaths,
     copyAgentInfrastructure,
     IBootstrapLogger,
@@ -35,15 +33,6 @@ export async function createNewProject(): Promise<void> {
     if (!targetProject) {
         return;
     }
-
-    // Опт-ин: starter tasks-фича (Category/Tag/Task/TaskTagMap demo).
-    // По умолчанию — голый проект (только settings/auth/configuration).
-    const tasksAnswer = await window.showInformationMessage(
-        'Сгенерировать starter tasks-фичу (Category/Tag/Task/TaskTagMap) для демо?',
-        'Yes, with tasks demo',
-        'No, plain project',
-    );
-    const withTasks = tasksAnswer === 'Yes, with tasks demo';
 
     const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
 
@@ -72,14 +61,11 @@ export async function createNewProject(): Promise<void> {
     await generationService.generate(config);
 
     // Bootstrap-шаги (вынесены в shared core/services/project_bootstrapper.ts).
+    // ВАЖНО: tasks-фичу НЕ генерируем. Tasks (Category/Tag/Task/TaskTagMap) —
+    // эталонные шаблоны для entity-генерации по YAML, не часть нового проекта.
     const bootstrapLogger: IBootstrapLogger = {
         info: (msg) => console.log(msg),
     };
-    if (withTasks) {
-        await autoGenerateTasksFeature(fileSystem, config, bootstrapLogger);
-    } else {
-        bootstrapLogger.info('Skipping tasks-фичу (default). Pass with tasks demo to include Category/Tag/Task/TaskTagMap.');
-    }
     await patchPubspecPackagePaths(fileSystem, config);
     await copyAgentInfrastructure(fileSystem, config, bootstrapLogger);
 
