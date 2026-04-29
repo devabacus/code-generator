@@ -1,5 +1,5 @@
 import { MicroserviceLanguage } from '../../core/interfaces/microservice_language';
-import { executeCommand } from '../../utils/terminal_handle';
+import { execCommand } from '../../core/utils/exec';
 
 /**
  * Реализация MicroserviceLanguage для Node.js.
@@ -12,7 +12,7 @@ export const nodeLanguage: MicroserviceLanguage = {
 
     async initialize(projectPath: string): Promise<void> {
         try {
-            await executeCommand('npm install', projectPath);
+            await execCommand('npm install', projectPath);
         } catch {
             // Игнорируем если нет package.json
         }

@@ -17,7 +17,10 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./out/extension.js",
+  "main": "./out/adapters/vscode/extension.js",
+  "bin": {
+    "codegen": "./out/adapters/cli/index.js"
+  },
   "contributes": {
     "commands": [
       {
@@ -26,7 +29,7 @@
       },
       {
         "command": "code-generator.vsCodeExtHandler",
-        "title": "AntigravityHandler"
+        "title": "viscode handler"
       },
       {
         "command": "code-generator.createNewProject",
@@ -96,17 +99,19 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "cli": "node out/adapters/cli/index.js"
   },
   "dependencies": {
     "@types/yaml": "^1.9.6",
+    "commander": "^14.0.3",
     "js-yaml": "^4.1.0",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
+    "@types/node": "^22.19.17",
     "@types/vscode": "^1.104.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",

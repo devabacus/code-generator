@@ -19,7 +19,7 @@ export class SectionReplacer {
             const generatorFunc = getSectionGenerator(generatorName);
 
             if (generatorFunc) {
-                const newContent = generatorFunc(model) || '';
+                const newContent = generatorFunc(model, config) || '';
                 const startMarker = `// === generated_start:${generatorName} ===`;
                 const endMarker = `// === generated_end:${generatorName} ===`;
 

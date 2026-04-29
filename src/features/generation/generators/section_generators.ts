@@ -1,3 +1,4 @@
+import { GenerationConfig } from "../config/generation_config";
 import { CodeFormatter } from "../parsers/formatters/code_formatter";
 import { ServerpodModel } from "../parsers/formatters/types";
 import { generateDriftTableImports, generateEntityToServerpodParams, generateServerpodToModelParams } from "./relation_generation";
@@ -21,7 +22,7 @@ export const DEFAULT_MARKERS = {
     END: '// === GENERATED_END ==='
 } as const;
 
-type SectionGenerator = (model: ServerpodModel) => string;
+type SectionGenerator = (model: ServerpodModel, config: GenerationConfig) => string;
 
 const sectionGeneratorRegistry: Record<string, SectionGenerator> = {
 
@@ -52,8 +53,8 @@ const sectionGeneratorRegistry: Record<string, SectionGenerator> = {
         const formatter = new CodeFormatter();
         return formatter.formatSimpleFields(model.fields);
     },
-    [GENERATORS.DRIFT_TABLE_IMPORTS]: (model) => {
-        return generateDriftTableImports(model);
+    [GENERATORS.DRIFT_TABLE_IMPORTS]: (model, config) => {
+        return generateDriftTableImports(model, config);
     },
 
     [GENERATORS.SERVERPOD_TO_MODEL_PARAMS]: (model) => {

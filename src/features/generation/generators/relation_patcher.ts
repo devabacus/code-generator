@@ -6,6 +6,7 @@ import { ServerpodModel } from '../parsers/formatters/types';
 import { getPathInfo } from '../config/path_handle';
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { DictionaryPresets } from '../replacement/dictionary_presets';
+import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
 
 export class RelationPatcher {
     constructor(private fileSystem: IFileSystem) { }
@@ -18,7 +19,8 @@ export class RelationPatcher {
         const markerName = 'oneToManyMethods';
         const startMarker = `// === generated_start:${markerName} ===`;
         const endMarker = `// === generated_end:${markerName} ===`;
-        const regex = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`, 'g');
+        const blockRegex = new RegExp(`${startMarker}([\\s\\S]*?)${endMarker}`);
+        const blockRegexAll = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`, 'g');
 
         const relationFields = RelationAnalyzer.manyToOneFields(model.fields);
 
@@ -49,76 +51,97 @@ export class RelationPatcher {
 
                 const relationTemplateContent = await this.fileSystem.readFile(relationTemplatePath);
 
-                const matched = relationTemplateContent.match(regex);
-                if (!matched) {
+                const innerMatch = relationTemplateContent.match(blockRegex);
+                if (!innerMatch) {
                     continue;
                 }
-                const blockContent = matched[0];
+                // innerBody — содержимое между маркерами в шаблоне (тело одного relation-метода)
+                const innerBody = innerMatch[1];
 
                 const isBlockInClass = relationTemplateContent.trim().endsWith('}');
 
-                let allProcessedBlocks = '';
+                // Накапливаем тела методов БЕЗ маркеров — обёртка одна на блок (см. ниже)
+                let processedBodies = '';
 
                 for (const relationField of relationFields) {
                     if (!relationField.relatedModel) {
                         continue;
                     }
 
-                    let templateBlock = blockContent;
+                    let body = innerBody;
 
                     const mainEntityConfig = new GenerationConfig({ ...config, templEntity: relationTemplateEntity, targetEntity: model.className });
                     const mainEntityRules = getDictionaryRules(DictionaryPresets.ENTITY, mainEntityConfig);
                     for (const rule of mainEntityRules) {
-                        templateBlock = templateBlock.replace(new RegExp(rule.from, 'g'), rule.to);
+                        body = body.replace(new RegExp(rule.from, 'g'), rule.to);
                     }
 
                     const relatedEntityConfig = new GenerationConfig({ ...config, templEntity: templateRelatedEntity, targetEntity: relationField.relatedModel });
                     const relatedEntityRules = getDictionaryRules(DictionaryPresets.ENTITY, relatedEntityConfig);
                     for (const rule of relatedEntityRules) {
-                        templateBlock = templateBlock.replace(new RegExp(rule.from, 'g'), rule.to);
+                        body = body.replace(new RegExp(rule.from, 'g'), rule.to);
                     }
 
                     const targetIdName = relationField.name.endsWith('Id') ? relationField.name : `${relationField.name}Id`;
-                    templateBlock = templateBlock.replace(new RegExp(`${templateRelatedEntity}Id`, 'g'), targetIdName);
+                    body = body.replace(new RegExp(`${templateRelatedEntity}Id`, 'g'), targetIdName);
 
-                    allProcessedBlocks += '\n\n' + templateBlock;
+                    processedBodies += '\n' + body.replace(/^\n+|\n+$/g, '') + '\n';
                 }
 
-                if (allProcessedBlocks.length > 0) {
-                    const relativePath = path.relative(sourceBasePath, templateFilePath).replace(/\\/g, '/');
-                    const destinationPath = path.join(destinationBasePath, this._getDestinationPath(new GenerationConfig({ ...config, templEntity: 'category' }), relativePath));
+                if (processedBodies.length === 0) {
+                    continue;
+                }
 
-                    if (!await this.fileSystem.exists(destinationPath)) {
-                        continue;
-                    }
+                const relativePath = path.relative(sourceBasePath, templateFilePath).replace(/\\/g, '/');
+                const destinationPath = path.join(destinationBasePath, this._getDestinationPath(new GenerationConfig({ ...config, templEntity: 'category' }), relativePath));
 
-                    let destinationContent = await this.fileSystem.readFile(destinationPath);
+                if (!await this.fileSystem.exists(destinationPath)) {
+                    continue;
+                }
 
-                    // Skip if already patched (avoid duplicate methods)
-                    if (destinationContent.includes(startMarker)) {
-                        continue;
-                    }
+                const destinationContent = await this.fileSystem.readFile(destinationPath);
 
-                    if (isBlockInClass) {
-                        const lastBraceIndex = destinationContent.lastIndexOf('}');
-                        if (lastBraceIndex !== -1) {
-                            const indentedBlock = allProcessedBlocks.trim();
-                            const newContent =
-                                destinationContent.slice(0, lastBraceIndex) +
-                                `\n  ${indentedBlock}\n` +
-                                destinationContent.slice(lastBraceIndex);
-                            await this.fileSystem.createFile(destinationPath, newContent);
+                // Один маркерный блок на весь файл — все методы внутри.
+                // Это делает patch идемпотентным и устраняет накопление дубликатов на повторных regen.
+                const fullBlock = `${startMarker}${processedBodies}  ${endMarker}`;
+
+                if (destinationContent.includes(startMarker)) {
+                    // Заменяем первое вхождение marker-блока на единый свежий fullBlock,
+                    // последующие вхождения (если есть — legacy-дубликаты) удаляем.
+                    let firstReplaced = false;
+                    let newContent = destinationContent.replace(blockRegexAll, () => {
+                        if (!firstReplaced) {
+                            firstReplaced = true;
+                            return fullBlock;
                         }
-                    } else {
-                        await this.fileSystem.createFile(destinationPath, destinationContent + allProcessedBlocks);
+                        return '';
+                    });
+                    // Подчищаем лишние пустые строки от удалённых дубликатов
+                    newContent = newContent.replace(/\n{3,}/g, '\n\n');
+                    await this.fileSystem.createFile(destinationPath, newContent);
+                    continue;
+                }
+
+                if (isBlockInClass) {
+                    const lastBraceIndex = destinationContent.lastIndexOf('}');
+                    if (lastBraceIndex !== -1) {
+                        const newContent =
+                            destinationContent.slice(0, lastBraceIndex) +
+                            `\n  ${fullBlock}\n` +
+                            destinationContent.slice(lastBraceIndex);
+                        await this.fileSystem.createFile(destinationPath, newContent);
                     }
+                } else {
+                    await this.fileSystem.createFile(destinationPath, destinationContent + '\n' + fullBlock + '\n');
                 }
             }
         }
     }
 
     private _getDestinationPath(config: GenerationConfig, relativePath: string): string {
-        let destinationRelativePath = relativePath.replaceAll(config.templEntity, config.targetEntity);
+        // BUG-002: пути на диске должны быть snake_case
+        const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
+        let destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
         return destinationRelativePath;
     }

@@ -1,4 +1,4 @@
-import { cap, pluralConvert, unCap } from "../../../utils/text_work/text_util";
+import { cap, pluralConvert, toSnakeCase, unCap } from "../../../utils/text_work/text_util";
 import { ReplacementRule } from "../generators/replacing_file_processor";
 import { GenerationConfig } from "../config/generation_config";
 
@@ -31,12 +31,20 @@ const dictionaryRegistry: Record<DictionaryName, RuleGenerator> = {
             ds: pluralConvert(unCap(config.targetEntity)),
             D: cap(config.targetEntity),
             d: unCap(config.targetEntity),
+            // snake_case form для путей и snake_case-идентификаторов (BUG-002)
+            // например `category_table.dart` → `correction_button_table.dart`
+            dSnake: toSnakeCase(unCap(config.targetEntity)),
         };
 
         return [
             { from: baseForms.Ds, to: newForms.Ds },
             { from: baseForms.ds, to: newForms.ds },
             { from: baseForms.D, to: newForms.D },
+            // snake-case rule должен идти ПЕРЕД camelCase d-rule:
+            // ловит `category` за которым следует `_`, `/` или `.dart` (path/file context)
+            // и подставляет snake_case форму вместо camelCase. Не трогает `categoryTable`,
+            // `category.id` и подобные identifier-контексты — те обрабатываются d-rule.
+            { from: `${baseForms.d}(?=_|/|\\.dart\\b)`, to: newForms.dSnake },
             { from: baseForms.d, to: newForms.d },
         ];
     },
@@ -50,12 +58,14 @@ const dictionaryRegistry: Record<DictionaryName, RuleGenerator> = {
         rules.push(
             { from: pluralConvert(cap(templEntity1)), to: pluralConvert(cap(config.targetEntity1)) },
             { from: cap(templEntity1), to: cap(config.targetEntity1) },
+            { from: `${unCap(templEntity1)}(?=_|/|\\.dart\\b)`, to: toSnakeCase(unCap(config.targetEntity1)) },
             { from: unCap(templEntity1), to: unCap(config.targetEntity1) },
         );
 
         rules.push(
             { from: pluralConvert(cap(templEntity2)), to: pluralConvert(cap(config.targetEntity2)) },
             { from: cap(templEntity2), to: cap(config.targetEntity2) },
+            { from: `${unCap(templEntity2)}(?=_|/|\\.dart\\b)`, to: toSnakeCase(unCap(config.targetEntity2)) },
             { from: unCap(templEntity2), to: unCap(config.targetEntity2) },
         );
         return rules;

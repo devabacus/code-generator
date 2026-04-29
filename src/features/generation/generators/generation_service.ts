@@ -12,6 +12,7 @@ import { allManifests, manifestType } from './manifests';
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { RelationPatcher } from './relation_patcher';
 import { scanWithIgnore } from '../../../utils/dir_handle_adv';
+import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
 
 /**
  * Сервис для генерации кода.
@@ -200,7 +201,11 @@ export class GenerationService {
      * заменяя плейсхолдеры сущности и проекта на реальные имена.
      */
     private _getDestinationPath(relativePath: string, config: GenerationConfig): string {
-        let destinationRelativePath = relativePath.replaceAll(config.templEntity, config.targetEntity);
+        // BUG-002: пути на диске должны быть snake_case (lower_case_with_underscores).
+        // targetEntity приходит как camelCase (например, 'correctionButton'), а имена файлов/папок
+        // в Dart-конвенции — snake_case ('correction_button_table.dart', 'correction_button/').
+        const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
+        let destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
         return destinationRelativePath;
     }
