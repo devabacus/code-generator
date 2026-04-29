@@ -1,4 +1,5 @@
 import path from "path";
+import { window } from "vscode";
 import { ServiceLocator } from "../../../core/services/service_locator";
 import { gitInit } from "../utils/git_init";
 import { startAppFix } from "../../../utils/start_app_fix";
@@ -7,6 +8,12 @@ import { getUserInput } from "../ui/ui_ask_folder";
 import { GenerationConfig } from "../../../features/generation/config/generation_config";
 import { AppDatabaseGenerator } from "../../../features/generation/generators/app_database_generator";
 import { GenerationService } from "../../../features/generation/generators/generation_service";
+import {
+    autoGenerateTasksFeature,
+    patchPubspecPackagePaths,
+    copyAgentInfrastructure,
+    IBootstrapLogger,
+} from "../../../core/services/project_bootstrapper";
 
 const SERVERPOD_GENERATE = 'serverpod generate --experimental-features=all';
 const SERVERPOD_CREATE_MIGRATION = 'serverpod create-migration --experimental-features=all --force';
@@ -28,6 +35,15 @@ export async function createNewProject(): Promise<void> {
     if (!targetProject) {
         return;
     }
+
+    // Опт-ин: starter tasks-фича (Category/Tag/Task/TaskTagMap demo).
+    // По умолчанию — голый проект (только settings/auth/configuration).
+    const tasksAnswer = await window.showInformationMessage(
+        'Сгенерировать starter tasks-фичу (Category/Tag/Task/TaskTagMap) для демо?',
+        'Yes, with tasks demo',
+        'No, plain project',
+    );
+    const withTasks = tasksAnswer === 'Yes, with tasks demo';
 
     const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
 
@@ -54,6 +70,18 @@ export async function createNewProject(): Promise<void> {
     // Main generation service
     const generationService = new GenerationService(fileSystem);
     await generationService.generate(config);
+
+    // Bootstrap-шаги (вынесены в shared core/services/project_bootstrapper.ts).
+    const bootstrapLogger: IBootstrapLogger = {
+        info: (msg) => console.log(msg),
+    };
+    if (withTasks) {
+        await autoGenerateTasksFeature(fileSystem, config, bootstrapLogger);
+    } else {
+        bootstrapLogger.info('Skipping tasks-фичу (default). Pass with tasks demo to include Category/Tag/Task/TaskTagMap.');
+    }
+    await patchPubspecPackagePaths(fileSystem, config);
+    await copyAgentInfrastructure(fileSystem, config, bootstrapLogger);
 
     // Create database.dart file (drift table)
     const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
