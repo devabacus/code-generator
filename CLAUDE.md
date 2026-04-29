@@ -15,8 +15,11 @@
 - **Начинай с**: [ai/docs/INDEX.md](ai/docs/INDEX.md) → [ai/docs/agent_memory.md](ai/docs/agent_memory.md)
 
 **Не пропусти:**
+- [AGENTS.md](AGENTS.md) — глобальные правила процесса (запреты, block-rules, PR/merge flow, коммиты)
 - [ai/docs/agent_memory.md](ai/docs/agent_memory.md) — обязателен к прочтению каждой сессии
 - [ai/bug-reports/](ai/bug-reports/) — статус известных багов (часть закрыта 2026-04-25/26)
+- [ai/prompts/{teamlead,executor,finalize}.prompt.md](ai/prompts/) — промпты для ролей (teamlead — оркестратор, executor — реализация, finalize — закрытие задачи)
+- [ai/scripts/{new_task.py, task.py}](ai/scripts/) — task management CLI: создать TASK-XXX, feature branch → PR → merge
 
 ---
 
@@ -137,6 +140,8 @@ G:/Projects/Flutter/serverpod/<name>/
 
 ## Жёсткие правила для агента
 
+> **Полный набор правил** — в [AGENTS.md](AGENTS.md). Здесь — выжимка специфичная для code-generator.
+
 ### Definition of Done (для изменений в генераторе или шаблоне t115)
 
 Изменение **НЕ считается готовым** к показу пользователю пока:
@@ -182,6 +187,33 @@ G:/Projects/Flutter/serverpod/<name>/
 
 ---
 
+## Task workflow (TASK-XXX через скрипты)
+
+### Создание задачи
+```bash
+python ai/scripts/new_task.py "Краткое название"
+# → создаёт ai/tasks/active/TASK-XXX-краткое-название/{task.md, report.md}
+```
+
+### Workflow feature branch → PR → merge
+```bash
+python ai/scripts/task.py start TASK-XXX-краткое-название   # feature branch от свежего master
+# ... работа executor'а: коммиты, тесты ...
+python ai/scripts/task.py pr        # push + gh pr create с body=report.md
+python ai/scripts/task.py merge     # дождаться CI, squash-merge, обратно на master
+# или одной командой:
+python ai/scripts/task.py finish    # pr + merge
+```
+
+Требования: `gh` CLI авторизован (`gh auth status`), запуск из корня репо.
+
+### Структура `ai/tasks/`
+- `_template/` — шаблон task.md/report.md (копируется new_task.py)
+- `active/TASK-XXX-*/` — текущие задачи
+- `done/TASK-XXX-*/` — завершённые
+
+См. [AGENTS.md → Прогресс через task.md](AGENTS.md) — три секции в task.md ("План работы" / "STOP-gates" / "Журнал исполнения") как live-журнал executor'а.
+
 ## Порядок работы для типичных задач
 
 ### "Добавь поле X в существующую сущность"
@@ -222,6 +254,14 @@ G:/Projects/Flutter/serverpod/<name>/
 ## Полезные пути для поиска
 
 ```
+AGENTS.md                                                       # глобальные правила процесса
+ai/scripts/{new_task.py, task.py}                               # task management CLI
+ai/prompts/{teamlead,executor,finalize}.prompt.md               # промпты для ролей
+ai/tasks/{_template,active/,done/}                              # задачи
+ai/bug-reports/                                                 # известные баги (001-006)
+ai/discussions/{active/,done/}                                  # multi-agent дискуссии
+ai/docs/{INDEX,agent_memory,architecture,status,roadmap}.md     # документация процесса
+
 src/features/generation/parsers/server_yaml_parser.ts          # YAML → модель
 src/features/generation/parsers/entity_yaml_validator.ts       # 6-field + sync-event валидация
 src/features/generation/parsers/relation-analyzer.ts           # detection one/many-to-one
