@@ -9,8 +9,22 @@ export interface ValidationError {
     message: string;
 }
 
+/**
+ * Profile-aware validator (TASK-016 / audit point 4.1).
+ *
+ * Поле `profile` в `.spy.yaml`:
+ *  - `customerScoped` (default): требует userId + customerId + isDeleted (6-field pattern).
+ *  - `userScoped`: требует только userId + isDeleted (5-field pattern, todo-style).
+ *
+ * Backward-compat: YAML без явного `profile` поля → `customerScoped` (текущее поведение).
+ */
+export type SyncProfile = 'customerScoped' | 'userScoped';
+
 export class EntityYamlValidator {
-    private static readonly REQUIRED_FIELDS = ['userId', 'customerId', 'isDeleted'];
+    private static readonly REQUIRED_BY_PROFILE: Record<SyncProfile, readonly string[]> = {
+        customerScoped: ['userId', 'customerId', 'isDeleted'],
+        userScoped: ['userId', 'isDeleted'],
+    };
 
     static validate(model: ServerpodModel): ValidationError[] {
         if (model.isRelation) { return []; }
@@ -18,16 +32,33 @@ export class EntityYamlValidator {
         const errors: ValidationError[] = [];
         const fieldNames = new Set(model.fields.map(f => f.name));
 
-        for (const required of this.REQUIRED_FIELDS) {
-            if (!fieldNames.has(required)) {
+        const profile: SyncProfile = (model.profile ?? 'customerScoped') as SyncProfile;
+        const required = this.REQUIRED_BY_PROFILE[profile];
+        if (!required) {
+            errors.push({
+                code: 'MISSING_FIELD',
+                message: `Entity "${model.className}" has unknown profile "${model.profile}". Allowed: customerScoped, userScoped.`,
+            });
+            return errors;
+        }
+
+        for (const requiredField of required) {
+            if (!fieldNames.has(requiredField)) {
                 errors.push({
                     code: 'MISSING_FIELD',
-                    message: `Entity "${model.className}" missing required field "${required}". The codegen template assumes the 6-field pattern (userId, customerId, isDeleted, createdAt, lastModified, id with defaultPersist).`,
+                    message: `Entity "${model.className}" (profile=${profile}) missing required field "${requiredField}". ${this.profileHint(profile)}`,
                 });
             }
         }
 
         return errors;
+    }
+
+    private static profileHint(profile: SyncProfile): string {
+        if (profile === 'userScoped') {
+            return 'userScoped profile expects 5-field pattern (id, userId, createdAt, lastModified, isDeleted).';
+        }
+        return 'customerScoped profile expects 6-field pattern (id, userId, customerId, createdAt, lastModified, isDeleted).';
     }
 
     static validateSyncEvent(yamlPath: string, model: ServerpodModel): ValidationError[] {
@@ -50,7 +81,8 @@ export class EntityYamlValidator {
     static formatErrors(errors: ValidationError[]): string {
         const header = `Non-standard entity detected. Codegen aborted to prevent broken Dart output (see BUG-004).`;
         const list = errors.map(e => `  - ${e.message}`).join('\n');
-        const hint = `\nFor system-scoped entities (no userId/customerId), generate manually or extend YAML to include the 6-field pattern.`;
+        const hint = `\nFor user-only entities (no customerId), set 'profile: userScoped' in YAML to use the 5-field pattern. ` +
+            `For system-scoped entities (no userId/customerId), generate manually.`;
         return `${header}\n${list}${hint}`;
     }
 }

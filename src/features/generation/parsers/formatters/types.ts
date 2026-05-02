@@ -27,6 +27,15 @@ export interface ServerpodModel {
     isRelation: boolean;
     entity1?: string;
     entity2?: string;
+    /**
+     * Sync profile (TASK-016 / audit point 4.1).
+     *
+     *  - `customerScoped` (default): требует userId + customerId + isDeleted (6-field pattern).
+     *  - `userScoped`: требует только userId + isDeleted (5-field pattern, todo-style).
+     *
+     * Backward-compat: YAML без `profile` → trated as `customerScoped`.
+     */
+    profile?: 'customerScoped' | 'userScoped';
 }
 
 export interface ManyToManyRelation {

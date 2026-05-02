@@ -3,7 +3,7 @@ import { ServiceLocator } from "../../../core/services/service_locator";
 import { gitInit } from "../utils/git_init";
 import { startAppFix } from "../../../utils/start_app_fix";
 import { executeCommand } from "../utils/terminal_handle";
-import { getUserInput } from "../ui/ui_ask_folder";
+import { getUserInput, pickPath } from "../ui/ui_ask_folder";
 import { GenerationConfig } from "../../../features/generation/config/generation_config";
 import { AppDatabaseGenerator } from "../../../features/generation/generators/app_database_generator";
 import { GenerationService } from "../../../features/generation/generators/generation_service";
@@ -35,12 +35,22 @@ export async function createNewProject(): Promise<void> {
     }
 
     const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
+    const defaultProjectsPath = new GenerationConfig({}).projectsPath;
+
+    const projectsPath = await pickPath(
+        `Where to create '${targetProject}'?`,
+        defaultProjectsPath,
+    );
+    if (!projectsPath) {
+        return;
+    }
 
     const config = new GenerationConfig({
         templProject: 't115',
         targetProject: targetProject,
         manifest: ['startProject'],
-        templatesPath: templatesPath
+        templatesPath: templatesPath,
+        projectsPath: projectsPath,
     });
 
     // Create serverpod app

@@ -7,12 +7,22 @@ export class ServerpodYamlParser {
     static parse(yamlContent: string): ServerpodModel {
         const parsed = yaml.load(yamlContent) as any;
 
+        // TASK-016 / audit point 4.1 — sync profile.
+        // YAML field `profile: customerScoped | userScoped`. Default is
+        // `customerScoped` (backward-compat with existing 6-field pattern).
+        const rawProfile = parsed.profile;
+        const profile: 'customerScoped' | 'userScoped' | undefined =
+            rawProfile === 'userScoped' || rawProfile === 'customerScoped'
+                ? rawProfile
+                : undefined;
+
         const model: ServerpodModel = {
             className: parsed.class || '',
             tableName: parsed.table || '',
             isRelation: parsed.class.includes('Map'),
             fields: this.parseFields(parsed.fields || {}),
             indexes: this.parseIndexes(parsed.indexes),
+            profile,
         };
 
         if (model.isRelation) {
