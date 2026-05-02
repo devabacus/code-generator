@@ -13,10 +13,21 @@ export interface IBootstrapLogger {
 
 /**
  * Патчит относительные path-зависимости в pubspec.yaml внутри target-проекта.
- * Шаблон t115 живёт в `Templates/flutter/t115/`, target проект в
- * `Projects/Flutter/serverpod/<name>/` — на 1 уровень глубже из-за `serverpod/`.
- * Поэтому `path: ../../Packages/X` (валидно в шаблоне) нужно превратить в
- * `path: ../../../Packages/X` для target.
+ *
+ * Шаблон t115 живёт в `Templates/flutter/t115/<feature>_flutter/`, target проект
+ * в `Projects/Flutter/serverpod/<name>/<name>_flutter/` — на 1 уровень глубже
+ * из-за `serverpod/`. Поэтому ВСЕ relative paths в pubspec.yaml шаблона нужно
+ * углубить на один уровень (`../...` → `../../...`).
+ *
+ * Покрытие:
+ *   1. **In-monorepo packages** (Templates/flutter/t115/Packages/X → Projects/Flutter/serverpod/<n>/Packages/X):
+ *      `path: ../../Packages/X` → `path: ../../../Packages/X`
+ *   2. **Out-of-monorepo packages** (sync_core path-dep, etc., from Projects/Flutter/Packages/):
+ *      `path: ../../../../Projects/Flutter/Packages/X` → `path: ../../../../../Projects/Flutter/Packages/X`
+ *      Корень remain тот же `G:/`, но из target нужно подняться на 1 уровень больше.
+ *
+ * Inverse-проверки: оставленные неизменёнными absolute paths и `path: ../../<feature>_client`
+ * (внутримонорепо siblings) — для них не применяется substitution.
  */
 export async function patchPubspecPackagePaths(
     fileSystem: IFileSystem,
@@ -30,7 +41,19 @@ export async function patchPubspecPackagePaths(
     for (const pubspecPath of pubspecCandidates) {
         if (!await fileSystem.exists(pubspecPath)) { continue; }
         const content = await fileSystem.readFile(pubspecPath);
-        const patched = content.replace(/(\bpath:\s*)\.\.\/\.\.\/Packages\//g, '$1../../../Packages/');
+        let patched = content;
+        // 1. In-monorepo packages: ../../Packages/X → ../../../Packages/X
+        patched = patched.replace(
+            /(\bpath:\s*)\.\.\/\.\.\/Packages\//g,
+            '$1../../../Packages/'
+        );
+        // 2. Out-of-monorepo packages (sync_core etc.):
+        //    ../../../../Projects/... → ../../../../../Projects/...
+        //    Pattern matches >= 4 leading `../` followed by `Projects/`.
+        patched = patched.replace(
+            /(\bpath:\s*)((?:\.\.\/){4,})Projects\//g,
+            '$1../$2Projects/'
+        );
         if (patched !== content) {
             await fileSystem.createFile(pubspecPath, patched);
         }

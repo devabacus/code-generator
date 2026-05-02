@@ -248,11 +248,11 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 | A | Manifest markers в t115 template (30 файлов: 5 sync infra source + 5 Configuration + 15 Tasks + 5 TaskTagMap) | ✅ done 2026-05-02 (no commit yet) | uncommitted |
 | B | Orchestrator marker блоки в template (3 пары) | ✅ done 2026-05-02 (no commit yet) | uncommitted |
 | **B5** | Manual inspection (paired markers, content saved) | ✅ done 2026-05-02 | — |
-| **B6/B7** | Idempotency unit test + SectionReplacer marker tests | ⏭ pending (вместе с C2) | — |
-| **C0** | replacement_util ENTITY/M2M словари audit | ⏭ pending | — |
-| C | orchestrator_patcher.ts + 6 unit-tests | ⏭ pending | — |
-| **C7** | Mock-based concurrent patcher test (commutative) | ⏭ pending | — |
-| D | patchPubspecPackagePaths fix (sync_core path-dep) | ⏭ pending | — |
+| **B6/B7** | Idempotency unit test + SectionReplacer marker tests | ✅ done 2026-05-02 — `section_replacer.test.ts` (5 tests, B6+B7×4) | — |
+| **C0** | replacement_util ENTITY/M2M словари audit | ✅ done 2026-05-02 (no extension needed — built-in placeholder substitution) | — |
+| C | orchestrator_patcher.ts + 6 unit-tests | ✅ done 2026-05-02 — `orchestrator_patcher.ts` + 7 tests | — |
+| **C7** | Mock-based concurrent patcher test (commutative) | ✅ done 2026-05-02 — included in patcher tests | — |
+| D | patchPubspecPackagePaths fix (sync_core path-dep) | ✅ done 2026-05-02 — extended regex для `../../../../Projects/...` patterns + 6 tests | — |
 | E | Codegen docs cleanup (drop R1 references) | ⏭ pending | — |
 | **E5/E5.1** | README short bullet + new `docs-code-generator/sync-core-integration.md` | ⏭ pending | — |
 | **E6** | TASK-013 backlog placeholder (robust junction detection) | ⏭ pending | — |
@@ -264,10 +264,19 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 ## Изменения
 
 ### Создано
-(executor: список новых файлов после implementation)
+
+**Codegen src:**
+- `src/features/generation/generators/orchestrator_patcher.ts` (~250 строк) — идемпотентный patcher для 3 marker блоков в `sync_orchestrator_provider.dart`. Junction detection через `model.className.endsWith('Map')`. Placeholder-based substitution (3-form: PascalCase/camelCase/snake_case). Recovery from legacy duplicates (как `relation_patcher.ts` BUG-003 fix).
+
+**Codegen tests:**
+- `src/test/generators/orchestrator_patcher.test.ts` — 7 tests (empty/single/idempotent/junction/multi-sequential/recovery-duplicates/commutative)
+- `src/test/generators/section_replacer.test.ts` — 5 tests (B6 digest stable + B7 4 cases: empty/existing/malformed/duplicates)
+- `src/test/services/project_bootstrapper.test.ts` — 6 tests для patchPubspecPackagePaths (in-monorepo / out-of-monorepo / combined / idempotent / absolute / sibling)
 
 ### Изменено в codegen src
-(executor: список изменённых TS файлов)
+
+- `src/features/generation/generators/generation_service.ts` — подключён `OrchestratorPatcher` в `generate()` flow после `RelationPatcher.patch()` (только при entity-based generation).
+- `src/core/services/project_bootstrapper.ts` — `patchPubspecPackagePaths` extended regex для покрытия sync_core path-dep (`(?:\.\.\/){4,}Projects\/` pattern).
 
 ### Изменено в t115 template
 
@@ -347,11 +356,11 @@ TBD
 - [x] Phase A: 30 файлов с manifest маркерами (5 sync infra source + 5 Configuration + 15 Tasks + 5 TaskTagMap) — 2026-05-02, `flutter analyze` adapter dirs clean
 - [x] **Phase B**: 3 marker блока в sync_orchestrator_provider.dart — 2026-05-02, `flutter analyze` clean
 - [x] **Phase B5**: marker integrity (manual inspection PASS) — 2026-05-02
-- [ ] **Phase B6/B7**: idempotency + SectionReplacer marker tests (вместе с C2)
-- [ ] **Phase C0**: replacement_util ENTITY/M2M audit + extensions
-- [ ] Phase C: orchestrator_patcher.ts + 6 unit-tests passing
-- [ ] **Phase C7**: mock-based concurrent test (commutative)
-- [ ] Phase D: patchPubspecPackagePaths covers sync_core path-dep
+- [x] **Phase B6/B7**: idempotency + SectionReplacer marker tests — 2026-05-02, `section_replacer.test.ts` (5 tests: empty pair / existing idempotent / malformed orphan no-crash / duplicate pairs no-op / B6 digest stable)
+- [x] **Phase C0**: replacement_util audit — ✅ no extension needed (orchestrator_patcher использует built-in 3-form placeholder substitution с PascalCase/camelCase/snake_case formstvo + не зависит от dictionary словарей, т.к. patcher не делает file-level replacement, а text-snippet substitution).
+- [x] **Phase C**: orchestrator_patcher.ts + 7 unit-tests passing — 2026-05-02
+- [x] **Phase C7**: commutative test (apply A→B == B→A) — included in patcher tests
+- [x] **Phase D**: patchPubspecPackagePaths covers sync_core path-dep — 2026-05-02, regex extension `(?:\.\.\/){4,}Projects\/` + 6 unit-tests
 - [ ] Phase E: docs cleanup (drop R1)
 - [ ] **Phase E5/E5.1**: README short bullet + `docs-code-generator/sync-core-integration.md`
 - [ ] **Phase E6**: TASK-013 backlog placeholder

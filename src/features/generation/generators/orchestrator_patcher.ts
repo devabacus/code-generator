@@ -1,0 +1,349 @@
+import path from 'path';
+import { IFileSystem } from '../../../core/interfaces/file_system';
+import { GenerationConfig } from '../config/generation_config';
+import { ServerpodModel } from '../parsers/formatters/types';
+import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
+
+/**
+ * OrchestratorPatcher — идемпотентный patcher для `sync_orchestrator_provider.dart`
+ * в target проекте. Вставляет три marker блока на каждый новый entity:
+ *
+ *   1. `:syncImports`        — 7 import строк per entity (5 adapter + 1 dao + 1 entity)
+ *   2. `:syncEntityTypes`    — `'<entityType>',` строка в const list
+ *   3. `:syncRegistrations`  — `orchestrator.register<XEntity>(...)` блок (12 строк
+ *                              для regular, 18 для junction с docstring)
+ *
+ * Поведение:
+ *   - **Идемпотентен:** повторный вызов с тем же model = identical content (snippet
+ *     уже присутствует — skip, не дублировать).
+ *   - **Recovery from legacy duplicates:** если найдено несколько marker pairs
+ *     `:syncRegistrations` (или `:syncImports` / `:syncEntityTypes`) — оставляем
+ *     первую, остальные удаляем + содержимое сохраняем в первой (как
+ *     `relation_patcher.ts` BUG-003 fix).
+ *   - **Junction detection:** `model.className.endsWith('Map')` → snippet берётся
+ *     из `_JUNCTION_*` templates с docstring о junction-specific routing
+ *     update→createX и delete→noop.
+ *   - **Commutative:** apply A → B == apply B → A в final state.
+ *
+ * Reference patterns:
+ *   - `relation_patcher.ts` — pattern для idempotent + recovery-from-legacy-duplicates
+ *   - sync_core conventions.md Pattern 6/7 — multi-entity registration + junction
+ *
+ * Не патчит, если orchestrator файл не существует (свежий проект до Phase B).
+ */
+export class OrchestratorPatcher {
+    constructor(private fileSystem: IFileSystem) {}
+
+    public async patch(_config: GenerationConfig, model: ServerpodModel): Promise<void> {
+        const orchestratorPath = path.join(
+            _config.targetFlutterProjectPath,
+            'lib',
+            'core',
+            'sync',
+            'sync_orchestrator_provider.dart'
+        );
+
+        if (!(await this.fileSystem.exists(orchestratorPath))) {
+            return;
+        }
+
+        let content = await this.fileSystem.readFile(orchestratorPath);
+
+        const isJunction = model.className.endsWith('Map');
+
+        // Build all three snippets с substitutions подгоняя placeholders под
+        // model.className.
+        const importsSnippet = this._buildImportsSnippet(model, isJunction);
+        const entityTypeSnippet = this._buildEntityTypeSnippet(model);
+        const registerSnippet = this._buildRegisterSnippet(model, isJunction);
+
+        // Patch каждый marker блок.
+        content = this._patchMarkerBlock(content, 'syncImports', importsSnippet);
+        content = this._patchMarkerBlock(content, 'syncEntityTypes', entityTypeSnippet);
+        content = this._patchMarkerBlock(content, 'syncRegistrations', registerSnippet);
+
+        await this.fileSystem.createFile(orchestratorPath, content);
+    }
+
+    /**
+     * Patches marker block `:<markerName>`:
+     * - Если block отсутствует — no-op (orchestrator не подготовлен).
+     * - Если block содержит `newSnippet` уже — idempotent skip.
+     * - Иначе — append newSnippet к existing content внутри block.
+     * - Recovery from legacy duplicates: оставляем первую marker pair,
+     *   из последующих копируем content в первую и удаляем pair.
+     *
+     * Marker pair preserves leading whitespace перед start marker (для list literal —
+     * `  // === ... ===`, для top-level imports — без indent).
+     */
+    private _patchMarkerBlock(
+        content: string,
+        markerName: string,
+        newSnippet: string
+    ): string {
+        const startMarker = `// === generated_start:${markerName} ===`;
+        const endMarker = `// === generated_end:${markerName} ===`;
+        const startEsc = this._escapeRegex(startMarker);
+        const endEsc = this._escapeRegex(endMarker);
+
+        // Captures leading whitespace (indent) перед start marker. Single line.
+        const pairRegex = new RegExp(
+            `([ \\t]*)${startEsc}([\\s\\S]*?)([ \\t]*)${endEsc}`,
+            'g'
+        );
+
+        const matches: Array<{
+            full: string;
+            startIndent: string;
+            inner: string;
+            endIndent: string;
+        }> = [];
+        let m: RegExpExecArray | null;
+        while ((m = pairRegex.exec(content)) !== null) {
+            matches.push({
+                full: m[0],
+                startIndent: m[1] ?? '',
+                inner: m[2] ?? '',
+                endIndent: m[3] ?? '',
+            });
+        }
+
+        if (matches.length === 0) {
+            return content;
+        }
+
+        // Combine inner content from ALL matches (recovery from legacy duplicates).
+        const combinedInner = matches.map((mm) => mm.inner).join('\n');
+
+        // Idempotency check: snippet (trimmed) already present?
+        const trimmedSnippet = newSnippet.trim();
+        const alreadyPresent =
+            trimmedSnippet.length > 0 && combinedInner.includes(trimmedSnippet);
+
+        // Build new combined inner content as array of lines (без leading/trailing
+        // newline у каждой строки).
+        const existingLines = this._extractContentLines(combinedInner);
+        const snippetLines = this._extractContentLines(newSnippet);
+
+        let mergedLines: string[];
+        if (alreadyPresent) {
+            mergedLines = existingLines;
+        } else {
+            mergedLines = [...existingLines, ...snippetLines];
+        }
+
+        // Build replacement string. Always:
+        //   <startIndent><startMarker>\n<lines joined by \n>\n<endIndent><endMarker>
+        // Где endIndent = startIndent (для consistency — orchestrator written by Edit
+        // клал endMarker с тем же indent).
+        const indent = matches[0].startIndent;
+        const innerJoined = mergedLines.length > 0 ? mergedLines.join('\n') : '';
+        const replacement = innerJoined.length > 0
+            ? `${indent}${startMarker}\n${innerJoined}\n${indent}${endMarker}`
+            : `${indent}${startMarker}\n${indent}${endMarker}`;
+
+        // Replace ВСЕ marker pairs одним проходом:
+        // первое вхождение → replacement, остальные → '' (removed).
+        let firstReplaced = false;
+        let result = content.replace(new RegExp(pairRegex.source, 'g'), () => {
+            if (!firstReplaced) {
+                firstReplaced = true;
+                return replacement;
+            }
+            return '';
+        });
+
+        // Подчищаем избыточные пустые строки от удалённых дубликатов.
+        result = result.replace(/\n{3,}/g, '\n\n');
+
+        return result;
+    }
+
+    /**
+     * Extracts non-empty content lines from inner block, preserving original indentation
+     * within each line. Strips leading/trailing pure-whitespace lines.
+     */
+    private _extractContentLines(inner: string): string[] {
+        const lines = inner.split('\n');
+        // Trim leading/trailing fully-empty lines (whitespace only).
+        let start = 0;
+        let end = lines.length;
+        while (start < end && lines[start].trim() === '') {
+            start++;
+        }
+        while (end > start && lines[end - 1].trim() === '') {
+            end--;
+        }
+        return lines.slice(start, end);
+    }
+
+    /**
+     * Builds imports snippet (7 import lines) для regular или junction entity.
+     */
+    private _buildImportsSnippet(model: ServerpodModel, isJunction: boolean): string {
+        const tplEntity = isJunction ? 'taskTagMap' : 'category';
+        const tplEntitySnake = toSnakeCase(tplEntity);
+
+        const targetEntityCamel = unCap(model.className);
+        const targetEntitySnake = toSnakeCase(targetEntityCamel);
+
+        const template = isJunction
+            ? this._JUNCTION_IMPORTS_TEMPLATE
+            : this._ENTITY_IMPORTS_TEMPLATE;
+
+        return this._substitutePlaceholders(template, {
+            tplPascal: cap(tplEntity), // 'Category' / 'TaskTagMap'
+            tplCamel: tplEntity, // 'category' / 'taskTagMap'
+            tplSnake: tplEntitySnake, // 'category' / 'task_tag_map'
+            targetPascal: cap(targetEntityCamel),
+            targetCamel: targetEntityCamel,
+            targetSnake: targetEntitySnake,
+        });
+    }
+
+    /**
+     * Builds entityType snippet: `  '<snake>',` (один literal с indent).
+     */
+    private _buildEntityTypeSnippet(model: ServerpodModel): string {
+        const targetSnake = toSnakeCase(unCap(model.className));
+        return `  '${targetSnake}',`;
+    }
+
+    /**
+     * Builds register block snippet (12-18 lines) для regular или junction entity.
+     */
+    private _buildRegisterSnippet(model: ServerpodModel, isJunction: boolean): string {
+        const tplEntity = isJunction ? 'taskTagMap' : 'category';
+        const tplEntitySnake = toSnakeCase(tplEntity);
+
+        const targetEntityCamel = unCap(model.className);
+        const targetEntitySnake = toSnakeCase(targetEntityCamel);
+
+        const template = isJunction
+            ? this._JUNCTION_REGISTER_TEMPLATE
+            : this._ENTITY_REGISTER_TEMPLATE;
+
+        return this._substitutePlaceholders(template, {
+            tplPascal: cap(tplEntity),
+            tplCamel: tplEntity,
+            tplSnake: tplEntitySnake,
+            targetPascal: cap(targetEntityCamel),
+            targetCamel: targetEntityCamel,
+            targetSnake: targetEntitySnake,
+        });
+    }
+
+    /**
+     * Substitutes 3-form (PascalCase / camelCase / snake_case) placeholders
+     * в template snippet. Order matters — длинные substitutions сначала, чтобы
+     * не пересекаться (например `taskTagMap` matchиs `task` если не аккуратно).
+     */
+    private _substitutePlaceholders(
+        template: string,
+        forms: {
+            tplPascal: string;
+            tplCamel: string;
+            tplSnake: string;
+            targetPascal: string;
+            targetCamel: string;
+            targetSnake: string;
+        }
+    ): string {
+        // Order: snake (longest tokens), Pascal, camel.
+        // Use word boundaries / negative-lookahead-friendly approach where possible.
+        let result = template;
+
+        // 1) snake_case form (e.g. `task_tag_map`) — заменяем literally,
+        //    т.к. в Dart code это всегда file/path/string-id context.
+        result = this._replaceAll(result, forms.tplSnake, forms.targetSnake);
+
+        // 2) PascalCase (e.g. `TaskTagMap`) — заменяем literally (case-sensitive).
+        result = this._replaceAll(result, forms.tplPascal, forms.targetPascal);
+
+        // 3) camelCase (e.g. `taskTagMap`) — заменяем literally.
+        //    Note: Это safe потому что snake_case (`task_tag_map`) уже заменили в шаге 1
+        //    и в template нет идентификаторов вида `task` без следующего символа `T`.
+        //    Для regular entity (placeholder=`category`), tplCamel === tplSnake — second
+        //    substitution no-op (string already replaced).
+        if (forms.tplCamel !== forms.tplSnake) {
+            result = this._replaceAll(result, forms.tplCamel, forms.targetCamel);
+        }
+
+        return result;
+    }
+
+    private _replaceAll(s: string, find: string, replace: string): string {
+        return s.split(find).join(replace);
+    }
+
+    private _escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // ── Templates ──────────────────────────────────────────────────────────
+
+    /**
+     * Imports template для regular entity.
+     * Placeholders: `category` (snake/camel — same), `Category` (Pascal).
+     *
+     * Reference: t115/TASK-001 Phase 2b orchestrator post-add state.
+     */
+    private readonly _ENTITY_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/category/category_event_adapter.dart';
+import '../../features/tasks/data/adapters/category/category_local_apply.dart';
+import '../../features/tasks/data/adapters/category/category_payload_codec.dart';
+import '../../features/tasks/data/adapters/category/category_pull_adapter.dart';
+import '../../features/tasks/data/adapters/category/category_remote_adapter.dart';
+import '../../features/tasks/data/datasources/local/daos/category/category_dao.dart';
+import '../../features/tasks/domain/entities/category/category_entity.dart';`;
+
+    /**
+     * Imports template для junction entity.
+     * Placeholders: `task_tag_map` (snake), `taskTagMap` (camel), `TaskTagMap` (Pascal).
+     */
+    private readonly _JUNCTION_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_event_adapter.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_local_apply.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_payload_codec.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_pull_adapter.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_remote_adapter.dart';
+import '../../features/tasks/data/datasources/local/daos/task_tag_map/task_tag_map_dao.dart';
+import '../../features/tasks/domain/entities/task_tag_map/task_tag_map_entity.dart';`;
+
+    /**
+     * Register block template для regular entity.
+     */
+    private readonly _ENTITY_REGISTER_TEMPLATE = `  // ── Adapter bundle: Category ────────────────────────────────────────────
+  orchestrator.register<CategoryEntity>(
+    'category',
+    AdapterBundle<CategoryEntity>(
+      writeAdapter: CategoryRemoteAdapter(client),
+      codec: const CategoryPayloadCodec(),
+      localApply: CategoryLocalApply(CategoryDao(dbService)),
+      pullAdapter: CategoryPullAdapter(client),
+      eventAdapter: CategoryEventAdapter(client),
+    ),
+  );`;
+
+    /**
+     * Register block template для junction entity (с docstring о routing
+     * update→createX и delete→noop).
+     *
+     * Reference: t115/TASK-001 Phase 2d TaskTagMap register block.
+     */
+    private readonly _JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: TaskTagMap (junction FK→task+tag) ───────────────────
+  // Junction-specific: server has no \`updateTaskTagMap\` RPC, only
+  // \`createTaskTagMap\` (idempotent create + resurrect) and
+  // \`deleteTaskTagMapByTaskAndTag\` (soft-delete via business key).
+  // \`update()\` adapter routes через \`createTaskTagMap\`; \`delete()\` is
+  // a noop (Repository должен решать delete-flow — см.
+  // task_tag_map_remote_adapter.dart docstring).
+  orchestrator.register<TaskTagMapEntity>(
+    'task_tag_map',
+    AdapterBundle<TaskTagMapEntity>(
+      writeAdapter: TaskTagMapRemoteAdapter(client),
+      codec: const TaskTagMapPayloadCodec(),
+      localApply: TaskTagMapLocalApply(TaskTagMapDao(dbService)),
+      pullAdapter: TaskTagMapPullAdapter(client),
+      eventAdapter: TaskTagMapEventAdapter(client),
+    ),
+  );`;
+}
