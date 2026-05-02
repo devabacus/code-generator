@@ -53,6 +53,8 @@ Fix file path generation для junction adapters так чтобы non-Map junc
 
 ## Критерии приёмки
 
+> **Note про test entity name (added 2026-05-02 post-implementation):** Initial task.md acceptance Test 2/3 ссылается на RolePermission/CustomerUser. Phase 4 E2E test использует **ProjectMember** вместо RolePermission — t115 template имеет pre-existing `role.spy.yaml` + `permission.spy.yaml` + `role_permission.spy.yaml` в admin auth schema (`manifest: startProject`), что создавало namespace collision при `generate-entity` (verified через `find G:/Templates/flutter/t115/t115_server/lib/src/models -iname "role*"`). ProjectMember сохраняет structural test rigor (3 entities, 2 FK junction, identical pattern). RolePermission/CustomerUser cases покрыты unit tests (replacement_util / generation_service / orchestrator_patcher) без E2E generate. Verified не workaround — pre-existing template constraint, не TASK-014 баг.
+
 ### Must-have
 
 - [ ] **`MANY_TO_MANY` словарь parametrization fix:**

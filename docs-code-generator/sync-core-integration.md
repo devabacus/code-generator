@@ -85,6 +85,35 @@ fields:
 - Routing через `manifest: manyToMany` словарь
 - Server endpoints: `createX`, `deleteXByBusinessKey` (НЕ `updateX` / `deleteX`)
 
+#### Junction FK extraction — known limitation
+
+Generator extracts junction `entity1`/`entity2` names из **первых 2 FK fields** в YAML declaration order (Option A). Это правильно для clean junctions (`RolePermission(roleId, permissionId)`, `TaskTagMap(taskId, tagId)`).
+
+**Known limitation для junctions с non-FK pseudo-keys:**
+
+Если junction имеет business key включающий non-FK поле (e.g. `userId: int` без `relation(parent=user)`) — generator пропустит non-FK поле и возьмёт следующее FK declaration. Example из weight repo (`weight_server/lib/src/models/user/customer_user.spy.yaml`):
+
+```yaml
+class: CustomerUser
+fields:
+  customerId: UuidValue, relation(parent=customer)        # FK
+  userId: int                                              # NOT a relation declaration
+  roleId: UuidValue, relation(parent=role)                 # FK
+  defaultTerminalSetId: UuidValue?, relation(parent=terminal_set)  # FK nullable
+```
+
+Generated method будет `deleteCustomerUserByCustomerAndRole` (берёт `customerId`+`roleId`) instead of `deleteCustomerUserByCustomerAndUser` если business key fact'ically `customer+user`. Docstring аналогично — `junction FK→customer+role`.
+
+`serverpod generate` PASS, `flutter analyze` PASS, `verify` PASS (syntactically valid). Сломается на runtime когда orchestrator попытается `delete()` через soft-delete by-key path — server вернёт 404 или resurrect неправильную row → silent data corruption.
+
+**Workaround options:**
+
+1. Объявить FK через `relation(parent=user)` если actual FK relationship существует в schema.
+2. Manually adjust generated adapter после `generate-entity` для custom business key logic.
+3. Future: parser warning when FK count выглядит off (3+ FK + non-FK fields со суффиксом `Id`) — см. **TASK-015 backlog** для robust improvement (extract shared `extractEntity1Entity2` utility + parser warning + optional `junctionKeyFields` YAML override).
+
+Pre-existing `server_yaml_parser` limitation (`relationFields[0]/[1]` для entity1/entity2), expanded blast radius via TASK-014 FK extraction в `orchestrator_patcher._substituteJunctionFKs` (identical algorithm в двух местах). Documented 2026-05-02 (TASK-014 round 1 adversarial review Bomb #1).
+
 References:
 - t115/TASK-001 Phase 2d TaskTagMap pattern (multi-entity validated)
 - [TASK-013 task.md](../ai/tasks/active/TASK-013-junction-detection-robust-yaml-field-analysis/task.md) — robust detection acceptance

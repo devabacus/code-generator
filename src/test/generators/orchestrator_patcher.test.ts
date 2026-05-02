@@ -600,6 +600,30 @@ void wireUp() {
             result.includes('customer_user_remote_adapter.dart'),
             'TASK-013: customer_user imports (snake_case)',
         );
+
+        // TASK-014 round 1 adversarial Bomb #6 — semantic assertion.
+        // Fixes current FK extraction behavior: relationFields=[customerId, roleId, defaultTerminalSetId],
+        // первые 2 FK = customer+role (userId: int пропускается т.к. НЕ FK). Catches docstring/method-name
+        // regression если FK extraction algorithm change'нется в future. Documented в
+        // docs-code-generator/sync-core-integration.md "Junction FK extraction — known limitation"
+        // + TASK-015 backlog для robust pseudo-FK detection.
+        assert.ok(
+            result.includes('junction FK→customer+role'),
+            'TASK-014 Bomb #6: CustomerUser docstring должен явно отражать current FK extraction (customer+role) — catches regression',
+        );
+        assert.ok(
+            result.includes('deleteCustomerUserByCustomerAndRole'),
+            'TASK-014 Bomb #6: method-name должен быть deleteCustomerUserByCustomerAndRole (current behavior)',
+        );
+        // NEGATIVE: template defaults НЕ должны leak.
+        assert.ok(
+            !result.includes('junction FK→task+tag'),
+            'TASK-014 Bomb #6: template default `task+tag` НЕ должен leak в CustomerUser docstring',
+        );
+        assert.ok(
+            !result.includes('deleteCustomerUserByTaskAndTag'),
+            'TASK-014 Bomb #6: template default `ByTaskAndTag` НЕ должен leak в method-name',
+        );
     });
 
     test('TASK-013 backward compat: TaskTagMap (с Map suffix) → junction routing preserved', async () => {
