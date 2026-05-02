@@ -37,9 +37,25 @@
 
 **Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия codegen TASK-X2 acceptance. Это hard gate без Soft Launch — sync_core teamlead координирует через `G:/Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md`.
 
+### Hard gate: junction detection audit (TASK-013)
+
+**weight TASK-018 НЕ стартует пока junction detection audit не done.**
+
+`OrchestratorPatcher` использует heuristic `model.className.endsWith('Map')` для детекции junction (many-to-many) entities. Если weight имеет junction-style entity (2+ FK + минимум domain полей) БЕЗ `Map` суффикса → false-negative routing через regular template → silent data divergence на out-of-order writes.
+
+**Audit результат (TASK-011 Phase G4, 2026-05-02):**
+- Все 14 sync entities в weight (имеют `*_sync_event.spy.yaml`) проверены — см. [`ai/bug-reports/junction-detection-audit.md`](../bug-reports/junction-detection-audit.md).
+- **Trivially passed** — junction-style без `Map` суффикса entities не найдено.
+- TASK-013 priority остаётся **Medium** (не блокер для текущего state weight'а).
+
+**Re-trigger TASK-013 priority bump на High если:**
+- weight в production добавит entity типа `UserPermission(userId, permissionId)` или `RolePermission(roleId, permissionId)` без `Map` суффикса.
+- Cross-device data divergence для permission/relationship-table-style entity замечен.
+
 **Критерии завершения Фазы 1.5:**
 - TASK-X1 merged → t115 regression PASS (existing template работает после маркеров + патчер)
 - TASK-X2 merged → fresh todo app sync working cross-device
+- Junction detection audit done (✅ TASK-011 Phase G4, 2026-05-02)
 - weight TASK-018 unblocked
 
 ---

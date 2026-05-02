@@ -31,7 +31,7 @@
 | **C/C7** | `orchestrator_patcher.ts` + 7 tests (incl. commutative) | done 2026-05-02 | be0e805 |
 | **D** | `patchPubspecPackagePaths` regex для sync_core + 6 tests | done 2026-05-02 | be0e805 |
 | **E/E5/E5.1/E6** | Docs cleanup + new sync-core-integration.md + TASK-013 backlog | done 2026-05-02 | 053204d |
-| **F0** | E2E patcher validation на t115 (re-add 4 tasks через generate-entity) — **partial** (см. caveat ниже) | done with caveat 2026-05-02 | 053204d |
+| **F0** | E2E patcher validation на t115 — `[x] done with caveat` (BUG-007 cascade — F0 demonstrates patcher idempotency, не runtime correctness; relation_patcher gap pre-existing) | done with caveat 2026-05-02 | 053204d |
 | **D5** | BUG-008 fix -- AppDatabaseGenerator scan core/* tables + regression+idempotency tests | done 2026-05-02 | 06bf4e8 |
 | **F2** | `create-project --name t152` SUCCESS (191584ms) | done 2026-05-02 | filesystem |
 | **F3** | `verify --name t152` PASS errors=0 | done 2026-05-02 | -- |
@@ -208,7 +208,7 @@ Phase F0 (re-add 4 tasks для E2E patcher proof) приводит template orc
 - [x] **Phase E**: docs cleanup
 - [x] **Phase E5/E5.1**: README + new sync-core-integration.md
 - [x] **Phase E6**: TASK-013 backlog placeholder
-- [x] **Phase F0**: E2E patcher validation (re-add tasks через generate-entity)
+- [x] **Phase F0**: E2E patcher validation — `done with caveat` (BUG-007 cascade — F0 demonstrates patcher idempotency, не runtime correctness; relation_patcher gap pre-existing)
 - [x] **Phase F2**: create-project --name t152 SUCCESS
 - [x] **Phase F3**: verify --name t152 PASS errors=0 (warnings=3, infos=44)
 - [x] **Phase F5**: финальный report.md

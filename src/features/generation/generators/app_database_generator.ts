@@ -59,6 +59,19 @@ export class AppDatabaseGenerator {
         const allTableClasses = new Set(liveTableClassesArr);
         const liveTableClassNames = new Set(liveTableClassesArr.map(c => c.replace(/,\s*$/, '')));
 
+        // BUG-D7/Bomb#2 (defensive strip — independent of template state):
+        // Если template (или existing target file) содержит fixed-line `import '..._table.dart';`
+        // строки ВНЕ markers `:GENERATED_IMPORTS:` — и тот же файл уже найден scan'ом —
+        // удаляем дубликат из existing content ДО применения markers. То же для table class
+        // mentions ВНЕ `:GENERATED_TABLES:`. Это closes loop независимо от template repo state
+        // (см. round 2 reviews 2026-05-02 — fix template только в working tree → не воспроизводимо
+        // на fresh clone). Здесь generator сам — single source of truth, template-state-agnostic.
+        const scanImportFilenames = new Set(
+            liveTableFiles.map(({ fileName }) => fileName),
+        );
+        existingContent = this.stripDuplicateFixedLineImports(existingContent, scanImportFilenames);
+        existingContent = this.stripDuplicateFixedLineTables(existingContent, liveTableClassNames);
+
         let finalContent = this.updateSection(
             existingContent,
             '// === GENERATED_IMPORTS_START ===',
@@ -140,6 +153,73 @@ export class AppDatabaseGenerator {
         }
         // Сортировка применяется в caller'е после merge с feature files.
         return result;
+    }
+
+    /**
+     * Defensive strip: удаляет fixed-line `import '..._table.dart';` строки **вне** markers
+     * `:GENERATED_IMPORTS:` если соответствующий файл уже найден scan'ом и попадает внутрь
+     * markers. Это closes Bomb #2 robustly — не зависит от того, очищен ли template на disk
+     * (round 2 review 2026-05-02 нашёл что template fix живёт в uncommitted working tree
+     * t115 → fresh clone reproduces duplicate. Defensive strip в generator делает problem
+     * idempotent независимо от template state).
+     */
+    private stripDuplicateFixedLineImports(content: string, scanFilenames: Set<string>): string {
+        const importsStart = '// === GENERATED_IMPORTS_START ===';
+        const importsEnd = '// === GENERATED_IMPORTS_END ===';
+        const startIdx = content.indexOf(importsStart);
+        const endIdx = content.indexOf(importsEnd);
+
+        // Если markers нет — нечего защищать (no-op).
+        if (startIdx < 0 || endIdx < 0 || endIdx < startIdx) { return content; }
+
+        const before = content.slice(0, startIdx);
+        const inside = content.slice(startIdx, endIdx + importsEnd.length);
+        const after = content.slice(endIdx + importsEnd.length);
+
+        const importRegex = /^import\s+'([^']*_table\.dart)';\s*\r?\n/gm;
+        const stripFn = (segment: string): string =>
+            segment.replace(importRegex, (match, importPath: string) => {
+                const fileName = path.basename(importPath);
+                return scanFilenames.has(fileName) ? '' : match;
+            });
+
+        return stripFn(before) + inside + stripFn(after);
+    }
+
+    /**
+     * Defensive strip для `@DriftDatabase(tables: [...])`: удаляет fixed-line упоминания
+     * table classes (e.g. `SyncMetadataTable,` `ConfigurationTable,`) **вне** markers
+     * `:GENERATED_TABLES:` если class уже в scan list. Pair с {@link stripDuplicateFixedLineImports}.
+     */
+    private stripDuplicateFixedLineTables(content: string, liveTableClassNames: Set<string>): string {
+        const tablesStart = '// === GENERATED_TABLES_START ===';
+        const tablesEnd = '// === GENERATED_TABLES_END ===';
+        const driftDbRegex = /@DriftDatabase\s*\(\s*tables\s*:\s*\[([\s\S]*?)\]\s*\)/;
+        const m = content.match(driftDbRegex);
+        if (!m) { return content; }
+
+        const blockInner = m[1];
+        const startIdx = blockInner.indexOf(tablesStart);
+        const endIdx = blockInner.indexOf(tablesEnd);
+        if (startIdx < 0 || endIdx < 0) { return content; }
+
+        const beforeMarkers = blockInner.slice(0, startIdx);
+        const insideMarkers = blockInner.slice(startIdx, endIdx + tablesEnd.length);
+        const afterMarkers = blockInner.slice(endIdx + tablesEnd.length);
+
+        // Strip строки `ClassName,` (с возможным indent + trailing horizontal whitespace + newline)
+        // только если ClassName в scan list. Не трогаем чужие классы (developer-defined).
+        // ВАЖНО: после `,` используем только `[ \t]*\r?\n?` (горизонтальные whitespace + newline),
+        // НЕ `\s*` — иначе матч съест newline + indent следующей строки и regex `^` не сработает
+        // на ней (test edge case: 2 подряд class refs `SyncMetadataTable,\n    ConfigurationTable,`).
+        const classRefRegex = /^[ \t]*([A-Z][A-Za-z0-9_]*)[ \t]*,[ \t]*\r?\n?/gm;
+        const stripFn = (segment: string): string =>
+            segment.replace(classRefRegex, (matched, className: string) => {
+                return liveTableClassNames.has(className) ? '' : matched;
+            });
+
+        const newInner = stripFn(beforeMarkers) + insideMarkers + stripFn(afterMarkers);
+        return content.replace(driftDbRegex, `@DriftDatabase(tables: [${newInner}])`);
     }
 
     private removeStaleMigrationLines(content: string, liveTableClassNames: Set<string>): string {

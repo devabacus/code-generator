@@ -347,6 +347,110 @@ class AppDatabase extends _$AppDatabase {
         assert.strictEqual(configurationTableClassCount, 1, 'ConfigurationTable class должен встречаться ровно 1 раз');
     });
 
+    test('G1 defensive strip: real-world template state с fixed-line imports/tables вне markers → generator сам стрипает дубликаты', async () => {
+        // Reproduce реального t153 disk scenario (round 2 reviews 2026-05-02):
+        // template (или existing target file) имеет fixed-line `import '..._table.dart';`
+        // ВНЕ markers `:GENERATED_IMPORTS:`, плюс scan находит тот же файл.
+        // До G1 fix → final file содержит import дважды (один outside markers, один inside)
+        // → `flutter analyze` reports `duplicate_import` warning.
+        // После G1 fix → defensive strip в generator удаляет outside-markers fixed-line
+        // если scan нашёл тот же файл, независимо от template state.
+        const templateWithFixedLineImports = `import 'package:drift/drift.dart';
+import 'tables/sync_metadata_table.dart';
+import '../../../../features/configuration/data/datasources/local/tables/configuration_table.dart';
+// === GENERATED_IMPORTS_START ===
+// === GENERATED_IMPORTS_END ===
+
+@DriftDatabase(tables: [
+    SyncMetadataTable,
+    ConfigurationTable,
+// === GENERATED_TABLES_START ===
+// === GENERATED_TABLES_END ===
+])
+class AppDatabase extends _$AppDatabase {
+  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) { return m.createAll(); },
+    onUpgrade: (Migrator m, int from, int to) async {},
+  );
+}
+`;
+        mockFs.setFile(TEMPLATE_DB_PATH, templateWithFixedLineImports);
+
+        const flutterLib = `${PROJECTS_PATH}/weight/weight_flutter/lib`;
+        // Scan найдёт sync_metadata_table.dart (через core scan) — exact filename совпадает с
+        // fixed-line import в template (`tables/sync_metadata_table.dart` → basename =
+        // `sync_metadata_table.dart`).
+        mockFs.setFile(`${flutterLib}/core/data/datasources/local/tables/sync_metadata_table.dart`, '// stub');
+        // Scan найдёт configuration_table.dart (через features scan).
+        mockFs.setFile(`${flutterLib}/features/configuration/data/datasources/local/tables/configuration_table.dart`, '// stub');
+        // Scan найдёт sync_queue_table.dart (через core scan, новая table — не было в template).
+        mockFs.setFile(`${flutterLib}/core/sync/sync_queue_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('configuration', 'configuration'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+
+        // Critical: каждый import строго 1 раз (не 2):
+        const syncMetadataImportCount = (result.match(/import\s+'[^']*sync_metadata_table\.dart'/g) || []).length;
+        const configImportCount = (result.match(/import\s+'[^']*configuration_table\.dart'/g) || []).length;
+        const syncQueueImportCount = (result.match(/import\s+'[^']*sync_queue_table\.dart'/g) || []).length;
+        assert.strictEqual(syncMetadataImportCount, 1, 'G1: sync_metadata_table.dart import должен быть 1× (defensive strip удаляет fixed-line вне markers)');
+        assert.strictEqual(configImportCount, 1, 'G1: configuration_table.dart import должен быть 1×');
+        assert.strictEqual(syncQueueImportCount, 1, 'G1: sync_queue_table.dart import должен быть 1×');
+
+        // Critical: каждый class в @DriftDatabase(tables: [...]) строго 1 раз:
+        const syncMetadataClassCount = (result.match(/SyncMetadataTable/g) || []).length;
+        const configurationClassCount = (result.match(/ConfigurationTable/g) || []).length;
+        const syncQueueClassCount = (result.match(/SyncQueueTable/g) || []).length;
+        assert.strictEqual(syncMetadataClassCount, 1, 'G1: SyncMetadataTable class должен быть 1× (defensive strip удаляет fixed-line вне markers)');
+        assert.strictEqual(configurationClassCount, 1, 'G1: ConfigurationTable class должен быть 1×');
+        assert.strictEqual(syncQueueClassCount, 1, 'G1: SyncQueueTable class должен быть 1×');
+    });
+
+    test('G1 defensive strip idempotency: повторный run на already-stripped output → identical', async () => {
+        // Idempotency invariant: generator на already-clean output не должен менять content
+        // (commutative с собой). Critical для reproducibility — verify работает consistently.
+        const templateWithFixedLineImports = `import 'package:drift/drift.dart';
+import 'tables/sync_metadata_table.dart';
+// === GENERATED_IMPORTS_START ===
+// === GENERATED_IMPORTS_END ===
+
+@DriftDatabase(tables: [
+    SyncMetadataTable,
+// === GENERATED_TABLES_START ===
+// === GENERATED_TABLES_END ===
+])
+class AppDatabase extends _$AppDatabase {
+  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) { return m.createAll(); },
+    onUpgrade: (Migrator m, int from, int to) async {},
+  );
+}
+`;
+        mockFs.setFile(TEMPLATE_DB_PATH, templateWithFixedLineImports);
+
+        const flutterLib = `${PROJECTS_PATH}/weight/weight_flutter/lib`;
+        mockFs.setFile(`${flutterLib}/core/data/datasources/local/tables/sync_metadata_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('configuration', 'configuration'));
+        await gen.generate();
+        const after1 = await mockFs.readFile(TARGET_DB_PATH);
+
+        await gen.generate();
+        const after2 = await mockFs.readFile(TARGET_DB_PATH);
+
+        assert.strictEqual(after1, after2, 'G1: repeat generate на already-stripped output должен дать identical content');
+
+        // Sanity: первый прогон уже clean (1× import, 1× table class)
+        const syncMetadataImportCount = (after1.match(/import\s+'[^']*sync_metadata_table\.dart'/g) || []).length;
+        const syncMetadataClassCount = (after1.match(/SyncMetadataTable/g) || []).length;
+        assert.strictEqual(syncMetadataImportCount, 1);
+        assert.strictEqual(syncMetadataClassCount, 1);
+    });
+
     test('игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart', async () => {
         const featPath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/tasks/data/datasources/local/tables`;
         mockFs.setFile(`${featPath}/category_table.dart`, '// stub');

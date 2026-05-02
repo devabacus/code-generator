@@ -67,54 +67,59 @@ DoD-гейт: `codegen create-project --name t152` + `codegen verify --name t152
   - 5 adapter файлов в `lib/features/configuration/data/adapters/configuration/` → `// manifest: startProject` (Configuration — singleton, копируется как есть)
   - 15 adapter файлов в `lib/features/tasks/data/adapters/{category,task,tag}/` → `// manifest: entity`
   - 5 adapter файлов в `lib/features/tasks/data/adapters/task_tag_map/` → `// manifest: manyToMany`
-- [ ] **Phase B (orchestrator marker блоки):** в `lib/core/sync/sync_orchestrator_provider.dart` обернуть 3 секции в marker блоки:
+- [x] **Phase B (orchestrator marker блоки):** в `lib/core/sync/sync_orchestrator_provider.dart` обернуть 3 секции в marker блоки:
   - imports группа adapter'ов → `// === generated_start:syncImports ===` / `// === generated_end:syncImports ===`
   - `const List<String> syncEntityTypes = [...]` → `// === generated_start:syncEntityTypes ===` / `// === generated_end:syncEntityTypes ===`
   - блок `orchestrator.register<X>(...)` вызовов → `// === generated_start:syncRegistrations ===` / `// === generated_end:syncRegistrations ===`
-- [ ] **Phase B5 (marker integrity test — per Discussion #1 concern №4):**
+- [x] **Phase B5 (marker integrity test — per Discussion #1 concern №4):**
   - Manual inspection orchestrator файла после Phase B — все 3 marker pairs paired correctly, content внутри сохранён без потери
   - Нет orphan `generated_end` без matching `generated_start` или наоборот
-- [ ] **Phase B6 (idempotency unit test — per Discussion #1 concern №4):**
+- [x] **Phase B6 (idempotency unit test — per Discussion #1 concern №4):**
   - Unit test: `SectionReplacer.process()` на orchestrator файле post-Phase-B без изменений content → file content stable, не trigger'ит accidental re-generation
   - На MockFileSystem с двумя последовательными вызовами — digest identical
-- [ ] **Phase B7 (SectionReplacer marker tests — per Discussion #1 codegen teamlead concern):** unit tests для `:syncRegistrations` / `:syncImports` / `:syncEntityTypes` markers (4 cases: empty / existing content idempotent / malformed orphan / duplicate recovery)
-- [ ] **Phase C0 (replacement_util audit — per Discussion #1 codegen teamlead concern):** ENTITY/M2M словари расширены под orchestrator_patcher requirements (XEntity / 'x' lowercase id / XRemoteAdapter etc.) + tests
-- [ ] **Phase C (codegen TypeScript):**
+- [x] **Phase B7 (SectionReplacer marker tests — per Discussion #1 codegen teamlead concern):** unit tests для `:syncRegistrations` / `:syncImports` / `:syncEntityTypes` markers (4 cases: empty / existing content idempotent / malformed orphan / duplicate recovery)
+- [x] **Phase C0 (replacement_util audit — per Discussion #1 codegen teamlead concern):** ENTITY/M2M словари расширены под orchestrator_patcher requirements (XEntity / 'x' lowercase id / XRemoteAdapter etc.) + tests
+- [x] **Phase C (codegen TypeScript):**
   - `orchestrator_patcher.ts` создан, идемпотентный (повторный generate с тем же YAML → identical content), recovery от legacy duplicates (как `relation_patcher.ts` BUG-003 fix)
   - Patches 3 marker блока на основе ServerpodModel (entity name, junction detection, relation analysis)
   - Подключён в `generation_service.ts` flow после relation_patcher
   - Unit-tests на MockFileSystem (минимум: empty state, single entity add, idempotent re-run, junction entity, multiple entities, recovery from legacy duplicates) — **минимум 6 тестов**
-- [ ] **Phase C7 (concurrent test — per Discussion #1 codegen teamlead concern):** mock-based test что patcher commutative (apply A→B == apply B→A в final state)
-- [ ] **Phase D5 (BUG-008 fix):** `AppDatabaseGenerator` scan paths расширены до `core/**/*_table.dart` — `sync_queue_table.dart` (и любые будущие core-уровневые tables) попадают в `database.dart` imports + tables list. Regression test + idempotency test.
-- [ ] **Phase D (pubspec fix):** `patchPubspecPackagePaths` правильно обрабатывает sync_core path-dep в свежем target проекте
+- [x] **Phase C7 (concurrent test — per Discussion #1 codegen teamlead concern):** mock-based test что patcher commutative (apply A→B == apply B→A в final state)
+- [x] **Phase D5 (BUG-008 fix):** `AppDatabaseGenerator` scan paths расширены до `core/**/*_table.dart` — `sync_queue_table.dart` (и любые будущие core-уровневые tables) попадают в `database.dart` imports + tables list. Regression test + idempotency test.
+- [x] **Phase D (pubspec fix):** `patchPubspecPackagePaths` правильно обрабатывает sync_core path-dep в свежем target проекте
   - Template path: `path: ../../../../Projects/Flutter/Packages/sync_core` (в `Templates/flutter/t115/t115_flutter/pubspec.yaml`)
   - Target path после create-project: должен быть `path: ../../../../../Projects/Flutter/Packages/sync_core` (на 1 глубже из-за `serverpod/`)
   - Текущий `patchPubspecPackagePaths` обрабатывает только `path: ../../Packages/X` → `path: ../../../Packages/X` — нужно расширить regex
-- [ ] **Phase E (docs cleanup):**
+- [x] **Phase E (docs cleanup):**
   - `ai/docs/agent_memory.md` секция "Sync-паттерн в шаблоне" переписана под sync_core 0.3.0 (Adapter Bundle, mutation-first, register patcher)
   - `ai/docs/architecture.md` секция "Sync-паттерн (в шаблоне t115)" переписана
   - `CLAUDE.md` обновлён — sync_core 0.3.0 generation теперь покрыт codegen
-- [ ] **Phase E5 (README short bullet + new detail doc — per Discussion #1 codegen teamlead concern):**
+- [x] **Phase E5 (README short bullet + new detail doc — per Discussion #1 codegen teamlead concern):**
   - `README.md` (root) — short bullet + link на новый detailed doc (не expand README extensively)
   - **`docs-code-generator/sync-core-integration.md`** (новый файл) — детальное описание: что генерируется, YAML model requirements, limitations, references на sync_core docs
-- [ ] **TASK-013 backlog created** (per Discussion #1 concern №2): robust junction detection (YAML field analysis или explicit `junction: true` flag) — defer на отдельный TASK после weight TASK-018 если weight discoverит false-negatives на `endsWith('Map')` heuristic
-- [ ] **Phase F0 (E2E patcher validation — per Discussion #1 Variant A): re-add tasks через generate-entity** для t115
+- [x] **TASK-013 backlog created** (per Discussion #1 concern №2): robust junction detection (YAML field analysis или explicit `junction: true` flag) — defer на отдельный TASK после weight TASK-018 если weight discoverит false-negatives на `endsWith('Map')` heuristic
+- [x] **Phase F0 (E2E patcher validation — per Discussion #1 Variant A): re-add tasks через generate-entity** для t115 — `done with caveat` (BUG-007 cascade — F0 demonstrates patcher idempotency, не runtime correctness; relation_patcher gap pre-existing)
   - Прогон 4 раза `codegen generate-entity --yaml {category,task,tag,task_tag_map}.spy.yaml --feature-path .../tasks --workspace t115`
   - Это E2E проверка: orchestrator_patcher (Phase C) реально воссоздаёт original orchestrator state из minimal Configuration baseline
   - После этого orchestrator должен иметь те же 5 register'ов что были в pre-A0 state (Configuration + Category + Task + Tag + TaskTagMap)
   - `dart format` orchestrator_provider.dart — для проверки стабильности idempotent reformatting
-- [ ] **DoD verify (regression на t115):** `codegen verify --name t115` PASS errors=0 — **выполняется ПОСЛЕ Phase F0** (re-add tasks). Без F0 t115 ожидаемо fail (acceptable intermediate state).
-- [ ] **DoD verify (свежий проект):** `codegen create-project --name t152` + `codegen verify --name t152` PASS errors=0
+- [x] **DoD verify (regression на t115):** `codegen verify --name t115` PASS errors=0 — **выполняется ПОСЛЕ Phase F0** (re-add tasks). Без F0 t115 ожидаемо fail (acceptable intermediate state).
+- [x] **DoD verify (свежий проект):** `codegen create-project --name t152` + `codegen verify --name t152` PASS errors=0
   - Новый проект имеет `lib/core/sync/` (8 файлов скопированы)
   - Configuration entity registered в orchestrator (singleton baseline)
   - Tasks features НЕ присутствуют по default (TASK-002 опт-ин)
   - `flutter analyze` 0 errors / warnings ≤ 5
-- [ ] **DoD generate-entity:** в свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t152` создаёт:
+- [x] **DoD generate-entity:** в свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t152` создаёт:
   - 5 adapter файлов в `lib/features/expense/data/adapters/expense/`
   - register block + import + entityType добавлены в `sync_orchestrator_provider.dart`
   - `flutter analyze` все ещё PASS
-- [ ] **report.md** написан с цитированием actual `verify` JSON output (errors=N, warnings=M, infos=K)
-- [ ] **Все 62+ existing tests passing** + новые tests для orchestrator_patcher
+- [x] **report.md** написан с цитированием actual `verify` JSON output (errors=N, warnings=M, infos=K)
+- [x] **Все 62+ existing tests passing** + новые tests для orchestrator_patcher
+- [x] **Phase G1 (defensive strip Bomb #2 closure):** `AppDatabaseGenerator.stripDuplicateFixedLineImports` + `stripDuplicateFixedLineTables` — generator сам удаляет fixed-line `import '..._table.dart';` и table class refs ВНЕ markers, если scan нашёл тот же файл. Independent of template state. 2 realistic regression tests (87 passing total).
+- [x] **Phase G2 (t115 cleanup commit):** все 51 файла uncommitted changes в `G:/Templates/flutter/t115/` зафиксированы commit'ом 9ded2a7 — D7 cleanup, Configuration baseline, manifest markers, home_page UI закомментирован.
+- [x] **Phase G3 (sync inconsistencies):** F0 status sync (task.md == report.md `[x] done with caveat`), 53 acceptance checkboxes synced `[x]`.
+- [x] **Phase G4 (TASK-013 audit weight 13 entities):** junction-style без `Map` suffix — список + verdict per entity, hard gate в roadmap.
+- [x] **Phase G5 (fresh t154 verify — Bomb #2 actually closed):** `flutter analyze` t154 — **0 `duplicate_import` warnings**.
 
 ### Should-have (nice-to-have, не блокеры)
 
