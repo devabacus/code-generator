@@ -1,19 +1,35 @@
 import * as yaml from 'js-yaml';
 import { ServerpodModel, ServerpodField, ServerpodIndex } from './formatters/types';
 import { RelationAnalyzer } from './relation-analyzer';
+import { JunctionDetector } from './junction_detector';
 
 export class ServerpodYamlParser {
 
     static parse(yamlContent: string): ServerpodModel {
         const parsed = yaml.load(yamlContent) as any;
 
+        // Dependency ordering (TASK-013, Discussion #2 Q3 Claude_1):
+        //   1. parseFields() ДО junction detection — detector работает на already-parsed
+        //      `ServerpodField[]` (с заполненными `isRelation` flags).
+        //   2. Затем JunctionDetector.isJunctionEntity() устанавливает `model.isRelation`
+        //      flag (drives manifest selection в generate_entity.ts:72 + create_data_files...).
+        //
+        // Legacy `parsed.class.includes('Map')` heuristic dropped (Q2=A) — производил
+        // false-negatives для junction'ов без `Map` суффикса (RolePermission, CustomerUser
+        // в weight). См. ai/bug-reports/junction-detection-audit.md.
+        const fields = this.parseFields(parsed.fields || {});
+        const explicitJunction: boolean | undefined =
+            typeof parsed.junction === 'boolean' ? parsed.junction : undefined;
+
         const model: ServerpodModel = {
             className: parsed.class || '',
             tableName: parsed.table || '',
-            isRelation: parsed.class.includes('Map'),
-            fields: this.parseFields(parsed.fields || {}),
+            isRelation: false, // populated below через JunctionDetector
+            fields,
             indexes: this.parseIndexes(parsed.indexes),
         };
+
+        model.isRelation = JunctionDetector.isJunctionEntity(model, explicitJunction);
 
         if (model.isRelation) {
             const entities = this.extractManyToManyEntities(model);

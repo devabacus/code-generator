@@ -5,6 +5,7 @@ import { getDictionaryRules } from '../replacement/replacement_util';
 import { ServerpodModel } from '../parsers/formatters/types';
 import { getPathInfo } from '../config/path_handle';
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
+import { JunctionDetector } from '../parsers/junction_detector';
 import { DictionaryPresets } from '../replacement/dictionary_presets';
 import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
 
@@ -24,7 +25,11 @@ export class RelationPatcher {
 
         const relationFields = RelationAnalyzer.manyToOneFields(model.fields);
 
-        if (relationFields.length === 0 || model.className.includes('Map')) {
+        // TASK-013: junction skip через shared JunctionDetector (Q3=A).
+        // Replaces legacy `model.className.includes('Map')` (Q2=A — drop suffix).
+        // Junction entities имеют свой relation patching через manyToMany manifest;
+        // RelationPatcher предназначен только для regular oneToMany methods.
+        if (relationFields.length === 0 || JunctionDetector.isJunctionEntity(model)) {
             return;
         }
 

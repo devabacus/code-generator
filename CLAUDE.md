@@ -208,6 +208,17 @@ G:/Projects/Flutter/serverpod/<name>/
 
 ## Task workflow (TASK-XXX через скрипты)
 
+### ⚠ HARD RULE — tasks/discussions ТОЛЬКО через python скрипты
+
+User decision 2026-05-02: **создание новых TASK-XXX и discussions — ТОЛЬКО через python скрипты в `ai/scripts/` и `ai/discussions/scripts/`. Запрещено создавать `ai/tasks/active/*/task.md` или `ai/discussions/active/N-*.md` через `Write` tool вручную.**
+
+**Почему:** scripts обеспечивают auto-ID (без conflicts), копируют свежий template, обновляют `STATUS.md`, применяют naming conventions. Manual creation breaks все эти invariants. Конкретный случай: 2026-05-02 manually-created TASK-011 conflict'нул с auto-ID 011 от new_task.py — пришлось переименовывать руками.
+
+**Скрипты в codegen:**
+- `ai/scripts/new_task.py "название"` — новая TASK-XXX (auto-ID)
+- `ai/scripts/task.py start|pr|merge|finish` — workflow feature branch → PR → squash merge
+- `ai/discussions/scripts/discuss.py new|list|continue|close` — discussions
+
 ### Создание задачи
 ```bash
 python ai/scripts/new_task.py "Краткое название"

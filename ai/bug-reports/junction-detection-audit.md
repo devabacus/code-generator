@@ -158,3 +158,64 @@ Future audits такого типа должны:
 2. Per entity: count FK relations (signaled by `relation(parent=...)` syntax) + count non-FK domain fields.
 3. Flag as junction-style: 2+ FK + ≤1 trivially-typed non-FK поле (id is excluded — auto-PK).
 4. Verify naming heuristic match per flagged entity.
+
+---
+
+## Re-audit 2026-05-02 (post TASK-013 fix)
+
+**Trigger:** TASK-013 implementation — replacement `endsWith('Map')` heuristic на `JunctionDetector.isJunctionEntity()` shared utility (Discussion #2 Q1=C / Q2=A / Q3=A unanimous consensus). Re-audit нужен для подтверждения что новая methodology корректно классифицирует обе false-negative cases (RolePermission, CustomerUser) + не вводит false-positives.
+
+### Updated methodology
+
+Programmatic scan через `node` running compiled `out/features/generation/parsers/junction_detector.js`:
+
+```bash
+# Walks все *.spy.yaml под weight_server/lib/src/models/ (excluding *_sync_event.spy.yaml)
+# Для каждого: ServerpodYamlParser.parse() → JunctionDetector.analyze()
+# Output: junction list (with reason) + regular list (with FK count + extra fields)
+node /tmp/audit_weight.js  # script saved at C:/Users/User/AppData/Local/Temp/audit_weight.js
+```
+
+**Detection rules** (per `junction_detector.ts`):
+- **Structural junction:** 2+ FK relations (`isRelation === true`) + 0 non-FK fields outside base whitelist (`id, userId, customerId, createdAt, lastModified, isDeleted`). Nullable FK = FK.
+- **Explicit override:** YAML top-level `junction: true` field (not used in weight today; reserved for junction-with-metadata e.g. `UserPermission(userId, permissionId, assignedAt)`).
+- **Validation:** `junction:true` + FK<2 throws `JunctionValidationError`.
+
+### Results (37 YAML files scanned)
+
+#### Junction-detected (2)
+
+| # | Entity | File | FK count | FKs | Reason |
+|---|--------|------|----------|-----|--------|
+| 1 | **RolePermission** | `user/role_permission.spy.yaml` | 2 | roleId, permissionId | `structural` |
+| 2 | **CustomerUser** | `user/customer_user.spy.yaml` | 3 | customerId, roleId, defaultTerminalSetId (nullable) | `structural` |
+
+**Verdict:** обе false-negative cases из original audit (round 3) **correctly classified as junction** через новую structural detection. Routing через `_JUNCTION_*` templates на момент future migration.
+
+#### Newly-discovered junction-style entities
+
+**Нет** — кроме уже известных RolePermission + CustomerUser, других strict-junction entities (2+ FK + 0 extra fields) в weight нет.
+
+#### Regular (27)
+
+Все остальные 27 entities classified as regular. Highlight'ы:
+- **Configuration, TerminalSet, Cargo/Contractor/CorrectionButton/CustomField/Driver/Vehicle/Weighing**: имеют domain поля (group/key/value, name/address, etc) → не junction.
+- **Subscription** (FK=2: customerId + terminalSetId, extras=4): не junction — есть `feature, status, startedAt, expiresAt` business fields.
+- **TerminalDevice** (FK=2: customerId + terminalSetId, extras=5): не junction — есть `mac, type, name, firmwareVersion, lastSeenAt`.
+- **CustomFieldValue** (FK=2, extras=2: `entityId, value`): не junction — `value` field carries domain data (EAV-style).
+- **Weighing** (FK=6, extras=16): definitely transactional record, не junction (наибольшее количество FK + наибольший набор domain полей).
+- **WeighingCorrection / WeighingPhoto** (FK=2 each, extras=3-4): regular — содержат attribute поля (value/label/photoUrl).
+
+### Cross-check vs initial audit
+
+Original audit (line 23-38) covered 14 entities (только sync set — те что имели paired `*_sync_event.spy.yaml`). Re-audit покрыл **37 entities** — full models tree. **No additional false-negatives discovered.**
+
+Borderline cases re-confirmed:
+- `CustomFieldValue` остаётся **regular** — domain field `value` присутствует, structural detection корректно flags as regular.
+- `Subscription`, `TerminalDevice` — re-affirmed regular per same logic.
+
+### Verdict (post-TASK-013)
+
+✅ **Resolved.** Both false-negatives (RolePermission + CustomerUser) **correctly detected as junction** через `JunctionDetector.isJunctionEntity()` после TASK-013 fix. **No new false-negatives** discovered в weight schema. **No false-positives** introduced (все 27 regular entities classified correctly).
+
+Hard gate для weight TASK-018 ✅ closed: junction routing будет корректным на момент migration. RolePermission и CustomerUser получат `_JUNCTION_*` template snippets (update→createX + docstring) при добавлении в sync set.

@@ -46,14 +46,49 @@ Orchestrator после `create-project` имеет:
 2. **`:syncEntityTypes`** — добавляет `'<entityType>',` строку в `const List<String>`
 3. **`:syncRegistrations`** — добавляет `orchestrator.register<XEntity>(...)` блок (12 строк)
 
-#### Junction entities (`*Map` className)
+#### Junction entities (FK field analysis)
 
-Если `model.className.endsWith('Map')` — например `TaskTagMap`, `UserPermissionMap` — patcher выбирает junction template:
-- Snippet содержит docstring о junction-specific routing: `update()` → `createX` (idempotent create + resurrect), `delete()` → noop (Repository должен решать delete-flow)
-- routing через `manifest: manyToMany` словарь
-- Server endpoints: `createX`, `deleteXByABusinessKey` (НЕ `updateX` / `deleteX`)
+Junction (many-to-many) entities определяются через **`JunctionDetector.isJunctionEntity()`** — shared utility из `src/features/generation/parsers/junction_detector.ts` (single source of truth с TASK-013, 2026-05-02). Suffix `*Map` больше не используется для detection.
 
-Reference: t115/TASK-001 Phase 2d TaskTagMap pattern.
+**Detection rules** (per [Discussion #2](../ai/discussions/archive/2-task-013-junction-detection-robust-yaml/) Q1=C / Q2=A / Q3=A unanimous consensus):
+
+- **Structural (default):** entity = junction если **2+ FK relations** (поля с `relation(parent=...)` syntax) + 0 non-FK fields outside base whitelist (`id, userId, customerId, createdAt, lastModified, isDeleted`). Nullable FK = FK.
+- **Explicit override:** YAML top-level `junction: true` field принудительно классифицирует entity как junction независимо от extra fields. Use case: junction с metadata (e.g. `UserPermission(userId, permissionId, assignedAt)`). Negative override (`junction: false`) НЕ supported — risk скрыть structural junction.
+- **Validation:** `junction: true` + FK<2 → throws `JunctionValidationError` (fail-fast).
+
+**Examples:**
+
+```yaml
+# Structural junction (no Map suffix needed — detection через FK analysis)
+class: RolePermission
+table: role_permission
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  roleId: UuidValue, relation(parent=role, onDelete=Cascade)
+  permissionId: UuidValue, relation(parent=permission, onDelete=Cascade)
+```
+
+```yaml
+# Junction with metadata — requires explicit override
+class: UserPermission
+table: user_permission
+junction: true                                                       # explicit override
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  userId: UuidValue, relation(parent=user, onDelete=Cascade)
+  permissionId: UuidValue, relation(parent=permission, onDelete=Cascade)
+  assignedAt: DateTime                                               # business field
+```
+
+**Junction template snippet** (выбирается через `_JUNCTION_*` templates):
+- Docstring о junction-specific routing: `update()` → `createX` (idempotent create + resurrect), `delete()` → noop (Repository должен решать delete-flow)
+- Routing через `manifest: manyToMany` словарь
+- Server endpoints: `createX`, `deleteXByBusinessKey` (НЕ `updateX` / `deleteX`)
+
+References:
+- t115/TASK-001 Phase 2d TaskTagMap pattern (multi-entity validated)
+- [TASK-013 task.md](../ai/tasks/active/TASK-013-junction-detection-robust-yaml-field-analysis/task.md) — robust detection acceptance
+- [ai/bug-reports/junction-detection-audit.md](../ai/bug-reports/junction-detection-audit.md) — false-negative audit + re-audit (2026-05-02 verified RolePermission + CustomerUser correctly classified)
 
 ## YAML model requirements
 
@@ -88,25 +123,11 @@ fields:
   scope: String
 ```
 
-Junction (`*Map`) **пропускают** sync_event валидацию (per Discussion #1 решение, robust junction detection — TASK-013 backlog).
+Junction entities **пропускают** sync_event валидацию (detected через `JunctionDetector.isJunctionEntity()` — TASK-013, 2026-05-02).
 
 ## Limitations
 
-### 1. Junction detection — `endsWith('Map')` heuristic
-
-Текущий patcher использует `model.className.endsWith('Map')` для определения junction.
-
-**False-negatives potential:**
-- Regular entity `Roadmap`, `Sitemap` будут treated как junction (regex match)
-- Workaround: переименовать или добавить `junction: false` flag (TASK-013)
-
-**False-positives potential:**
-- Junction без `Map` suffix (e.g., `UserRoleAssignment`) не будет detected
-- Workaround: переименовать в `UserRoleAssignmentMap` или ждать TASK-013
-
-**Trigger для priority bump:** weight TASK-018 production migration discoverит false-negatives на 13 entities → robust solution через YAML field analysis или explicit `junction: true` flag (см. [TASK-013 backlog](../ai/tasks/backlog/) или [roadmap.md](../ai/docs/roadmap.md)).
-
-### 2. Soft-delete via update pattern
+### 1. Soft-delete via update pattern
 
 Sync_core 0.3.0 не имеет dedicated `delete()` RPC на server side для большинства entities — soft-delete делается через `update()` с `isDeleted=true`.
 
@@ -116,15 +137,15 @@ Sync_core 0.3.0 не имеет dedicated `delete()` RPC на server side для
 - `getXSince(DateTime since, scope)` — incremental pull
 - `watchEvents(scope) -> Stream<XSyncEvent>` — server-side events
 
-Junction entities (`*Map`) — **отсутствует `updateX`**, есть `deleteXByBusinessKey` (через FK pair).
+Junction entities — **отсутствует `updateX`**, есть `deleteXByBusinessKey` (через FK pair).
 
-### 3. Patcher работает только если orchestrator pre-prepared с marker блоками
+### 2. Patcher работает только если orchestrator pre-prepared с marker блоками
 
 `OrchestratorPatcher.patch()` — **no-op** если `sync_orchestrator_provider.dart` не существует или не содержит marker pairs (`:syncImports` / `:syncEntityTypes` / `:syncRegistrations`).
 
 В свежих проектах через `create-project` markers подготовлены автоматически (Configuration baseline + 3 empty marker pairs ready for entities).
 
-### 4. `patchPubspecPackagePaths` regex extension (Phase D, TASK-011)
+### 3. `patchPubspecPackagePaths` regex extension (Phase D, TASK-011)
 
 sync_core path-dep живёт **вне** Packages/ monorepo (в `Projects/Flutter/Packages/sync_core`). Regex extended для покрытия `(?:\.\.\/){4,}Projects\/...` patterns. См. `src/core/services/project_bootstrapper.ts`.
 
@@ -135,7 +156,9 @@ sync_core path-dep живёт **вне** Packages/ monorepo (в `Projects/Flutte
 ### Codegen src
 
 - `src/features/generation/generators/orchestrator_patcher.ts` — patcher implementation
-- `src/test/generators/orchestrator_patcher.test.ts` — 7 unit-tests (empty/single/idempotent/junction/multi-sequential/recovery-duplicates/commutative)
+- `src/features/generation/parsers/junction_detector.ts` — junction detection (TASK-013)
+- `src/test/generators/orchestrator_patcher.test.ts` — unit-tests (empty/single/idempotent/junction/multi-sequential/recovery-duplicates/commutative + TASK-013 regression)
+- `src/test/parsers/junction_detector.test.ts` — JunctionDetector unit-tests (structural / negative / dynamic regression / integration)
 - `src/test/generators/section_replacer.test.ts` — 5 unit-tests (B6/B7 — SectionReplacer не трогает sync markers)
 - `src/test/services/project_bootstrapper.test.ts` — 6 unit-tests для patchPubspecPackagePaths
 - `src/core/services/project_bootstrapper.ts` — `patchPubspecPackagePaths` (sync_core path-dep coverage)
@@ -159,10 +182,8 @@ sync_core path-dep живёт **вне** Packages/ monorepo (в `Projects/Flutte
 - **TASK-012** (next) — codegen → todo real app generation + smoke (cross-device runtime validation)
 - **weight TASK-018** (after TASK-012) — 13 entities production migration
 
-## TASK-013 backlog (deferred)
+## TASK-013 — Resolved (2026-05-02)
 
-Robust junction detection: вместо `endsWith('Map')` heuristic — анализ YAML fields (foreign-key only entity = junction) или explicit `junction: true` flag.
+Robust junction detection ✅ shipped. `endsWith('Map')` / `includes('Map')` heuristic заменены на shared `JunctionDetector.isJunctionEntity()` utility (3 production decision-paths). Detection через YAML field analysis (2+ FK + base-only fields = structural junction) + explicit `junction: true` override для junction-with-metadata cases. См. [ai/tasks/active/TASK-013-junction-detection-robust-yaml-field-analysis/task.md](../ai/tasks/active/TASK-013-junction-detection-robust-yaml-field-analysis/task.md).
 
-**Trigger:** weight TASK-018 false-negatives на 13 entities. До этого keep heuristic.
-
-См. [ai/docs/roadmap.md](../ai/docs/roadmap.md) или [ai/tasks/backlog/](../ai/tasks/backlog/).
+Re-audit weight (37 YAML files) confirmed: RolePermission + CustomerUser correctly classified as junction; нет new false-negatives; нет false-positives. Hard gate ✅ closed для weight TASK-018.

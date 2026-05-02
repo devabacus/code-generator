@@ -37,29 +37,44 @@
 
 **Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия codegen TASK-X2 acceptance. Это hard gate без Soft Launch — sync_core teamlead координирует через `G:/Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md`.
 
-### Hard gate: TASK-013 junction detection (revised post round 3)
+### Hard gate: TASK-013 junction detection — Detection-side resolved, file paths blocked by TASK-014 (2026-05-02)
 
-**weight TASK-018 НЕ стартует пока TASK-013 не closed.**
+**Status:** ⚠ **Partial closure (Variant B split per User decision 2026-05-02).**
+- **Detection-side ✅ closed via TASK-013** — junction detection refactored через `JunctionDetector.isJunctionEntity()` shared utility. Discussion #2 unanimous consensus (Q1=C / Q2=A / Q3=A) approved by User 2026-05-02.
+- **Production migration weight TASK-018 BLOCKED by TASK-014** (file path generation для non-Map junction adapters — `replacement_util.ts MANY_TO_MANY` + `_getDestinationPath` для two-entity rename, broken). Premature unblock запрещён.
 
-`OrchestratorPatcher` использует heuristic `model.className.endsWith('Map')` для детекции junction (many-to-many) entities. Если weight имеет junction-style entity (2+ FK + минимум domain полей) БЕЗ `Map` суффикса → false-negative routing через regular template → silent data divergence на out-of-order writes.
+**Original problem:** `OrchestratorPatcher` использовал heuristic `model.className.endsWith('Map')` для детекции junction (many-to-many) entities. Если weight имеет junction-style entity (2+ FK + минимум domain полей) БЕЗ `Map` суффикса → false-negative routing через regular template → silent data divergence на out-of-order writes.
 
 **Audit результат (TASK-011 Phase G4 + round 3 follow-up, 2026-05-02):**
 - Initial audit (Phase G4) проверил 14 sync entities (имеют `*_sync_event.spy.yaml`) — verdict "trivially passed".
-- **Round 3 adversarial follow-up: failed — 2 false-negative cases confirmed.** Initial audit использовал leaky selection criterion (только existing sync entities) и не учёл junction-style entities которые уже на disk но не в sync set yet.
+- **Round 3 adversarial follow-up: failed — 2 false-negative cases confirmed.**
   - `RolePermission` — pure 2-FK junction (`roleId` + `permissionId`), file `weight_server/lib/src/models/user/role_permission.spy.yaml`.
   - `CustomerUser` — 3-FK + 1 nullable FK junction-style, file `weight_server/lib/src/models/user/customer_user.spy.yaml`.
-- См. [`ai/bug-reports/junction-detection-audit.md`](../bug-reports/junction-detection-audit.md) — секция "False-negative discovered post-audit (round 3 adversarial)".
 
-**Hard gate (revised):** TASK-018 blocking until TASK-013 closed. Это fixed gate, не trigger-based. Без TASK-013 fix RolePermission/CustomerUser получают broken routing на момент migration в sync set.
+**TASK-013 fix (2026-05-02, detection-side only):** replaced `endsWith('Map')` / `includes('Map')` heuristics на shared `JunctionDetector.isJunctionEntity()` utility (single source of truth) в 4 production decision-paths (3 required + 1 bonus from grep audit):
+- `parsers/server_yaml_parser.ts:13→32` (model.isRelation flag, dependency ordering fix: parseFields() ДО isRelation evaluation)
+- `parsers/entity_yaml_validator.ts` (junction skip pattern в validate() + validateSyncEvent())
+- `generators/orchestrator_patcher.ts:52→58` (template selection)
+- `generators/relation_patcher.ts:32` (bonus 4th call-site discovered through grep audit)
 
-**TASK-013 priority bumped Medium → High** ([backlog.md](../tasks/backlog.md)). Scope: replace `endsWith('Map')` heuristic на YAML field analysis (2+ FK + ≤1 non-FK поле → junction) ИЛИ explicit `junction: true` flag в YAML.
+Detection rules: structural (2+ FK relations + 0 non-FK fields outside base whitelist) OR explicit `junction: true` YAML field. Nullable FK = FK. См. [`ai/bug-reports/junction-detection-audit.md`](../bug-reports/junction-detection-audit.md) re-audit section (2026-05-02).
+
+**Re-audit verification (37 weight YAML files programmatic scan через JunctionDetector):** обе false-negative cases (RolePermission + CustomerUser) **correctly classified as junction** через structural detection. **No new false-negatives** discovered. **No false-positives** introduced.
+
+**TASK-014 (создаётся после TASK-013 merge):** "junction adapter file path generation для non-Map entities (RolePermission case + general M2M two-entity rename)". Bug в **отдельном code path**: `replacement_util.ts MANY_TO_MANY` словарь не заменяет template entity name (`taskTagMap`) на target entity (`rolePermission`) в file paths/filenames + class name `Map` суффикс остаётся — class name становится `RolePermissionMap` вместо `RolePermission`. Symptom: generated файлы lying под `task_tag_map/` directory с `task_tag_map_*.dart` filenames + endpoint references несуществующий `RolePermissionMap` model → flutter analyze 356 errors + serverpod generate FAIL.
+
+**BUG-010 placeholder (создан в TASK-013 backlog):** `code_formatter.ts:81 !field.name.includes('Map')` — silent data loss landmine для fields с "Map" в имени (mapData, bitmapJson, mapboxToken, coordinatesMap). НЕ junction detection (separate concern, field-name filter в Drift Value wrapper). Out-of-scope TASK-013 grep gate.
+
+**Hard gate status для weight TASK-018:**
+- Detection-side ✅ closed — junction routing будет корректным на момент migration (orchestrator imports + syncEntityTypes + register block correct).
+- **Production migration ещё blocked TASK-014** (file path generation) — без TASK-014 fix миграция produces broken Flutter code (356 analyze errors).
+- weight TASK-018 prep work НЕ начинается до TASK-014 closure.
 
 **Критерии завершения Фазы 1.5:**
 - TASK-X1 merged → t115 regression PASS (existing template работает после маркеров + патчер)
 - TASK-X2 merged → fresh todo app sync working cross-device
-- Junction detection audit done (✅ TASK-011 Phase G4) + post-audit findings documented (✅ round 3, 2026-05-02)
-- **TASK-013 closed** (junction false-negative fix shipped)
-- weight TASK-018 unblocked
+- Junction detection audit done (✅ TASK-011 Phase G4) + post-audit findings documented (✅ round 3, 2026-05-02) + **detection fix shipped (✅ TASK-013, 2026-05-02)** + **file path generation fixed (TASK-014 — pending)**
+- weight TASK-018 unblocked **только после двойного gate (TASK-X2 + TASK-014 closed)**
 
 ---
 

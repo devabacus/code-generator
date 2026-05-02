@@ -84,6 +84,42 @@ function makeModel(className: string): ServerpodModel {
     };
 }
 
+/**
+ * Junction-style model fixture (TASK-013 regression). Используется для testing
+ * junction detection через JunctionDetector.isJunctionEntity() (replacement
+ * legacy `endsWith('Map')` heuristic).
+ *
+ * Shape: 2+ FK relation fields + базовые системные поля. Без `Map` суффикса
+ * (главный fix point — RolePermission/CustomerUser в weight были false-negatives).
+ */
+function makeJunctionModel(
+    className: string,
+    fkFields: ServerpodField[],
+    extraFields: ServerpodField[] = [],
+): ServerpodModel {
+    return {
+        className,
+        tableName: className.toLowerCase(),
+        isRelation: true, // populated to true since we know this is junction
+        fields: [
+            { name: 'id', type: 'UuidValue', nullable: true },
+            ...fkFields,
+            ...extraFields,
+        ],
+    };
+}
+
+function fkField(name: string, related?: string): ServerpodField {
+    return {
+        name,
+        type: 'UuidValue',
+        nullable: false,
+        isRelation: true,
+        relationType: 'manyToOne',
+        relatedModel: related ?? name.replace(/Id$/, ''),
+    };
+}
+
 suite('OrchestratorPatcher Test Suite', () => {
     let mockFs: MockFileSystem;
     let patcher: OrchestratorPatcher;
@@ -233,7 +269,12 @@ suite('OrchestratorPatcher Test Suite', () => {
 
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
-        await patcher.patch(configWithCustomFeature, makeModel('UserPermissionMap'));
+        // TASK-013: junction fixture теперь требует FK relation fields (не className suffix).
+        const userPermissionMap = makeJunctionModel('UserPermissionMap', [
+            fkField('userId', 'User'),
+            fkField('permissionId', 'Permission'),
+        ]);
+        await patcher.patch(configWithCustomFeature, userPermissionMap);
 
         const result = await mockFs.readFile(ORCHESTRATOR_PATH);
 
@@ -282,8 +323,15 @@ suite('OrchestratorPatcher Test Suite', () => {
     test('junction entity (*Map): routing через manyToMany словарь + docstring', async () => {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
-        // Junction entity: className.endsWith('Map')
-        await patcher.patch(makeConfig(), makeModel('UserPermissionMap'));
+        // TASK-013: junction detection через JunctionDetector — теперь требует
+        // 2+ FK relation fields (не className suffix). Backward compat: *Map
+        // entity с правильной junction signature (2 FK + base only) всё ещё
+        // detected как junction.
+        const userPermissionMap = makeJunctionModel('UserPermissionMap', [
+            fkField('userId', 'User'),
+            fkField('permissionId', 'Permission'),
+        ]);
+        await patcher.patch(makeConfig(), userPermissionMap);
 
         const result = await mockFs.readFile(ORCHESTRATOR_PATH);
 
@@ -481,5 +529,132 @@ void wireUp() {
         const countAlphaBA = (resultBA.match(/register<AlphaEntity>/g) || []).length;
         assert.strictEqual(countAlphaAB, 1, 'AB: ровно 1 Alpha register');
         assert.strictEqual(countAlphaBA, 1, 'BA: ровно 1 Alpha register');
+    });
+
+    // ── TASK-013 regression: junction detection через JunctionDetector ──────
+
+    test('TASK-013: RolePermission (no Map suffix, 2 FK only) → junction routing', async () => {
+        // Воспроизводит false-negative #1 из weight repo. Без TASK-013 fix
+        // RolePermission получал regular template routing. После fix — должен
+        // routing'ить через _JUNCTION_* templates.
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const rolePermission = makeJunctionModel('RolePermission', [
+            fkField('roleId', 'Role'),
+            fkField('permissionId', 'Permission'),
+        ]);
+
+        await patcher.patch(makeConfig(), rolePermission);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Junction-specific docstring должен присутствовать.
+        assert.ok(
+            result.includes('Junction-specific'),
+            'TASK-013: RolePermission должен получить junction docstring',
+        );
+
+        // PascalCase + Entity suffix в register.
+        assert.ok(
+            result.includes('register<RolePermissionEntity>'),
+            'TASK-013: register<RolePermissionEntity> должен присутствовать',
+        );
+
+        // snake_case path для file imports.
+        assert.ok(
+            result.includes('role_permission_remote_adapter.dart'),
+            'TASK-013: role_permission imports (snake_case path)',
+        );
+
+        // entityType id в snake_case.
+        assert.ok(
+            result.includes(`'role_permission',`),
+            `TASK-013: 'role_permission' entityType должен быть в syncEntityTypes`,
+        );
+    });
+
+    test('TASK-013: CustomerUser (3 FK + nullable FK, no Map suffix) → junction routing', async () => {
+        // Воспроизводит false-negative #2 из weight repo. Nullable FK = FK для detection.
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const customerUser = makeJunctionModel('CustomerUser', [
+            fkField('customerId', 'Customer'),
+            { name: 'userId', type: 'int', nullable: false },
+            fkField('roleId', 'Role'),
+            { name: 'defaultTerminalSetId', type: 'UuidValue', nullable: true, isRelation: true, relationType: 'manyToOne', relatedModel: 'TerminalSet' },
+        ]);
+
+        await patcher.patch(makeConfig(), customerUser);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        assert.ok(
+            result.includes('Junction-specific'),
+            'TASK-013: CustomerUser должен получить junction docstring (nullable FK counted as FK)',
+        );
+        assert.ok(
+            result.includes('register<CustomerUserEntity>'),
+            'TASK-013: register<CustomerUserEntity>',
+        );
+        assert.ok(
+            result.includes('customer_user_remote_adapter.dart'),
+            'TASK-013: customer_user imports (snake_case)',
+        );
+    });
+
+    test('TASK-013 backward compat: TaskTagMap (с Map suffix) → junction routing preserved', async () => {
+        // Verify что existing *Map entities продолжают detect как junction после
+        // TASK-013 (drop *Map suffix heuristic + structural detection вместо).
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const taskTagMap = makeJunctionModel('TaskTagMap', [
+            fkField('taskId', 'Task'),
+            fkField('tagId', 'Tag'),
+        ]);
+
+        await patcher.patch(makeConfig(), taskTagMap);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        assert.ok(
+            result.includes('Junction-specific'),
+            'TASK-013 backward compat: TaskTagMap (с Map suffix) detected as junction',
+        );
+        assert.ok(
+            result.includes('register<TaskTagMapEntity>'),
+            'TASK-013 backward compat: TaskTagMap register block',
+        );
+    });
+
+    test('TASK-013 negative: regular entity с 1 FK → НЕ junction (no false-positive)', async () => {
+        // Configuration-style: 1 FK (customerId) + business fields → regular routing.
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const configWithSingleFk: ServerpodModel = {
+            className: 'Subscription',
+            tableName: 'subscription',
+            isRelation: false,
+            fields: [
+                { name: 'id', type: 'UuidValue', nullable: true },
+                { name: 'userId', type: 'int', nullable: false },
+                fkField('customerId', 'Customer'),
+                { name: 'feature', type: 'String', nullable: false },
+                { name: 'status', type: 'String', nullable: false },
+            ],
+        };
+
+        await patcher.patch(makeConfig(), configWithSingleFk);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Regular template — НЕ должно быть junction docstring.
+        assert.ok(
+            !result.match(/register<SubscriptionEntity>[\s\S]{0,300}Junction-specific/),
+            'TASK-013: Subscription (regular) НЕ должна получить junction docstring',
+        );
+        assert.ok(
+            result.includes('register<SubscriptionEntity>'),
+            'Subscription register block присутствует (regular template)',
+        );
     });
 });
