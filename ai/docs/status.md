@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-04-25
+**Обновлено:** 2026-05-02
 
 ## Текущая фаза
 
@@ -19,10 +19,8 @@
 
 | ID | Описание | Статус | Дата |
 |---|---|---|---|
-| TASK-001 | Заполнить базовую документацию | 🟡 In Progress (ждёт approval) | 2026-04-18 |
-| TASK-008 | Фикс BUG-003 (relation_patcher идемпотентный) | ✅ Done (ждёт review) | 2026-04-25 |
-| TASK-009 | Фикс BUG-004 (валидация YAML) | ✅ Done (ждёт review) | 2026-04-25 |
 | TASK-010 | `codegen verify --runtime` + sync_smoke_test шаблон | 🟡 New (Open) | 2026-04-26 |
+| TASK-012 | codegen → todo real app + cross-device smoke (Phase 1.5 final gate) | ⏭ Next | — |
 
 ## Недавно завершено
 
@@ -39,25 +37,33 @@
 
 ## Риски / Открытые вопросы
 
-- **BUG-001 (High):** Ref disposed в сгенерированных state_providers — появляется в каждой новой сущности. [ai/bug-reports/001-state-provider-ref-disposed.md](../bug-reports/001-state-provider-ref-disposed.md)
-- **BUG-002 (Resolved):** имена файлов в camelCase — закрыто 2026-04-25. [ai/bug-reports/002-file-names-camelcase.md](../bug-reports/002-file-names-camelcase.md)
-- **BUG-005 (Open, High):** AppDatabaseGenerator работает только инкрементально — `database.dart` секции могут стать пустыми → 347 errors в analyze. Workaround: regen каждой фичи. Правильный фикс: scan `features/*/data/datasources/local/tables/`. [ai/bug-reports/005-app-database-generator-incremental-only.md](../bug-reports/005-app-database-generator-incremental-only.md)
-- **BUG-003 part 2 (открыт как backlog):** перезапись `:base` секций при regen теряет custom code — требует архитектурного решения (per-method markers или patch-only mode). Переоформить как BUG-006 когда станет блокером.
-- **Tech debt:** `code_formatter`, `server_yaml_parser`, `app_database_generator` не покрыты тестами
-- **Tech debt:** `project_creator.ts` не покрыт тестами — регрессия в standalone-режиме (gitInit + CI/CD prompt) не будет замечена автоматически
-- **Вопрос User:** нужно ли мержить `feature--create-cli` + `feature--fix-codegen-regen-bugs` в `master`? Накопился большой diff
+- **BUG-001 (Open, High):** Ref disposed в сгенерированных state_providers — единственный открытый High баг. May surface в TASK-012 todo app generation (не блокер acceptance, noise в production). [ai/bug-reports/001-state-provider-ref-disposed.md](../bug-reports/001-state-provider-ref-disposed.md)
+- **BUG-007 (Open, Medium):** relation_patcher silent no-op без `:oneToManyMethods` markers — pre-existing limitation для regen на template directory. [ai/bug-reports/007-relation-patcher-misses-template-without-markers.md](../bug-reports/007-relation-patcher-misses-template-without-markers.md)
+- **BUG-010 (Open, Medium-High):** `code_formatter.ts:81 !field.name.includes('Map')` silent data loss landmine для fields с "Map" в имени. [ai/bug-reports/010-code-formatter-field-name-includes-map-silent-data-loss.md](../bug-reports/010-code-formatter-field-name-includes-map-silent-data-loss.md)
+- **BUG-002/003/004/005/006/008/009 — Resolved.** 008 closed via TASK-011 Phase D5 + G1, 009 closed via TASK-013 D6 (commit a299f52, 2026-05-02).
+- **BUG-003 part 2 (backlog):** перезапись `:base` секций при regen теряет custom code — требует архитектурного решения (per-method markers или patch-only mode).
+- **Cross-repo gate:** weight TASK-018 (13 entities production migration) blocked до TASK-012 acceptance ✅
+- **TASK-015 (backlog):** robust junction FK extraction для non-FK pseudo-keys — НЕ блокер TASK-012, flag для weight TASK-018 (CustomerUser-style)
+- **Tech debt:** `code_formatter`, `server_yaml_parser`, workflow-модули, `project_creator.ts` не покрыты unit-тестами
 - **HOTFIX-001 (backlog):** `scripts/new_task.py` добавляет запись `status.md` после таблицы, а не в неё
+
+## Недавно завершено (Phase 1.5)
+
+| ID | Описание | Дата |
+|---|---|---|
+| TASK-011 | sync_core 0.3.0 templates integration (PR #2) | 2026-05-02 |
+| TASK-013 | junction detection robust YAML field analysis (PR #3) — закрыл BUG-009 в D6 | 2026-05-02 |
+| TASK-014 | junction adapter file path generation для non-Map entities (PR #4) | 2026-05-02 |
+| TASK-001 | базовая документация — done через TASK-011 docs work | 2026-05-02 |
+| TASK-008 | relation_patcher идемпотентный (BUG-003 fix) — moved active→done | 2026-05-02 |
+| TASK-009 | EntityYamlValidator (BUG-004 fix) — moved active→done | 2026-05-02 |
 
 ## Следующий фокус
 
-1. Завершить TASK-001 (approval протектед-файлов)
-2. Code review TASK-008 / TASK-009, мерж в master
-3. **TASK-002 — fix BUG-001 (Ref disposed)** — High, критичный для production проекта weight
-4. **TASK-003 — fix BUG-002 (camelCase)** — Medium, очищает `dart analyze`
-5. **TASK-004 — unit-тесты для остального entity-генератора** — снизит вероятность регрессий
-6. **ADR-0001 (актуализация)** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md` в `ai/docs/decisions/`, обновить статус
-| TASK-011 | sync_core 0.3.0 templates integration | ✅ Done (PR #2) | 2026-05-02 |
-| TASK-013 | junction detection robust YAML field analysis | ✅ Done (PR #3) | 2026-05-02 |
-| TASK-014 | junction adapter file path generation для non-Map entities | ✅ Done (PR #4) | 2026-05-02 |
-| TASK-012 | codegen → todo real app generation + cross-device smoke (Phase 1.5 final gate) | ⏭ Next | — |
-| TASK-015 | robust junction FK extraction для non-FK pseudo-keys (deferred from TASK-014 adversarial round 1) | 📝 Backlog | — |
+1. **TASK-012** (Phase 1.5 final gate) — `codegen create-project --name todo` + 3-5 entities (FK + junction, ProjectMember pattern из t157) + flutter analyze 0 errors + cross-device runtime smoke (manual user testing). После acceptance ✅ → weight TASK-018 unblocked.
+2. **TASK-002 — fix BUG-001 (Ref disposed)** — единственный открытый High баг, production-блокер weight
+3. **TASK-010** — `codegen verify --runtime` (docker + server + integration test) — закрывает DoD-дыру для runtime-гарантий
+4. **TASK-004** — unit-тесты для `code_formatter`, `server_yaml_parser` (BUG-010 fix входит сюда)
+5. **TASK-015** (backlog) — robust junction FK extraction (deferred from TASK-014, нужен для weight CustomerUser-style)
+6. **ADR-0001** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md`, обновить статус Proposed→Accepted
+| TASK-012 | todo real app generation cross-device smoke (Phase 1.5 final gate) | 🟡 In Progress | 2026-05-02 |

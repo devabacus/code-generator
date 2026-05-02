@@ -312,5 +312,5 @@ ai/tasks/active/               # текущие задачи
 
 ---
 
-**Последнее обновление:** 2026-04-26
-**Активная ветка:** `feature--fix-codegen-regen-bugs`
+**Последнее обновление:** 2026-05-02
+**Активная ветка:** `master` (Phase 1.5 active — sync_core 0.3.0 templates integration)

@@ -1,6 +1,7 @@
 # BUG-009: orchestrator_patcher вставляет imports с `templ-feature` вместо `feature-path`
 
-**Статус:** Open (out-of-scope TASK-011, для TASK-012 / отдельной багфикс задачи)
+**Статус:** ✅ Resolved (TASK-013 D6 round 2 fix, closed 2026-05-02, commit a299f52)
+**Evidence закрытия:** `_substitutePlaceholders` добавил feature segment substitution (`tplFeatureSnake` / `targetFeatureSnake`); 2 регрессионных теста (BUG-009 feature segment substitution для non-tasks feature + junction entity также получает правильный feature segment) — passing. TASK-014 E2E на t157: ProjectMember generate-entity → orchestrator imports `features/projects/data/adapters/project_member/...` (НЕ `features/tasks/...`).
 **Обнаружено:** 2026-05-02 (TASK-011 Phase F4 E2E проверка на t152)
 **Источник:** TASK-011 executor, generate-entity ad-hoc test
 **Критичность:** High (любой generate-entity --feature-path != tasks ломает orchestrator → каскад errors)

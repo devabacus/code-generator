@@ -1,6 +1,7 @@
 # BUG-008: AppDatabaseGenerator scan игнорирует tables вне `features/*/data/datasources/local/tables/`
 
-**Статус:** Open (in progress, fixed в TASK-011 Phase D5)
+**Статус:** ✅ Resolved (TASK-011 Phase D5 + G1 defensive strip, closed 2026-05-02)
+**Evidence закрытия:** t154/t157 verify PASS, 0 duplicate_import warnings; G1 round 3 fix добавил defensive strip robust против template drift.
 **Обнаружено:** 2026-05-02 (TASK-011 Phase F2/F3 verify FAIL errors=170 на t151)
 **Источник:** TASK-011 executor, sync_core 0.3.0 integration
 **Критичность:** High (фундаментальный блокер create-project — генерирует broken database.dart без sync_core tables)
