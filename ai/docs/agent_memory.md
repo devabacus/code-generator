@@ -3,7 +3,49 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-04-26
+**Последнее обновление:** 2026-05-02
+
+---
+
+## Текущее состояние (2026-05-02 snapshot)
+
+### Phase 1.5 progress (sync_core 0.3.0 templates integration)
+
+- ✅ **TASK-011** sync_core 0.3.0 templates integration (PR #2) — manifest markers + orchestrator_patcher + 87 tests
+- ✅ **TASK-013** junction detection robust YAML field analysis (PR #3) — `JunctionDetector.isJunctionEntity()` shared utility, 4 call-sites updated, 110 tests
+- ✅ **TASK-014** junction adapter file path generation для non-Map entities (PR #4) — `MANY_TO_MANY` parametrization + `_getDestinationPath` junction-aware + FK placeholders, 119 tests
+- ⏭ **TASK-012** todo real app generation + cross-device smoke — последний gate перед weight TASK-018
+
+### Active backlog
+
+- **TASK-015** robust junction FK extraction для non-FK pseudo-keys (`userId: int` без `relation()` declaration). Trigger: weight TASK-018 если CustomerUser-style migration.
+- **BUG-001** Ref disposed в state_providers (High, единственный открытый)
+- **BUG-007** relation_patcher gap для template без `:oneToManyMethods` markers
+- **BUG-010** `code_formatter.ts:81 field.name.includes('Map')` silent data loss landmine для fields с "Map" в имени
+
+### Junction detection / generation (post-TASK-013/TASK-014)
+
+**Detection** (TASK-013 — `src/features/generation/parsers/junction_detector.ts`):
+- Default field analysis: 2+ FK + base-only fields = junction
+- Explicit override: `junction: true` top-level YAML field
+- `JunctionValidationError` если `junction:true` но FK<2
+- Nullable FK = FK
+- 4 call-sites: `server_yaml_parser.ts:13`, `entity_yaml_validator.ts`, `orchestrator_patcher.ts:52`, `relation_patcher.ts:32`
+- Hard technical gate: НЕТ `endsWith('Map')` / `includes('Map')` в production decision paths (только legitimate JSDoc + BUG-010 deferred)
+
+**File path generation** (TASK-014):
+- `replacement_util.ts MANY_TO_MANY` parametrized — `templEntity1/templEntity2 + targetEntity1/targetEntity2 + targetJunctionClassName`
+- `generation_service.ts _getDestinationPath` детектит junction context через `model.isRelation` → two-entity path rewrite (`task_tag_map/` → `<targetSnakeCase>/`, file prefix `task_tag_map_` → `<targetSnakeCase>_`)
+- `orchestrator_patcher.ts _JUNCTION_REGISTER_TEMPLATE` использует `__FK1__/__FK2__` placeholders для docstring (`junction FK→role+permission`) + method names (`deleteRolePermissionByRoleAndPermission`)
+- Backward compat: TaskTagMap (`task` + `tag` template defaults) → identical output (no-op substitution)
+
+### Cross-repo blocking — current state
+
+- **sync_core 0.3.0** в master, R3+R3.5 release ✅
+- **t115/TASK-001** done (5 entities multi-entity validated) ✅
+- **codegen TASK-011/013/014** done ✅
+- **codegen TASK-012** pending — последний gate
+- **weight TASK-018** blocked до TASK-012 acceptance ✅
 
 ---
 
