@@ -2,13 +2,50 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-04-26
+**Обновлено:** 2026-05-02
 
 ---
 
 ## Текущая фаза
 
-**Фаза:** Фаза 1 — Стабилизация (около 80% завершена)
+**Фаза:** Фаза 1.5 — sync_core 0.3.0 templates integration (новая, blocking для weight TASK-018)
+**Фокус:** обновить codegen чтобы `create-project` + `generate-entity` производили sync_core 0.3.0 multi-entity patterns (5-adapter-per-entity bundle, mutation-first Repository, orchestrator registration patching)
+
+**Контекст (cross-repo):** sync_core 0.3.0 в master, t115/TASK-001 ✅ done 2026-05-02 (5 entities cross-device sync на Windows + Android). t115 template на disk (`G:/Templates/flutter/t115/`) уже содержит validated sync_core 0.3.0 patterns после TASK-001 — но **БЕЗ codegen manifest markers**. Подтверждено сканом 2026-05-02:
+
+- 8 файлов в `lib/core/sync/` (`sync_orchestrator_provider.dart` etc.) — нет `// manifest: startProject` → не копируются при `create-project`
+- 25 adapter файлов в `lib/features/*/data/adapters/<entity>/` — нет `// manifest: entity` / `manyToMany` → не генерируются при `generate-entity`
+- `sync_orchestrator_provider.dart` — нет marker блоков для патчинга `register<X>` + `syncEntityTypes`
+
+**Pipeline (approved sync_core teamlead 2026-05-02):**
+
+```
+[codegen TASK-X1] sync_core 0.3.0 templates integration
+   ─ Phase A: manifest markers в t115 template (STOP-gate, прогон create-project + verify regression)
+   ─ Phase B: orchestrator marker блоки (:syncImports / :syncRegistrations / :syncEntityTypes)
+   ─ Phase C: orchestrator_patcher.ts (analog relation_patcher) + tests
+   ─ Phase D: patchPubspecPackagePaths fix (sync_core вне Packages monorepo)
+   ─ Phase E: codegen agent_memory + architecture cleanup (drop R1 stack)
+   ─ DoD: create-project --name t<N+1> + verify --name t<N+1> PASS errors=0
+   ▼
+[codegen TASK-X2] todo real app generation + smoke
+   ─ create-project --name todo + generate-entity для 3-5 entities (FK + junction)
+   ─ flutter analyze 0 errors
+   ─ cross-device runtime smoke (2 устройства sync через Serverpod)
+   ▼ acceptance gate ✅ (двойной gate перед weight TASK-018)
+```
+
+**Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия codegen TASK-X2 acceptance. Это hard gate без Soft Launch — sync_core teamlead координирует через `G:/Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md`.
+
+**Критерии завершения Фазы 1.5:**
+- TASK-X1 merged → t115 regression PASS (existing template работает после маркеров + патчер)
+- TASK-X2 merged → fresh todo app sync working cross-device
+- weight TASK-018 unblocked
+
+---
+
+## Фаза 1 — Стабилизация (около 80% завершена)
+
 **Фокус:** починка критических багов генератора, расширение тестового покрытия, runtime-DoD-гейт
 **Критерии завершения:**
 - BUG-001 закрыт (BUG-002, 003, 004, 005, 006 уже закрыты на 2026-04-26)
@@ -96,6 +133,7 @@
 | 2026-04-26 | BUG-005 (scan-based) и BUG-006 (migration append) закрыты | t141→t142→t143 цикл итераций; BUG-006 найден внешними агентами TASK-015 в weight |
 | 2026-04-26 | Добавлены `codegen verify`, `autoGenerateTasksFeature`, `patchPubspecPackagePaths`, Definition of Done в CLAUDE.md | t143 PASS с первого create-project + runtime HTTP 200 |
 | 2026-04-26 | TASK-010 заведена | Закрыть DoD-дыру для runtime-проверки |
+| 2026-05-02 | Добавлена Фаза 1.5 — sync_core 0.3.0 templates integration | Cross-repo gate: t115/TASK-001 ✅ done в sync_core ecosystem; codegen TASK-X1/X2 blocking weight TASK-018 (13 entities production migration). Скан t115 template показал отсутствие manifest markers на 8 core/sync + 25 adapter файлах — codegen не покрывает sync_core 0.3.0 generation. |
 
 ---
 
