@@ -242,6 +242,61 @@ class AppDatabase extends _$AppDatabase {
         assert.ok(alphaIdx < newcomerIdx, 'alpha createTable должна быть ДО newcomer createTable');
     });
 
+    test('scans core/* tables in addition to features/* (BUG-008 regression)', async () => {
+        // BUG-008: AppDatabaseGenerator scan игнорировал tables вне features/*/.../tables/.
+        // sync_core 0.3.0 кладёт sync_queue_table.dart в lib/core/sync/ — путь вне whitelist'а.
+        // После fix scan расширен на lib/core/**/*_table.dart.
+        const flutterLib = `${PROJECTS_PATH}/weight/weight_flutter/lib`;
+        mockFs.setFile(`${flutterLib}/features/category/data/datasources/local/tables/category_table.dart`, '// stub');
+        mockFs.setFile(`${flutterLib}/core/sync/sync_queue_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('category', 'tasks'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+
+        // Оба import path'а присутствуют (relative к lib/core/data/datasources/local/database.dart)
+        assert.ok(
+            result.includes('features/category/data/datasources/local/tables/category_table.dart'),
+            'feature category_table import должен присутствовать',
+        );
+        assert.ok(
+            result.includes('sync/sync_queue_table.dart'),
+            'core/sync/sync_queue_table.dart import должен присутствовать (BUG-008 fix)',
+        );
+
+        // Оба class в @DriftDatabase(tables: [...])
+        assert.ok(result.includes('CategoryTable'), 'CategoryTable должен быть в tables list');
+        assert.ok(result.includes('SyncQueueTable'), 'SyncQueueTable должен быть в tables list (BUG-008 fix)');
+    });
+
+    test('core+features scan idempotent on repeat (BUG-008)', async () => {
+        // BUG-005 invariant: повторный run на том же FS state → identical content.
+        // Проверка что merge feature + core scan не нарушает idempotency.
+        const flutterLib = `${PROJECTS_PATH}/weight/weight_flutter/lib`;
+        mockFs.setFile(`${flutterLib}/features/category/data/datasources/local/tables/category_table.dart`, '// stub');
+        mockFs.setFile(`${flutterLib}/features/tag/data/datasources/local/tables/tag_table.dart`, '// stub');
+        mockFs.setFile(`${flutterLib}/core/sync/sync_queue_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('category', 'tasks'));
+        await gen.generate();
+        const after1 = await mockFs.readFile(TARGET_DB_PATH);
+
+        await gen.generate();
+        const after2 = await mockFs.readFile(TARGET_DB_PATH);
+
+        assert.strictEqual(
+            after1,
+            after2,
+            'two consecutive generates with core+features mix must produce identical content',
+        );
+
+        // Sanity: оба core и feature tables присутствуют после первого прогона
+        assert.ok(after1.includes('SyncQueueTable'));
+        assert.ok(after1.includes('CategoryTable'));
+        assert.ok(after1.includes('TagTable'));
+    });
+
     test('игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart', async () => {
         const featPath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/tasks/data/datasources/local/tables`;
         mockFs.setFile(`${featPath}/category_table.dart`, '// stub');

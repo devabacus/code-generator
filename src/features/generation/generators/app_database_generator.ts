@@ -39,7 +39,14 @@ export class AppDatabaseGenerator {
         // Сканируем ВСЕ feature-директории и собираем live table files (BUG-005).
         // Не полагаемся на инкрементальные правки existing-секций — это давало пустые
         // секции при определённом порядке вызовов.
-        const liveTableFiles = await this.scanAllFeatureTableFiles();
+        // BUG-008 (2026-05-02): дополнительно сканируем `lib/core/**/*_table.dart` —
+        // sync_core 0.3.0 кладёт `sync_queue_table.dart` в `lib/core/sync/` (вне `features/`).
+        // Без этого scan generated `database.dart` теряет SyncQueueTable → cascade 170+ analyzer errors.
+        const featureTableFiles = await this.scanAllFeatureTableFiles();
+        const coreTableFiles = await this.scanCoreTableFiles();
+        const liveTableFiles = [...featureTableFiles, ...coreTableFiles]
+            // Стабильный детерминированный порядок (BUG-005 idempotency invariant)
+            .sort((a, b) => a.fileName.localeCompare(b.fileName));
 
         const allImports = new Set(
             liveTableFiles.map(({ absolutePath }) => {
@@ -108,6 +115,30 @@ export class AppDatabaseGenerator {
         }
         // Стабильный порядок (детерминированный вывод) — алфавитно по имени файла
         result.sort((a, b) => a.fileName.localeCompare(b.fileName));
+        return result;
+    }
+
+    /**
+     * Сканирует `<flutterLib>/core/**` и возвращает live `*_table.dart` файлы (BUG-008).
+     * Любые core-уровневые tables (sync_core's `sync_queue_table.dart`, потенциальные
+     * future `core/auth/session_table.dart` и т.д.) попадают в `database.dart`.
+     * `*.g.dart` / `*.freezed.dart` / non-`*_table.dart` пропускаются.
+     */
+    private async scanCoreTableFiles(): Promise<{ absolutePath: string; fileName: string }[]> {
+        const coreDir = path.join(this.config.targetFlutterLibPath, 'core');
+        if (!await this.fileSystem.exists(coreDir)) { return []; }
+
+        const allCoreFiles = await this.fileSystem.readDirectoryRecursive(coreDir);
+        const result: { absolutePath: string; fileName: string }[] = [];
+
+        for (const absolutePath of allCoreFiles) {
+            const fileName = path.basename(absolutePath);
+            if (!fileName.endsWith('.dart')) { continue; }
+            if (fileName.endsWith('.g.dart') || fileName.endsWith('.freezed.dart')) { continue; }
+            if (!fileName.endsWith('_table.dart')) { continue; }
+            result.push({ absolutePath, fileName });
+        }
+        // Сортировка применяется в caller'е после merge с feature files.
         return result;
     }
 

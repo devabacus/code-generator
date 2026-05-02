@@ -10,6 +10,8 @@
 
 ## Текущий статус
 
+🔴 **BLOCKED 2026-05-02 на Phase F3 — verify FAIL errors=236 (architectural gap, см. § BLOCKED ниже).** Phase F2 (`create-project --name t150`) выполнен, project создан, но verify FAIL — orchestrator template после F0 содержит full 5-entities state, который при copy в new project ссылается на отсутствующие tasks features.
+
 🟡 **Phase A0/A0.6/A1-A4/B/B5 ✅ done, продолжаю Phase B6/B7 + C0 + C + C7 + D + E + E5/E5.1 + E6 + F0/F1 без STOP-gates до Phase F2.**
 
 - Прочитаны все обязательные docs: AGENTS.md, CLAUDE.md, agent_memory.md, INDEX.md, executor.prompt.md, task.md, Discussion #1 archive.
@@ -283,8 +285,10 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 | E | Codegen docs cleanup (drop R1 references) | ⏭ pending | — |
 | **E5/E5.1** | README short bullet + new `docs-code-generator/sync-core-integration.md` | ⏭ pending | — |
 | **E6** | TASK-013 backlog placeholder (robust junction detection) | ⏭ pending | — |
-| **F0** | E2E patcher validation: re-add 4 tasks через `generate-entity` для t115 | ✅ done 2026-05-02 — orchestrator_patcher восстановил 5 entities (Configuration + Category + Task + Tag + TaskTagMap), junction docstring корректный. **Pre-existing limitation:** relation_patcher не восстанавливает `:oneToManyMethods` marker блоки в task_usecases/providers/repository — template файлы без markers, regen ломает relation methods. 12 errors про `GetTasksByCategoryIdUseCase` — known issue, не TASK-011 регрессия. См. raw output ниже. | uncommitted |
-| F | DoD verify (t115 regression after F0 + fresh t<N+1>) | ⏭ pending | — |
+| **F0** | E2E patcher validation: re-add 4 tasks через `generate-entity` для t115 | ✅ done 2026-05-02 — orchestrator_patcher восстановил 5 entities (Configuration + Category + Task + Tag + TaskTagMap), junction docstring корректный. **Pre-existing limitation:** relation_patcher не восстанавливает `:oneToManyMethods` marker блоки в task_usecases/providers/repository — template файлы без markers, regen ломает relation methods. 12 errors про `GetTasksByCategoryIdUseCase` — known issue, не TASK-011 регрессия (BUG-007). См. raw output ниже. | uncommitted |
+| **F2** | `codegen create-project --name t150 --human` | ✅ done 2026-05-02 — 259 файлов создано за 236943ms, structure correct (5 source `lib/core/sync/` + 5 Configuration adapters + agent infra) | uncommitted (filesystem state) |
+| **F3** | `codegen verify --name t150 --human` | 🔴 **FAIL 2026-05-02** — errors=236 (architectural gap: t115 template orchestrator post-F0 has 5 entities — broken для fresh project copy без tasks features). См. § BLOCKED. | — |
+| F4-F5 | (опционально) generate-entity на t150 + финальный report | ⏭ blocked на F3 fix | — |
 
 **Phase pipeline expanded** через [Discussion #1 archive](../../../discussions/archive/1-task-011-sync-core-templates-hardcoded-r/) (User decision 2026-05-02): Variant A acceptance + 6 phase amendments (A0/A0.6, B5/B6/B7, C0, C7, E5+new doc, F0).
 
@@ -367,16 +371,45 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 TBD — заполняется после Phase A
 ```
 
-### Phase F fresh project — t<N+1>
+### Phase F fresh project — t150
+
+**`create-project --name t150 --human` (2026-05-02):**
 
 ```
-[create-project --name t<N+1>]
-TBD — заполняется после Phase F2
-
-[verify --name t<N+1>]
-TBD — заполняется после Phase F3
-  ✓ flutterAnalyze — Xms (errors=0, warnings=N, infos=M)
+SUCCESS: create-project
+Created (259):
+  + G:\Projects\Flutter\serverpod\t150\t150_flutter\lib\core\sync\app_lifecycle_provider.dart
+  + G:\Projects\Flutter\serverpod\t150\t150_flutter\lib\core\sync\device_id_provider.dart
+  + G:\Projects\Flutter\serverpod\t150\t150_flutter\lib\core\sync\drift_sync_queue_store.dart
+  + G:\Projects\Flutter\serverpod\t150\t150_flutter\lib\core\sync\sync_orchestrator_provider.dart
+  + G:\Projects\Flutter\serverpod\t150\t150_flutter\lib\core\sync\sync_queue_table.dart
+  + 5 configuration adapter files (event/local_apply/payload_codec/pull/remote)
+  + 254 other files (project skeleton)
+Modified (9): pubspec.yaml + main.dart + .gitignore in 3 sub-projects
+Duration: 236943ms
 ```
+
+**`verify --name t150 --human` (2026-05-02) — FAIL:**
+
+```
+[1/4] dart pub get (server)...
+[1/4] flutter pub get (flutter)...
+[2/4] serverpod generate --experimental-features=all...
+[3/4] dart run build_runner build --delete-conflicting-outputs...
+[4/4] flutter analyze...
+
+FAIL: verify t150
+  project: G:\Projects\Flutter\serverpod\t150
+  ✗ flutterAnalyze — 13821ms (errors=236, warnings=8, infos=44)
+  ✓ pubGet — 4566ms
+  ✓ serverpodGenerate — 9034ms
+  ✓ buildRunner — 3743ms
+Errors:
+  ! flutter analyze: 236 errors
+Total: 31168ms
+```
+
+**Root cause:** t115 template orchestrator после Phase F0 (E2E patcher validation re-add 4 tasks) содержит 5 entities (Configuration + Category + Task + Tag + TaskTagMap) — broken для fresh project copy. См. § BLOCKED секцию.
 
 ### Phase F generate-entity (опционально)
 
@@ -419,9 +452,72 @@ TBD
 
 ## BLOCKED — требуется решение User'а
 
-(Executor добавляет секцию если упёрся в архитектурный вопрос. Пример формата:)
+### BLOCKED 2026-05-02: Phase F3 verify FAIL errors=236 — architectural gap "post-F0 template state vs fresh project Configuration baseline"
 
-> **BLOCKED:** Junction entity TaskTagMap pattern имеет docstring routing update→createX. Generic codegen template скопирует docstring как есть для нового junction (e.g. `UserPermission`), но **routing logic** в `update()` методе нужен per-entity (call `_client.taskTagMap.createTaskTagMap` vs `_client.userPermission.createUserPermission`). Replacement_util словарь M2M это покрывает? Или нужен section_generator для adapter body?
+**Симптом:**
+
+Phase F2 успешен — `codegen create-project --name t150 --human` создал t150 за 237s, файлы скопированы корректно (5 source `lib/core/sync/` + 5 Configuration adapters + agent infrastructure).
+
+Phase F3 FAIL:
+```
+FAIL: verify t150
+  ✗ flutterAnalyze — 13821ms (errors=236, warnings=8, infos=44)
+  ✓ pubGet — 4566ms
+  ✓ serverpodGenerate — 9034ms
+  ✓ buildRunner — 3743ms
+```
+
+**Sample errors (из `flutter analyze lib/core/sync/sync_orchestrator_provider.dart`):**
+```
+error - Target of URI doesn't exist: '../../features/tasks/data/adapters/category/category_event_adapter.dart' - line 24:8 - uri_does_not_exist
+error - Target of URI doesn't exist: '../../features/tasks/data/adapters/category/category_local_apply.dart' - line 25:8 - uri_does_not_exist
+... (×28 import errors про отсутствующие tasks adapters/DAO/entities)
+... + cascading undefined classes (CategoryEntity / CategoryRemoteAdapter / TaskEntity / TaskTagMapDao etc.)
+```
+
+**Корневая причина:**
+
+t115 template `lib/core/sync/sync_orchestrator_provider.dart` после Phase F0 (E2E patcher validation — re-add tasks через generate-entity) содержит **5 entities** state:
+- 7 Configuration imports + 28 tasks imports = 35 imports
+- 5 entityTypes (`'configuration'` + 4 tasks)
+- 5 register блоков (Configuration + Category + Task + Tag + TaskTagMap)
+
+При `create-project --name t150` `manifest: startProject` копирует этот orchestrator файл as-is. Но tasks features **не копируются** (TASK-002 default off — нет manifest:entity директорий для tasks в новый проект). Результат: orchestrator ссылается на 28 несуществующих файлов → 236 errors.
+
+**Между Phase F0 и F2 есть architectural conflict:**
+- F0 цель — E2E validation patcher через re-add tasks → orchestrator template ВКЛЮЧАЕТ 5 entities
+- F2/F3 цель — fresh project с Configuration baseline только → orchestrator template ДОЛЖЕН содержать ТОЛЬКО Configuration
+
+Эти два требования взаимоисключающие при текущей архитектуре `manifest: startProject` (literal copy без фильтрации).
+
+**Возможные решения (нужен User decision):**
+
+**Variant A: rollback orchestrator template к Configuration baseline после F0 evidence**
+- После F0 успешного re-add (5 entities в orchestrator, idempotent patcher proven), сохранить evidence в discussion archive (текстовый снапшот orchestrator post-F0), затем git-revert template orchestrator к pre-F0 state (Configuration baseline только)
+- Pro: F2/F3 пройдут errors=0; Variant A intent сохранён ("Configuration baseline + future generate-entity adds tasks")
+- Con: t115 template снова broken (tasks UI закомментирован уже OK, но features/tasks директории остаются orphan'ами); F0 patcher evidence только в текстовой форме
+
+**Variant B: добавить tasks features в new project (TASK-002 включить по default)**
+- Включить копирование `lib/features/tasks/` директорий в `manifest: startProject` (или эквивалентный `manifest: entity` обработчик с include по default)
+- Pro: t115 template остаётся as-is post-F0 ("realistic state" reference)
+- Con: ломает TASK-002 default off contract — fresh project имеет hardcoded 5 entities вместо minimal Configuration baseline; противоречит scope task.md ("Tasks features НЕ присутствуют по default — TASK-002 опт-ин")
+
+**Variant C: orchestrator template делать "fragmented" с marker блоков
+- Template orchestrator копируется с пустыми marker pair, а Configuration register block добавляется через post-create-project step (orchestrator_patcher на manifest "Configuration" entity)
+- Pro: clean Configuration baseline по умолчанию; добавление entity через generate-entity — incremental
+- Con: требует архитектурного изменения — Configuration становится "first-class entity, генерируемый patcher'ом" (не singleton baseline в template). Расширяет TASK-011 scope значительно. Возможно нужен отдельный "configuration-entity" generator или special-case в `generation_service.ts`.
+
+**Variant D: post-create-project cleanup step**
+- В `create_project.ts` после копирования template orchestrator вызывать `orchestrator_patcher.stripEntities(content, ['category', 'task', 'tag', 'task_tag_map'])` (новый method)
+- Pro: исправление точечное; t115 template остаётся as-is post-F0
+- Con: новая complexity в orchestrator_patcher (strip operation вместо only insert/idempotent); требует tests; скорее всего создаёт TASK-013-like backlog
+
+**Текущее состояние filesystem:**
+- `G:/Projects/Flutter/serverpod/t150/` — 259 файлов созданы, broken state
+- `G:/Templates/flutter/t115/t115_flutter/lib/core/sync/sync_orchestrator_provider.dart` — 5 entities (post-F0 state)
+- Codegen tests — 80 passing (corrigeable F2/F3 не от codegen src, а от template state)
+
+**Жду:** User decision на Variant A/B/C/D перед continuation. Per executor.prompt.md "F3 errors > 0 — flag блокер, остановись".
 
 ## Next steps
 
@@ -433,4 +529,4 @@ TBD
 
 ## Статус
 
-🟡 In progress / Ready for review (executor меняет на финальный статус)
+🔴 **BLOCKED 2026-05-02** — Phase F2 done (t150 created), Phase F3 FAIL errors=236 (architectural gap orchestrator template post-F0 vs fresh project Configuration baseline). Жду teamlead/User decision на Variant A/B/C/D (см. § BLOCKED).

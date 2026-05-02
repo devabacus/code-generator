@@ -185,6 +185,25 @@ G:/Projects/Flutter/serverpod/<name>/
 - `serverpod generate` — ~10 сек, нормально для повторов.
 - `flutter pub run build_runner build` — 30-60 сек.
 
+### Test-проекты — incremental numbering, агент НЕ удаляет (HARD RULE)
+
+**Политика 2026-05-02 (User decision):** агент **НЕ имеет прав** на удаление test-проектов в `G:/Projects/Flutter/serverpod/t<N>/`. Sandbox **намеренно блокирует** `rm -rf` / `Remove-Item -Recurse -Force` / подобные ops. Это **не bug**, это политика User'а.
+
+**Hard rule — НИКОГДА:**
+- НЕ пробовать workaround sandbox через PowerShell wrappers (`powershell.exe -Command "Remove-Item ..."`)
+- НЕ через `cmd /c rd /s /q ...`
+- НЕ через `node` child_process exec
+- НЕ через любые другие альтернативные shell paths
+
+**Что делать вместо удаления:**
+1. Узнай актуальный последний `t<N>` через `ls G:/Projects/Flutter/serverpod/`
+2. Используй `t<N+1>` (или `t<N+2>` если только что создавал `t<N+1>`)
+3. После validation — оставь broken проекты на disk **как есть**
+4. User сам удалит когда сочтёт нужным — это его зона
+5. Если sandbox error на delete attempt — flag User'у конкретную команду которую попытался, **не пробуй workaround**
+
+**Расширение incremental numbering** (BUG-005 lesson 2026-04-26): теперь явно запрещены **попытки удаления** broken `t<N>` directories. Это касается **всех TASK-XXX** где есть `create-project` или подобные disk-heavy operations.
+
 ---
 
 ## Task workflow (TASK-XXX через скрипты)

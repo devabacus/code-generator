@@ -16,7 +16,7 @@
 3. При `generate-entity` идемпотентно патчил `sync_orchestrator_provider.dart` тремя marker блоками: imports + register<X> блок + `syncEntityTypes` const list.
 4. Mutation-first Repository pattern (`_db.transaction { dao.insert + orchestrator.enqueue }`) уже работает через существующий `manifest: entity` / `manifest: manyToMany` в template — проверить regression.
 
-DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>` PASS errors=0 на свежем проекте, плюс existing t115 regression PASS.
+DoD-гейт: `codegen create-project --name t152` + `codegen verify --name t152` PASS errors=0 на свежем проекте, плюс existing t115 regression PASS.
 
 ## Не-цели
 
@@ -85,6 +85,7 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
   - Подключён в `generation_service.ts` flow после relation_patcher
   - Unit-tests на MockFileSystem (минимум: empty state, single entity add, idempotent re-run, junction entity, multiple entities, recovery from legacy duplicates) — **минимум 6 тестов**
 - [ ] **Phase C7 (concurrent test — per Discussion #1 codegen teamlead concern):** mock-based test что patcher commutative (apply A→B == apply B→A в final state)
+- [ ] **Phase D5 (BUG-008 fix):** `AppDatabaseGenerator` scan paths расширены до `core/**/*_table.dart` — `sync_queue_table.dart` (и любые будущие core-уровневые tables) попадают в `database.dart` imports + tables list. Regression test + idempotency test.
 - [ ] **Phase D (pubspec fix):** `patchPubspecPackagePaths` правильно обрабатывает sync_core path-dep в свежем target проекте
   - Template path: `path: ../../../../Projects/Flutter/Packages/sync_core` (в `Templates/flutter/t115/t115_flutter/pubspec.yaml`)
   - Target path после create-project: должен быть `path: ../../../../../Projects/Flutter/Packages/sync_core` (на 1 глубже из-за `serverpod/`)
@@ -103,12 +104,12 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
   - После этого orchestrator должен иметь те же 5 register'ов что были в pre-A0 state (Configuration + Category + Task + Tag + TaskTagMap)
   - `dart format` orchestrator_provider.dart — для проверки стабильности idempotent reformatting
 - [ ] **DoD verify (regression на t115):** `codegen verify --name t115` PASS errors=0 — **выполняется ПОСЛЕ Phase F0** (re-add tasks). Без F0 t115 ожидаемо fail (acceptable intermediate state).
-- [ ] **DoD verify (свежий проект):** `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>` PASS errors=0
+- [ ] **DoD verify (свежий проект):** `codegen create-project --name t152` + `codegen verify --name t152` PASS errors=0
   - Новый проект имеет `lib/core/sync/` (8 файлов скопированы)
   - Configuration entity registered в orchestrator (singleton baseline)
   - Tasks features НЕ присутствуют по default (TASK-002 опт-ин)
   - `flutter analyze` 0 errors / warnings ≤ 5
-- [ ] **DoD generate-entity:** в свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t<N+1>` создаёт:
+- [ ] **DoD generate-entity:** в свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t152` создаёт:
   - 5 adapter файлов в `lib/features/expense/data/adapters/expense/`
   - register block + import + entityType добавлены в `sync_orchestrator_provider.dart`
   - `flutter analyze` все ещё PASS
@@ -128,8 +129,8 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
    - **Phase A0** (orchestrator minimal state — drop 4 tasks registers + imports + entityTypes) — особо destructive, требует explicit STOP.
    - **Phase A0.6** (закомментировать tasks UI в `home_page.dart`) — preserve TASK-002 default state.
    - **⚠ Verification rule между A0 и F0:** НЕ запускать full `codegen verify --name t115` (даст FAIL на intermediate broken state, может ввести в заблуждение). Допустим только targeted `flutter analyze` для конкретных новых файлов или `npm test` для unit-tests.
-2. **`codegen create-project --name t<N+1>`** — создаёт свежий проект на disk (~3 минуты, ~500MB). Перед запуском подтвердить какой `<N+1>` использовать (текущий последний был `t143`).
-3. **Удаление test-проектов** `G:/Projects/Flutter/serverpod/t<N>/` — за разрешением (политика «новый t<N+1> при каждом фиксе»).
+2. **`codegen create-project --name t152`** — создаёт свежий проект на disk (~3 минуты, ~500MB). Перед запуском подтвердить какой `<N+1>` использовать (текущий последний был `t143`).
+3. **Удаление test-проектов** `G:/Projects/Flutter/serverpod/t<N>/` — за разрешением (политика «новый t152 при каждом фиксе»).
 4. **Force push** на feature branch — допустим без STOP, на master — **запрещено** (только через PR + squash-merge).
 
 ## Заметки по реализации
@@ -203,8 +204,8 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
 ### Integration (DoD verify) — 2 прогона
 
 1. `codegen verify --name t115` regression (existing template post-markers) → PASS errors=0
-2. `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>` (свежий проект) → PASS errors=0
-3. (Bonus) `codegen generate-entity --yaml expense.spy.yaml ... --workspace t<N+1>` → PASS, проверить 5 файлов + 3 marker блока обновлены + `flutter analyze` clean
+2. `codegen create-project --name t152` + `codegen verify --name t152` (свежий проект) → PASS errors=0
+3. (Bonus) `codegen generate-entity --yaml expense.spy.yaml ... --workspace t152` → PASS, проверить 5 файлов + 3 marker блока обновлены + `flutter analyze` clean
 
 ### Definition of Done (cite actual numbers)
 
@@ -213,7 +214,7 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
 [verify regression t115]
   ✓ flutterAnalyze — Xms (errors=0, warnings=N, infos=M)
 
-[verify fresh t<N+1>]
+[verify fresh t152]
   ✓ flutterAnalyze — Xms (errors=0, warnings=N, infos=M)
 ```
 
@@ -302,7 +303,16 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
 ### Phase D — patchPubspecPackagePaths fix
 
 - [ ] D1. В `src/adapters/cli/commands/create_project.ts` функция `patchPubspecPackagePaths` — расширить regex для покрытия sync_core path-dep
-- [ ] D2. Тест на MockFileSystem (если возможно) или manual verify через `create-project --name t<N+1>` + проверить `<X>_flutter/pubspec.yaml`
+- [ ] D2. Тест на MockFileSystem (если возможно) или manual verify через `create-project --name t152` + проверить `<X>_flutter/pubspec.yaml`
+
+### Phase D5 — AppDatabaseGenerator scan paths fix (BUG-008)
+
+Per [BUG-008](../../bug-reports/008-app-database-generator-misses-core-sync-tables.md) — scan игнорирует tables вне `features/*/data/datasources/local/tables/`, теряет `core/sync/sync_queue_table.dart`.
+
+- [ ] D5.1. В `src/features/generation/generators/app_database_generator.ts` расширить scan paths (Variant B generic): добавить второй glob `<flutterLib>/core/**/*_table.dart` к existing scan
+- [ ] D5.2. Regression test в `src/test/generators/app_database_generator.test.ts`: MockFS с `features/X/.../X_table.dart` + `core/sync/sync_queue_table.dart` → оба попадают в imports + tables list в результирующем `database.dart`
+- [ ] D5.3. Idempotency test: повторный run → identical content
+- [ ] D5.4. `npm test` PASS
 
 ### Phase E — Codegen docs cleanup
 
@@ -324,9 +334,9 @@ DoD-гейт: `codegen create-project --name t<N+1>` + `codegen verify --name t<
 
 - [ ] F0. **E2E patcher validation:** прогон 4× `codegen generate-entity --yaml {category,task,tag,task_tag_map}.spy.yaml --feature-path .../tasks --workspace t115` → восстанавливает orchestrator state эквивалентный pre-A0 (4 register'а + 4 imports + 4 entityTypes ре-добавлены через patcher)
 - [ ] F1. `codegen verify --name t115` regression (после F0 re-add) — PASS errors=0
-- [ ] F2. `codegen create-project --name t<N+1>` (~3 минуты, STOP-gate) — PASS
-- [ ] F3. `codegen verify --name t<N+1>` — PASS errors=0 (Configuration-only baseline проект работает clean)
-- [ ] F4. (опционально) В свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t<N+1>` — успех + verify clean (patcher создал 5 adapter файлов + register block)
+- [ ] F2. `codegen create-project --name t152` (~3 минуты, STOP-gate) — PASS
+- [ ] F3. `codegen verify --name t152` — PASS errors=0 (Configuration-only baseline проект работает clean)
+- [ ] F4. (опционально) В свежем проекте `codegen generate-entity --yaml expense.spy.yaml --feature-path .../expense --workspace t152` — успех + verify clean (patcher создал 5 adapter файлов + register block)
 - [ ] F5. `report.md` написан с цитированием actual JSON output (errors=N, warnings=M, infos=K) для F1 + F3
 - [ ] F6. PR + squash-merge → master (после User approval)
 
