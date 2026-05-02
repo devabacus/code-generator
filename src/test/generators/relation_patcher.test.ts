@@ -54,6 +54,10 @@ function makeModel(extraRelations: ServerpodField[]): ServerpodModel {
             { name: 'userId', type: 'int', nullable: false },
             relationField('customerId', 'customer'),
             ...extraRelations,
+            // TASK-013: domain field обязателен — без него JunctionDetector
+            // classifies fixture как junction (2+ FK + 0 business fields), и
+            // RelationPatcher skips. Реальный Weighing содержит ticketNumber/etc.
+            { name: 'ticketNumber', type: 'String', nullable: false },
         ],
     };
 }
@@ -237,6 +241,10 @@ class CorrectionButtonDao {
                 { name: 'id', type: 'UuidValue', nullable: true },
                 relationField('customerId', 'customer'),
                 relationField('shiftId', 'shift'),
+                // TASK-013: domain field обязателен — без него JunctionDetector
+                // classifies fixture как junction (2 FK + 0 business). Реальная
+                // CorrectionButton имеет position/label/value поля.
+                { name: 'label', type: 'String', nullable: false },
             ],
         };
 

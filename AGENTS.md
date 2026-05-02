@@ -66,6 +66,18 @@ node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-ге
 
 ## Workflow на задачу
 
+### ⚠ HARD RULE (User decision 2026-05-02): tasks/discussions ТОЛЬКО через python скрипты
+
+**Запрещено создавать вручную через `Write`:**
+- `ai/tasks/active/TASK-XXX-*/task.md` или `report.md`
+- `ai/discussions/active/N-*.md`
+
+**Обязательно через скрипты:**
+- `python ai/scripts/new_task.py "название"` — auto-ID, copy template, update STATUS.md
+- `python ai/discussions/scripts/discuss.py new "тема"` — auto-нумерация, header, status
+
+Manual creation breaks: auto-ID (conflicts с merged tasks в done/), template freshness, naming conventions, status tracking.
+
 Для автоматизации используется `ai/scripts/task.py` с subcommands `start / pr / merge / finish`.
 
 ### 1. Teamlead: создать ветку перед запуском executor

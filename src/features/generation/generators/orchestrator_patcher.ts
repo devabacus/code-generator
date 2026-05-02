@@ -2,6 +2,7 @@ import path from 'path';
 import { IFileSystem } from '../../../core/interfaces/file_system';
 import { GenerationConfig } from '../config/generation_config';
 import { ServerpodModel } from '../parsers/formatters/types';
+import { JunctionDetector } from '../parsers/junction_detector';
 import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
 
 /**
@@ -20,9 +21,12 @@ import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
  *     `:syncRegistrations` (или `:syncImports` / `:syncEntityTypes`) — оставляем
  *     первую, остальные удаляем + содержимое сохраняем в первой (как
  *     `relation_patcher.ts` BUG-003 fix).
- *   - **Junction detection:** `model.className.endsWith('Map')` → snippet берётся
- *     из `_JUNCTION_*` templates с docstring о junction-specific routing
- *     update→createX и delete→noop.
+ *   - **Junction detection (TASK-013):** через `JunctionDetector.isJunctionEntity()`
+ *     (shared utility per Discussion #2 Q3=A). Junction → snippet берётся из
+ *     `_JUNCTION_*` templates с docstring о junction-specific routing
+ *     update→createX и delete→noop. Replaces legacy `endsWith('Map')` heuristic
+ *     которое производило false-negatives для junction'ов без `Map` суффикса
+ *     (см. ai/bug-reports/junction-detection-audit.md).
  *   - **Commutative:** apply A → B == apply B → A в final state.
  *
  * Reference patterns:
@@ -49,7 +53,9 @@ export class OrchestratorPatcher {
 
         let content = await this.fileSystem.readFile(orchestratorPath);
 
-        const isJunction = model.className.endsWith('Map');
+        // TASK-013: junction detection через shared JunctionDetector (Q3=A).
+        // Replaces legacy `endsWith('Map')` (Q2=A — drop suffix entirely).
+        const isJunction = JunctionDetector.isJunctionEntity(model);
 
         // Feature segment substitution (BUG-009 fix):
         // template imports содержат hardcoded `features/tasks/` literal. Заменяем

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ServerpodModel } from './formatters/types';
+import { JunctionDetector } from './junction_detector';
 
 export type ValidationErrorCode = 'MISSING_FIELD' | 'MISSING_SYNC_EVENT';
 
@@ -13,7 +14,12 @@ export class EntityYamlValidator {
     private static readonly REQUIRED_FIELDS = ['userId', 'customerId', 'isDeleted'];
 
     static validate(model: ServerpodModel): ValidationError[] {
-        if (model.isRelation) { return []; }
+        // TASK-013: junction detection через shared utility (Q3=A).
+        // Replaces previous `model.isRelation` reliance (which itself was set от
+        // legacy `parsed.class.includes('Map')` heuristic). Direct JunctionDetector
+        // call гарантирует consistency между parser/validator/patcher даже если
+        // `model.isRelation` flag не установлен (e.g. unit-test fixtures с raw model).
+        if (JunctionDetector.isJunctionEntity(model)) { return []; }
 
         const errors: ValidationError[] = [];
         const fieldNames = new Set(model.fields.map(f => f.name));
@@ -31,7 +37,8 @@ export class EntityYamlValidator {
     }
 
     static validateSyncEvent(yamlPath: string, model: ServerpodModel): ValidationError[] {
-        if (model.isRelation) { return []; }
+        // TASK-013: junction skip через shared JunctionDetector (Q3=A).
+        if (JunctionDetector.isJunctionEntity(model)) { return []; }
 
         const dir = path.dirname(yamlPath);
         const expectedFile = `${model.tableName}_sync_event.spy.yaml`;

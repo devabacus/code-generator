@@ -9,6 +9,21 @@ function field(name: string, type = 'String'): any {
     return { name, type, nullable: false };
 }
 
+/**
+ * FK field helper — обязателен для junction fixtures после TASK-013.
+ * JunctionDetector.isJunctionEntity() считает FK только поля с `isRelation: true`.
+ */
+function fkField(name: string, related?: string): any {
+    return {
+        name,
+        type: 'UuidValue',
+        nullable: false,
+        isRelation: true,
+        relationType: 'manyToOne',
+        relatedModel: related ?? name.replace(/Id$/, ''),
+    };
+}
+
 function standardModel(overrides: Partial<ServerpodModel> = {}): ServerpodModel {
     return {
         className: 'Weighing',
@@ -59,11 +74,14 @@ suite('EntityYamlValidator Test Suite', () => {
     });
 
     test('M2M junction map skips validation', () => {
+        // TASK-013: junction detection через JunctionDetector — FK fields обязаны
+        // иметь `isRelation: true` flag. Старая fixture использовала `field()` helper
+        // без relation flag → junction не detected → validation срабатывала.
         const model = standardModel({
             className: 'TaskTagMap',
             tableName: 'task_tag_map',
             isRelation: true,
-            fields: [field('id'), field('taskId'), field('tagId')],
+            fields: [field('id'), fkField('taskId', 'Task'), fkField('tagId', 'Tag')],
         });
         const errors = EntityYamlValidator.validate(model);
         assert.strictEqual(errors.length, 0);
@@ -108,7 +126,7 @@ suite('EntityYamlValidator Test Suite', () => {
                 className: 'TaskTagMap',
                 tableName: 'task_tag_map',
                 isRelation: true,
-                fields: [field('id'), field('taskId'), field('tagId')],
+                fields: [field('id'), fkField('taskId', 'Task'), fkField('tagId', 'Tag')],
             });
             const errors = EntityYamlValidator.validateSyncEvent(yamlPath, m2m);
             assert.strictEqual(errors.length, 0);
