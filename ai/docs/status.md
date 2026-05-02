@@ -58,3 +58,4 @@
 6. **ADR-0001 (актуализация)** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md` в `ai/docs/decisions/`, обновить статус
 | TASK-011 | sync_core 0.3.0 templates integration | 🟡 In Progress | 2026-05-02 |
 | TASK-013 | junction detection robust YAML field analysis | 🟡 In Progress | 2026-05-02 |
+| TASK-014 | junction adapter file path generation для non-Map entities | Ready for review | 2026-05-02 |

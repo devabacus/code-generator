@@ -33,3 +33,42 @@
 - `src/features/generation/parsers/entity_yaml_validator.ts` (validation hook)
 - `src/features/generation/parsers/serverpod_model.ts` (если нужно field count parsing)
 - `src/test/generators/orchestrator_patcher.test.ts` (regression на RolePermission / CustomerUser cases)
+
+## TASK-015 — Robust junction FK extraction для non-FK pseudo-keys
+
+**Priority:** Low-Medium (deferred from TASK-014 round 1 adversarial review 2026-05-02)
+**Trigger:** weight TASK-018 если developer migrate'ит CustomerUser-style junction (3+ FK + non-FK pseudo-key field типа `userId: int`)
+
+**Source:** [TASK-014 adversarial-review-report.md](active/TASK-014-junction-adapter-file-path-generation-non-map-entities/adversarial-review-report.md) Bomb #1 + Architectural smell #1 (двойное FK extraction в `server_yaml_parser.ts:51-52` + `orchestrator_patcher.ts:260-262` — identical algorithm в двух местах, drift risk).
+
+**Problem:** Generator extracts junction `entity1`/`entity2` через `relationFields[0]/[1]` (первые 2 FK fields в YAML declaration order). Это правильно для clean junctions (`RolePermission(roleId, permissionId)`), но silently wrong для junctions с non-FK pseudo-keys.
+
+Real example из weight repo (`weight_server/lib/src/models/user/customer_user.spy.yaml`):
+
+```yaml
+class: CustomerUser
+fields:
+  customerId: UuidValue, relation(parent=customer)        # FK
+  userId: int                                              # NOT a relation declaration (pseudo-FK)
+  roleId: UuidValue, relation(parent=role)                 # FK
+  defaultTerminalSetId: UuidValue?, relation(parent=terminal_set)  # FK nullable
+```
+
+Generated будет `deleteCustomerUserByCustomerAndRole` (берёт `customerId`+`roleId`) instead of `deleteCustomerUserByCustomerAndUser` если business key fact'ically `customer+user`. `serverpod generate` PASS, `flutter analyze` PASS, `verify` PASS — сломается на runtime когда orchestrator вызовет soft-delete by-key path → 404 или resurrect неправильную row → silent data corruption.
+
+**Scope:**
+
+1. **Detect junction с suspect pattern** — 3+ FK + non-FK field с `Id` suffix (potential pseudo-FK) → emit parser warning при `generate-entity` и `create-project`.
+2. **Extract shared `extractEntity1Entity2` utility** — устранить drift между `server_yaml_parser.ts` (entity1/entity2 для MANY_TO_MANY словаря) и `orchestrator_patcher._extractEntityNameFromField` (FK substitution в docstring). Single source of truth → consistent behavior.
+3. **Optional explicit YAML override** — `junctionKeyFields: [customerId, userId]` для случаев где business key не совпадает с первыми 2 FK declarations. Backward compat: если override отсутствует, current Option A (declaration order первых 2 FK) preserved.
+4. **Cross-component integration test** — create-project + generate-entity для junction entities verifying что parser entity1/entity2 == orchestrator FK extraction (не drift).
+
+**Reference:** TASK-014 adversarial-review-report.md Bomb #1 + Bomb #5 (architectural smell — двойное FK extraction) + Bomb #6 (test fixture semantic assertion — already added в orchestrator_patcher.test.ts CustomerUser case fixing current behavior).
+
+**Documented limitation:** [docs-code-generator/sync-core-integration.md](../../docs-code-generator/sync-core-integration.md) "Junction FK extraction — known limitation" section (added 2026-05-02 TASK-014 cleanup).
+
+**Files affected:**
+- `src/features/generation/parsers/server_yaml_parser.ts:44-66` — extract `extractEntity1Entity2` utility
+- `src/features/generation/generators/orchestrator_patcher.ts:260-323` — use shared utility (remove `_extractEntityNameFromField` duplicate)
+- `src/features/generation/parsers/junction_detector.ts` или новый `junction_fk_extractor.ts` — host shared utility
+- `src/test/generators/cross_component_integration.test.ts` (new) — verifies parser ↔ patcher alignment

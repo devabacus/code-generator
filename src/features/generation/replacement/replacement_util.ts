@@ -51,10 +51,54 @@ const dictionaryRegistry: Record<DictionaryName, RuleGenerator> = {
 
     [Dictionaries.MANY_TO_MANY]: (config) => {
         if (!config.targetEntity1 || !config.targetEntity2) { return []; }
-        const templEntity1 = 'task';
-        const templEntity2 = 'tag';
+
+        // TASK-014: template entity names параметризованы через config (default `task`/`tag`
+        // для t115 TaskTagMap baseline). Раньше hardcoded — это значит non-Map junctions
+        // (RolePermission, CustomerUser) получали неправильный rewrite — `task` менялся на
+        // `role`, `tag` на `permission`, но `taskTagMap`/`task_tag_map`/`TaskTagMap` literals
+        // оставались без изменений → класс становился `RolePermissionMap` вместо `RolePermission`.
+        const templEntity1 = config.templEntity1;
+        const templEntity2 = config.templEntity2;
+
+        // TASK-014: junction class name substitution. Template имеет literals
+        // `TaskTagMap` (PascalCase), `taskTagMap` (camelCase), `task_tag_map` (snake_case).
+        // Для targetJunctionClassName = `RolePermission` нужно заменить эти literals на
+        // `RolePermission` / `rolePermission` / `role_permission` (без `Map` суффикса).
+        // Backward compat: если targetJunctionClassName = `TaskTagMap` — substitution
+        // identity (no-op). Если empty — propagate legacy `<E1><E2>Map` shape (BackCompat
+        // для старых VS Code callers, которые не set'ят `targetJunctionClassName`).
+        const tplJunctionPascal = cap(templEntity1) + cap(templEntity2) + 'Map';
+        const tplJunctionCamel = unCap(templEntity1) + cap(templEntity2) + 'Map';
+        const tplJunctionSnake = `${toSnakeCase(unCap(templEntity1))}_${toSnakeCase(unCap(templEntity2))}_map`;
+
+        let targetJunctionPascal: string;
+        let targetJunctionCamel: string;
+        let targetJunctionSnake: string;
+        if (config.targetJunctionClassName && config.targetJunctionClassName.length > 0) {
+            targetJunctionPascal = cap(config.targetJunctionClassName);
+            targetJunctionCamel = unCap(config.targetJunctionClassName);
+            targetJunctionSnake = toSnakeCase(unCap(config.targetJunctionClassName));
+        } else {
+            // Legacy fallback: имя `<E1><E2>Map` (backward compat для VS Code path
+            // который не set'ит targetJunctionClassName).
+            targetJunctionPascal = cap(config.targetEntity1) + cap(config.targetEntity2) + 'Map';
+            targetJunctionCamel = unCap(config.targetEntity1) + cap(config.targetEntity2) + 'Map';
+            targetJunctionSnake = `${toSnakeCase(unCap(config.targetEntity1))}_${toSnakeCase(unCap(config.targetEntity2))}_map`;
+        }
 
         const rules: ReplacementRule[] = [];
+
+        // 1) Junction class name substitution идёт ПЕРВЫМ — длинные tokens заменяются
+        //    раньше чем подкомпоненты `task`/`tag`, иначе entity1/entity2 substitutions
+        //    разорвут junction literal в середине (e.g. `task_tag_map` → `role_tag_map`
+        //    после первой замены). Snake_case длиннее camelCase/PascalCase, поэтому идёт
+        //    первым в группе.
+        rules.push(
+            { from: tplJunctionSnake, to: targetJunctionSnake },
+            { from: tplJunctionPascal, to: targetJunctionPascal },
+            { from: tplJunctionCamel, to: targetJunctionCamel },
+        );
+
         rules.push(
             { from: pluralConvert(cap(templEntity1)), to: pluralConvert(cap(config.targetEntity1)) },
             { from: cap(templEntity1), to: cap(config.targetEntity1) },

@@ -600,6 +600,30 @@ void wireUp() {
             result.includes('customer_user_remote_adapter.dart'),
             'TASK-013: customer_user imports (snake_case)',
         );
+
+        // TASK-014 round 1 adversarial Bomb #6 — semantic assertion.
+        // Fixes current FK extraction behavior: relationFields=[customerId, roleId, defaultTerminalSetId],
+        // первые 2 FK = customer+role (userId: int пропускается т.к. НЕ FK). Catches docstring/method-name
+        // regression если FK extraction algorithm change'нется в future. Documented в
+        // docs-code-generator/sync-core-integration.md "Junction FK extraction — known limitation"
+        // + TASK-015 backlog для robust pseudo-FK detection.
+        assert.ok(
+            result.includes('junction FK→customer+role'),
+            'TASK-014 Bomb #6: CustomerUser docstring должен явно отражать current FK extraction (customer+role) — catches regression',
+        );
+        assert.ok(
+            result.includes('deleteCustomerUserByCustomerAndRole'),
+            'TASK-014 Bomb #6: method-name должен быть deleteCustomerUserByCustomerAndRole (current behavior)',
+        );
+        // NEGATIVE: template defaults НЕ должны leak.
+        assert.ok(
+            !result.includes('junction FK→task+tag'),
+            'TASK-014 Bomb #6: template default `task+tag` НЕ должен leak в CustomerUser docstring',
+        );
+        assert.ok(
+            !result.includes('deleteCustomerUserByTaskAndTag'),
+            'TASK-014 Bomb #6: template default `ByTaskAndTag` НЕ должен leak в method-name',
+        );
     });
 
     test('TASK-013 backward compat: TaskTagMap (с Map suffix) → junction routing preserved', async () => {
@@ -623,6 +647,73 @@ void wireUp() {
         assert.ok(
             result.includes('register<TaskTagMapEntity>'),
             'TASK-013 backward compat: TaskTagMap register block',
+        );
+    });
+
+    // ── TASK-014 regression: junction docstring FK parametrization ─────────
+
+    test('TASK-014: RolePermission docstring → "junction FK→role+permission" (NOT task+tag)', async () => {
+        // Bomb #6 closure: junction docstring был hardcoded `task+tag` literals
+        // и `ByTaskAndTag` substring — для RolePermission это semantically wrong.
+        // После TASK-014 — substitute через __FK1__/__FK2__ placeholders.
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const rolePermission = makeJunctionModel('RolePermission', [
+            fkField('roleId', 'Role'),
+            fkField('permissionId', 'Permission'),
+        ]);
+
+        await patcher.patch(makeConfig(), rolePermission);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Docstring должен содержать `junction FK→role+permission`.
+        assert.ok(
+            result.includes('junction FK→role+permission') || result.includes('junction FK→role+permission'),
+            `TASK-014: RolePermission docstring должен содержать "junction FK→role+permission"`,
+        );
+
+        // Method name reference — `ByRoleAndPermission` (НЕ `ByTaskAndTag`).
+        assert.ok(
+            result.includes('ByRoleAndPermission'),
+            'TASK-014: docstring должен ссылаться на ByRoleAndPermission method-name fragment',
+        );
+
+        // NEGATIVE: hardcoded `task+tag` / `ByTaskAndTag` НЕ должны leak.
+        assert.ok(
+            !result.includes('task+tag'),
+            'TASK-014: hardcoded `task+tag` literal НЕ должен присутствовать для RolePermission',
+        );
+        assert.ok(
+            !result.includes('ByTaskAndTag'),
+            'TASK-014: hardcoded `ByTaskAndTag` literal НЕ должен присутствовать для RolePermission',
+        );
+    });
+
+    test('TASK-014 backward compat: TaskTagMap docstring сохраняет "junction FK→task+tag"', async () => {
+        // Backward compat для TaskTagMap junction: FK extraction даёт task+tag,
+        // substitution производит identical output (`junction FK→task+tag` +
+        // `ByTaskAndTag` method name).
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const taskTagMap = makeJunctionModel('TaskTagMap', [
+            fkField('taskId', 'Task'),
+            fkField('tagId', 'Tag'),
+        ]);
+
+        await patcher.patch(makeConfig(), taskTagMap);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Docstring backward compat: `junction FK→task+tag` присутствует.
+        assert.ok(
+            result.includes('junction FK→task+tag') || result.includes('junction FK→task+tag'),
+            'TASK-014 backward compat: TaskTagMap docstring сохраняет junction FK→task+tag',
+        );
+        // Method name preserved.
+        assert.ok(
+            result.includes('ByTaskAndTag'),
+            'TASK-014 backward compat: TaskTagMap docstring имеет ByTaskAndTag method-name',
         );
     });
 
