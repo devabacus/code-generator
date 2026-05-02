@@ -56,6 +56,8 @@
 4. **TASK-003 — fix BUG-002 (camelCase)** — Medium, очищает `dart analyze`
 5. **TASK-004 — unit-тесты для остального entity-генератора** — снизит вероятность регрессий
 6. **ADR-0001 (актуализация)** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md` в `ai/docs/decisions/`, обновить статус
-| TASK-011 | sync_core 0.3.0 templates integration | 🟡 In Progress | 2026-05-02 |
-| TASK-013 | junction detection robust YAML field analysis | 🟡 In Progress | 2026-05-02 |
-| TASK-014 | junction adapter file path generation для non-Map entities | Ready for review | 2026-05-02 |
+| TASK-011 | sync_core 0.3.0 templates integration | ✅ Done (PR #2) | 2026-05-02 |
+| TASK-013 | junction detection robust YAML field analysis | ✅ Done (PR #3) | 2026-05-02 |
+| TASK-014 | junction adapter file path generation для non-Map entities | ✅ Done (PR #4) | 2026-05-02 |
+| TASK-012 | codegen → todo real app generation + cross-device smoke (Phase 1.5 final gate) | ⏭ Next | — |
+| TASK-015 | robust junction FK extraction для non-FK pseudo-keys (deferred from TASK-014 adversarial round 1) | 📝 Backlog | — |
