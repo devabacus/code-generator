@@ -72,7 +72,7 @@ suite('patchPubspecPackagePaths — Phase D (sync_core path-dep)', () => {
         assert.ok(after.includes('path: ../../../../../Projects/Flutter/Packages/sync_core'));
     });
 
-    test('idempotent re-run: повторный call не меняет уже-патченый файл', async () => {
+    test('idempotent re-run: повторный call не меняет уже-патченый файл (D8 fix)', async () => {
         const original = `dependencies:
   ble_feature:
     path: ../../Packages/ble_feature
@@ -87,22 +87,23 @@ suite('patchPubspecPackagePaths — Phase D (sync_core path-dep)', () => {
         await patchPubspecPackagePaths(mockFs, makeConfig());
         const after2 = await mockFs.readFile(TARGET_FLUTTER_PUBSPEC);
 
-        // ВАЖНО: после первого run все paths заменены, второй run не должен
-        // дальше углублять — потому что pattern matches ../../Packages/ (2 '..'),
-        // а после patch уже ../../../Packages/ (3 '..') — не matchится pattern.
-        // НО: out-of-monorepo pattern `(?:\.\.\/){4,}` matches >=4 '..',
-        // что после первого run = 5 '..' — ВСЁ ЕЩЁ matches → второй run углубит до 6.
-        // Это известное ограничение regex-based approach. Test verifies expected
-        // (текущее) behavior.
-        // ОЖИДАЕМОЕ ПОВЕДЕНИЕ:
-        //   In-monorepo path: idempotent (after1 == after2 для этой строки)
-        //   Out-of-monorepo: НЕ idempotent (разные depth каждый run)
-        //
-        // Compromise: patcher вызывается 1 раз в create-project bootstrap, поэтому
-        // non-idempotent edge case acceptable.
-        // Verifying: если pattern не matchится после 1-го run, after1 == after2.
-        const inMonorepoIdempotent = (after1.match(/\.\.\/\.\.\/\.\.\/Packages\/ble_feature/g) || []).length;
-        assert.strictEqual(inMonorepoIdempotent, 1, 'in-monorepo path stable');
+        // D8 fix (2026-05-02): patcher теперь fully idempotent для both patterns.
+        // - In-monorepo (`../../Packages/X`): не matches после 1-го run (4 leading dots).
+        // - Out-of-monorepo (`../../../../Projects/X`): regex поменян `{4,}` → `{4}`,
+        //   exact match. После 1-го run = 5 levels, regex `{4}` НЕ matches → no-op.
+        assert.strictEqual(after1, after2, 'patcher должен быть полностью idempotent (D8 fix)');
+
+        // Sanity checks: пути на правильной depth.
+        const inMonorepoCount = (after2.match(/\.\.\/\.\.\/\.\.\/Packages\/ble_feature/g) || []).length;
+        const outOfMonorepoCount = (after2.match(/\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/Projects\/Flutter\/Packages\/sync_core/g) || []).length;
+        assert.strictEqual(inMonorepoCount, 1, 'in-monorepo path: 3 levels (post-patch state)');
+        assert.strictEqual(outOfMonorepoCount, 1, 'out-of-monorepo path: 5 levels (post-patch state)');
+
+        // NEGATIVE: НЕ должно быть 6+ levels (что было бы при non-idempotent regex `{4,}`).
+        assert.ok(
+            !after2.includes('../../../../../../Projects/'),
+            'D8 fix: depth НЕ углубляется до 6 levels на повторном run'
+        );
     });
 
     test('absolute path не модифицируется (e.g. /home/user/Packages/X)', async () => {

@@ -297,6 +297,56 @@ class AppDatabase extends _$AppDatabase {
         assert.ok(after1.includes('TagTable'));
     });
 
+    test('D7 regression: template без fixed-line core imports → scan единственный источник, нет дублей', async () => {
+        // BUG D7 (Drift duplicate): раньше template database.dart имел fixed-line
+        // imports `tables/sync_metadata_table.dart` ВНЕ markers, плюс scan находил
+        // тот же файл по absolute path → результат: 2x import + 2x SyncMetadataTable.
+        // После Variant 7.A fix: template без fixed-line core imports, scan = single source.
+        const newTemplateContent = `import 'package:drift/drift.dart';
+// === GENERATED_IMPORTS_START ===
+// === GENERATED_IMPORTS_END ===
+
+@DriftDatabase(tables: [
+// === GENERATED_TABLES_START ===
+// === GENERATED_TABLES_END ===
+])
+class AppDatabase extends _$AppDatabase {
+  int get schemaVersion => 1;
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) { return m.createAll(); },
+    onUpgrade: (Migrator m, int from, int to) async {},
+  );
+}
+`;
+        mockFs.setFile(TEMPLATE_DB_PATH, newTemplateContent);
+
+        const flutterLib = `${PROJECTS_PATH}/weight/weight_flutter/lib`;
+        // Все три файла, которые раньше дублировались (template fixed + scan):
+        mockFs.setFile(`${flutterLib}/core/data/datasources/local/tables/sync_metadata_table.dart`, '// stub');
+        mockFs.setFile(`${flutterLib}/core/sync/sync_queue_table.dart`, '// stub');
+        mockFs.setFile(`${flutterLib}/features/configuration/data/datasources/local/tables/configuration_table.dart`, '// stub');
+
+        const gen = new AppDatabaseGenerator(mockFs, makeConfig('configuration', 'configuration'));
+        await gen.generate();
+
+        const result = await mockFs.readFile(TARGET_DB_PATH);
+
+        // Каждый import / table class встречается ровно 1 раз:
+        const syncMetadataImportCount = (result.match(/sync_metadata_table\.dart/g) || []).length;
+        const syncQueueImportCount = (result.match(/sync_queue_table\.dart/g) || []).length;
+        const configImportCount = (result.match(/configuration_table\.dart/g) || []).length;
+        assert.strictEqual(syncMetadataImportCount, 1, 'sync_metadata_table.dart должен встречаться ровно 1 раз (D7 dedup)');
+        assert.strictEqual(syncQueueImportCount, 1, 'sync_queue_table.dart должен встречаться ровно 1 раз (D7 dedup)');
+        assert.strictEqual(configImportCount, 1, 'configuration_table.dart должен встречаться ровно 1 раз (D7 dedup)');
+
+        const syncMetadataTableClassCount = (result.match(/SyncMetadataTable/g) || []).length;
+        const syncQueueTableClassCount = (result.match(/SyncQueueTable/g) || []).length;
+        const configurationTableClassCount = (result.match(/ConfigurationTable/g) || []).length;
+        assert.strictEqual(syncMetadataTableClassCount, 1, 'SyncMetadataTable class должен встречаться ровно 1 раз');
+        assert.strictEqual(syncQueueTableClassCount, 1, 'SyncQueueTable class должен встречаться ровно 1 раз');
+        assert.strictEqual(configurationTableClassCount, 1, 'ConfigurationTable class должен встречаться ровно 1 раз');
+    });
+
     test('игнорирует .g.dart, .freezed.dart, и файлы не *_table.dart', async () => {
         const featPath = `${PROJECTS_PATH}/weight/weight_flutter/lib/features/tasks/data/datasources/local/tables`;
         mockFs.setFile(`${featPath}/category_table.dart`, '// stub');

@@ -49,9 +49,14 @@ export async function patchPubspecPackagePaths(
         );
         // 2. Out-of-monorepo packages (sync_core etc.):
         //    ../../../../Projects/... → ../../../../../Projects/...
-        //    Pattern matches >= 4 leading `../` followed by `Projects/`.
+        //    D8 (2026-05-02): Pattern использует **exact** `{4}` (НЕ `{4,}` greedy),
+        //    чтобы быть **idempotent**. Template state = 4 levels (`../../../../`).
+        //    После 1-го patch = 5 levels (`../../../../../`). Pattern `{4}` НЕ matches
+        //    5 levels (`{4,}` matches'нул бы → углубил до 6 → broken).
+        //    Note: matched substring всё ещё имеет 4 leading `../`; replacement
+        //    добавляет ровно один additional `../`, всего получается 5.
         patched = patched.replace(
-            /(\bpath:\s*)((?:\.\.\/){4,})Projects\//g,
+            /(\bpath:\s*)((?:\.\.\/){4})Projects\//g,
             '$1../$2Projects/'
         );
         if (patched !== content) {

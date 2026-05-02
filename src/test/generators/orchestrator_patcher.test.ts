@@ -101,25 +101,49 @@ suite('OrchestratorPatcher Test Suite', () => {
         assert.strictEqual(exists, false, 'patcher must not create orchestrator file from scratch');
     });
 
-    test('single entity add: 3 marker блока обновлены', async () => {
+    test('single entity add: 3 marker блока обновлены + full import path correct (BUG-009 fix)', async () => {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         await patcher.patch(makeConfig(), makeModel('Expense'));
 
         const result = await mockFs.readFile(ORCHESTRATOR_PATH);
 
-        // Imports: добавлен ExpenseRemoteAdapter import
+        // BUG-009 fix: Full import paths должны использовать target feature segment
+        // (`features/expense/`), не template literal (`features/tasks/`).
         assert.ok(
-            result.includes('expense_remote_adapter.dart'),
-            'expense remote adapter import должен присутствовать'
+            result.includes("import '../../features/expense/data/adapters/expense/expense_remote_adapter.dart';"),
+            'expense_remote_adapter import должен иметь полный путь features/expense/data/adapters/expense/'
         );
         assert.ok(
-            result.includes('expense_dao.dart'),
-            'expense_dao.dart import должен присутствовать'
+            result.includes("import '../../features/expense/data/adapters/expense/expense_event_adapter.dart';"),
+            'expense_event_adapter import full path'
         );
         assert.ok(
-            result.includes('expense_entity.dart'),
-            'expense_entity.dart import должен присутствовать'
+            result.includes("import '../../features/expense/data/adapters/expense/expense_local_apply.dart';"),
+            'expense_local_apply import full path'
+        );
+        assert.ok(
+            result.includes("import '../../features/expense/data/adapters/expense/expense_payload_codec.dart';"),
+            'expense_payload_codec import full path'
+        );
+        assert.ok(
+            result.includes("import '../../features/expense/data/adapters/expense/expense_pull_adapter.dart';"),
+            'expense_pull_adapter import full path'
+        );
+        assert.ok(
+            result.includes("import '../../features/expense/data/datasources/local/daos/expense/expense_dao.dart';"),
+            'expense_dao import full path'
+        );
+        assert.ok(
+            result.includes("import '../../features/expense/domain/entities/expense/expense_entity.dart';"),
+            'expense_entity import full path'
+        );
+
+        // BUG-009 negative assertion: НЕТ literal `features/tasks/expense*` (template feature
+        // не должен утечь в target import path).
+        assert.ok(
+            !result.includes('features/tasks/data/adapters/expense'),
+            'BUG-009: features/tasks/...expense import path должен отсутствовать (template literal не leak)'
         );
 
         // Configuration imports preserved
@@ -150,6 +174,79 @@ suite('OrchestratorPatcher Test Suite', () => {
         assert.ok(
             result.includes('register<ConfigurationEntity>'),
             'Configuration register block должен сохраниться'
+        );
+    });
+
+    test('BUG-009: feature segment substitution для non-tasks feature (.../features/<custom>)', async () => {
+        // Конфигурация emulates real flow: developer вызывает
+        // `generate-entity --feature-path .../features/billing` на свежем create-project'е,
+        // где `features/tasks/` НЕ существует. Patcher ДОЛЖЕН substitute template's
+        // `features/tasks/` literal на target `features/billing/`.
+        const configWithCustomFeature = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'tasks',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/billing`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+        });
+
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        await patcher.patch(configWithCustomFeature, makeModel('Invoice'));
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // POSITIVE: imports должны указывать на features/billing/, НЕ features/tasks/
+        assert.ok(
+            result.includes("import '../../features/billing/data/adapters/invoice/invoice_remote_adapter.dart';"),
+            'BUG-009 fix: imports содержат features/billing/ (target feature segment)'
+        );
+        assert.ok(
+            result.includes("import '../../features/billing/data/datasources/local/daos/invoice/invoice_dao.dart';"),
+            'BUG-009 fix: dao import path resolves correctly'
+        );
+
+        // NEGATIVE: template feature literal НЕ должен утечь.
+        assert.ok(
+            !result.includes('features/tasks/'),
+            'BUG-009 fix: template literal `features/tasks/` НЕ leak в target imports'
+        );
+    });
+
+    test('BUG-009: junction entity также получает правильный feature segment', async () => {
+        // Junction (*Map) imports тоже должны substitute features/tasks/ → features/<target>/.
+        const configWithCustomFeature = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'tasks',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/access_control`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+        });
+
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        await patcher.patch(configWithCustomFeature, makeModel('UserPermissionMap'));
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // POSITIVE: junction imports use access_control feature segment
+        assert.ok(
+            result.includes("import '../../features/access_control/data/adapters/user_permission_map/user_permission_map_remote_adapter.dart';"),
+            'BUG-009 fix: junction remote adapter import имеет access_control feature segment'
+        );
+
+        // NEGATIVE
+        assert.ok(
+            !result.includes('features/tasks/'),
+            'BUG-009 fix: junction template literal `features/tasks/` НЕ leak'
         );
     });
 
@@ -315,7 +412,24 @@ void wireUp() {
         assert.ok(result.includes('income_remote_adapter.dart'), 'income (новый) добавлен');
     });
 
-    test('commutative apply: A→B == B→A (порядок не влияет на final state)', async () => {
+    test('eventual consistency apply: A→B и B→A содержат тот же набор entities (set-equality)', async () => {
+        // D10 (per Standard Finding #3 + Adversarial Bomb #6 reformulation):
+        //
+        // **Honest claim:** patcher НЕ обеспечивает байт-в-байт commutativity
+        // (apply order влияет на line ordering — append-only behavior). НО он
+        // обеспечивает **eventual consistency**: final orchestrator state содержит
+        // одинаковый **set** entries независимо от порядка применения.
+        //
+        // **Why это OK для production use case:** orchestrator file правится
+        // sequentially (один `generate-entity` за раз). Concurrent generate-entity
+        // не supported (file locking concern, не проверяется). Set-equality
+        // достаточна для invariant "финальный state содержит N expected register'ов".
+        //
+        // **Если бы потребовалась true bytewise commutativity:** patcher должен
+        // был бы sort'ировать entries (по entity name) при insert. Это можно
+        // добавить как future hardening (TASK-013 backlog scope или separate task),
+        // но не блокер для TASK-011 acceptance.
+
         // Apply A → B
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
         await patcher.patch(makeConfig(), makeModel('Alpha'));
@@ -330,16 +444,42 @@ void wireUp() {
         await patcher2.patch(makeConfig(), makeModel('Alpha'));
         const resultBA = await mockFs2.readFile(ORCHESTRATOR_PATH);
 
-        // Final state: оба содержат и Alpha и Beta.
-        assert.ok(resultAB.includes('register<AlphaEntity>'), 'AB: AlphaEntity');
-        assert.ok(resultAB.includes('register<BetaEntity>'), 'AB: BetaEntity');
-        assert.ok(resultBA.includes('register<AlphaEntity>'), 'BA: AlphaEntity');
-        assert.ok(resultBA.includes('register<BetaEntity>'), 'BA: BetaEntity');
+        // ---- Set-equality assertion ----
+        // Извлекаем все `register<XEntity>` имена из обоих результатов и сравниваем
+        // как множества (set-equality, порядко-независимо).
+        const extractRegistrationNames = (content: string): Set<string> => {
+            const matches = content.match(/register<(\w+)>/g) || [];
+            return new Set(matches);
+        };
+        const setAB = extractRegistrationNames(resultAB);
+        const setBA = extractRegistrationNames(resultBA);
+        assert.deepStrictEqual(
+            [...setAB].sort(),
+            [...setBA].sort(),
+            'D10: A→B и B→A должны иметь одинаковый set register'
+        );
+
+        // Аналогично для imports.
+        const extractImportPaths = (content: string): Set<string> => {
+            const matches = content.match(/import '[^']+';/g) || [];
+            return new Set(matches);
+        };
+        const importsAB = extractImportPaths(resultAB);
+        const importsBA = extractImportPaths(resultBA);
+        assert.deepStrictEqual(
+            [...importsAB].sort(),
+            [...importsBA].sort(),
+            'D10: A→B и B→A должны иметь одинаковый set imports'
+        );
+
+        // Sanity: оба содержат и Alpha и Beta.
+        assert.ok(setAB.has('register<AlphaEntity>') && setAB.has('register<BetaEntity>'), 'AB: Alpha + Beta');
+        assert.ok(setBA.has('register<AlphaEntity>') && setBA.has('register<BetaEntity>'), 'BA: Alpha + Beta');
 
         // Counts identical.
         const countAlphaAB = (resultAB.match(/register<AlphaEntity>/g) || []).length;
         const countAlphaBA = (resultBA.match(/register<AlphaEntity>/g) || []).length;
-        assert.strictEqual(countAlphaAB, 1);
-        assert.strictEqual(countAlphaBA, 1);
+        assert.strictEqual(countAlphaAB, 1, 'AB: ровно 1 Alpha register');
+        assert.strictEqual(countAlphaBA, 1, 'BA: ровно 1 Alpha register');
     });
 });

@@ -332,7 +332,8 @@ Per [BUG-008](../../bug-reports/008-app-database-generator-misses-core-sync-tabl
 
 ### Phase F — Final DoD verify
 
-- [ ] F0. **E2E patcher validation:** прогон 4× `codegen generate-entity --yaml {category,task,tag,task_tag_map}.spy.yaml --feature-path .../tasks --workspace t115` → восстанавливает orchestrator state эквивалентный pre-A0 (4 register'а + 4 imports + 4 entityTypes ре-добавлены через patcher)
+- [~] F0. **E2E patcher validation (partial):** прогон 4× `codegen generate-entity --yaml {category,task,tag,task_tag_map}.spy.yaml --feature-path .../tasks --workspace t115` → восстанавливает orchestrator state эквивалентный pre-A0 (4 register'а + 4 imports + 4 entityTypes ре-добавлены через patcher).
+  - **Caveat (per Adversarial Bomb #5, 2026-05-02):** BUG-007 (relation_patcher gap для template без markers) проявился во время F0. F0 demonstrated, что patcher восстанавливает orchestrator state, но downstream `flutter analyze` failed из-за relation_patcher pre-existing limitation. Cascading test value reduced — F0 НЕ proves runtime correctness, только patcher-level idempotency. Для full E2E validation (compile-clean t115) нужно сначала закрыть BUG-007.
 - [ ] F1. `codegen verify --name t115` regression (после F0 re-add) — PASS errors=0
 - [ ] F2. `codegen create-project --name t152` (~3 минуты, STOP-gate) — PASS
 - [ ] F3. `codegen verify --name t152` — PASS errors=0 (Configuration-only baseline проект работает clean)

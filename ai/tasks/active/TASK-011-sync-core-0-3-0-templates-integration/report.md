@@ -1,6 +1,6 @@
 # TASK-011 Report — sync_core 0.3.0 templates integration
 
-**Status:** Ready for review
+**Status:** Ready for re-review (post-adversarial-fixes D6-D12)
 **Branch:** `feature/TASK-011-sync-core-0-3-0-templates-integration`
 **Cross-repo:** sync_core teamlead-side `[codegen TASK-X1]` (см. [sync_core/ai/docs/roadmap.md](../../../../../../Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md))
 
@@ -31,12 +31,19 @@
 | **C/C7** | `orchestrator_patcher.ts` + 7 tests (incl. commutative) | done 2026-05-02 | be0e805 |
 | **D** | `patchPubspecPackagePaths` regex для sync_core + 6 tests | done 2026-05-02 | be0e805 |
 | **E/E5/E5.1/E6** | Docs cleanup + new sync-core-integration.md + TASK-013 backlog | done 2026-05-02 | 053204d |
-| **F0** | E2E patcher validation на t115 (re-add 4 tasks через generate-entity) | done 2026-05-02 | 053204d |
+| **F0** | E2E patcher validation на t115 (re-add 4 tasks через generate-entity) — **partial** (см. caveat ниже) | done with caveat 2026-05-02 | 053204d |
 | **D5** | BUG-008 fix -- AppDatabaseGenerator scan core/* tables + regression+idempotency tests | done 2026-05-02 | 06bf4e8 |
 | **F2** | `create-project --name t152` SUCCESS (191584ms) | done 2026-05-02 | filesystem |
 | **F3** | `verify --name t152` PASS errors=0 | done 2026-05-02 | -- |
 | **F4** | (опционально) `generate-entity` на t152 -- выявил BUG-009 (orchestrator_patcher import paths используют templ-feature вместо feature-path), out of scope | done 2026-05-02 | -- |
-| **F5** | Финальный report.md | done 2026-05-02 | (текущий commit) |
+| **F5** | Финальный report.md (initial) | done 2026-05-02 | df65751 |
+| **D6** | BUG-009 fix — orchestrator_patcher feature segment substitution + 2 new full-path tests | done 2026-05-02 | (this commit) |
+| **D7** | Drift duplicate fix (Variant A) — template без fixed-line core imports + regression test | done 2026-05-02 | (this commit) |
+| **D8** | pubspec regex `{4,}` → `{4}` (true idempotency) + updated test | done 2026-05-02 | (this commit) |
+| **D9** | Cleanup — .tmp file removed + F0 caveat documented + TASK-013 priority bump | done 2026-05-02 | (this commit) |
+| **D10** | Commutative test reformulated (set-equality + honest non-bytewise comment) | done 2026-05-02 | (this commit) |
+| **D11** | SectionReplacer noise suppressed (skip whitelist для orchestrator markers) | done 2026-05-02 | (this commit) |
+| **D12** | Fresh t153 + verify --name t153 PASS errors=0 + generate-entity expense → verify PASS errors=0 | done 2026-05-02 | (this commit) |
 
 ## Изменения
 
@@ -140,12 +147,26 @@ FAIL: verify t152
 
 F4 -- opt-in E2E demonstration, не блокер acceptance. F3 (фундаментальный gate, errors=0 на свежем create-project) PASS.
 
+## Caveat: Phase F0 validation strength (per Adversarial Bomb #5)
+
+**F0 был designed как E2E validation что `OrchestratorPatcher` корректно воссоздаёт original orchestrator state из Configuration baseline.** Test был run, но downstream `flutter analyze` failed на 12 errors про `GetTasksByCategoryIdUseCase` — это BUG-007 (relation_patcher не вставляет `:oneToManyMethods` markers в template без markers, pre-existing limitation).
+
+**Что F0 РЕАЛЬНО доказал:**
+- `OrchestratorPatcher` восстанавливает orchestrator state из Configuration baseline (proof patcher не падает + idempotent on real model data).
+- 4 entities (Category/Task/Tag/TaskTagMap) корректно re-added в orchestrator marker блоки.
+
+**Что F0 НЕ доказал:**
+- F0 НЕ proves runtime correctness — downstream `flutter analyze` failed из-за relation_patcher pre-existing gap.
+- Cascading test value reduced — F0 demonstrated patcher-level idempotency, не end-to-end clean compilation.
+
+**Для full E2E validation** (compile-clean t115 после re-add) необходимо сначала закрыть BUG-007. Это deferred TASK-014 backlog.
+
 ## Pre-existing limitations (out of scope TASK-011)
 
 - **BUG-007** -- `relation_patcher` не вставляет `:oneToManyMethods` marker блоки в template файлы без markers. F0 поверх template без markers даёт 12 errors про `GetTasksByCategoryIdUseCase`. Pre-existing template gap.
-- **BUG-009** -- `orchestrator_patcher` использует `--templ-feature` (default `tasks`) вместо `feature-path` для построения import paths. F4 demonstration выявил при `--feature-path .../features/expense`. 15 errors каскадом.
+- ~~**BUG-009**~~ — **CLOSED in D6** (2026-05-02) — `orchestrator_patcher` ранее использовал hardcoded `features/tasks/` literal в template imports. Fix: добавлен **feature segment substitution** через `config.targetFeatureName` (через `path.basename(targetFeaturePath)`). Anchored через `features/<X>/` prefix, чтобы избежать ложных matches на entity names. 2 new tests с full-path assertion (positive + negative): `BUG-009: feature segment substitution для non-tasks feature` + `BUG-009: junction entity также получает правильный feature segment`. **D12 E2E validated**: `generate-entity --feature-path .../features/expense` на свежем t153 → `verify` PASS errors=0.
 
-Оба bug записаны в `ai/bug-reports/`. TASK-011 acceptance не зависит от них (acceptance attached к F3 fresh project verify, который проходит чисто).
+BUG-007 записан в `ai/bug-reports/`. TASK-011 acceptance не зависит от него (acceptance attached к F3 fresh project verify, который проходит чисто).
 
 ## Architectural concerns / Risks
 
@@ -163,13 +184,11 @@ Phase F0 (re-add 4 tasks для E2E patcher proof) приводит template orc
 
 **Lesson:** scan paths == hard contract. Любой `*_table.dart` ВНЕ whitelist невидим. Записано в `agent_memory.md`.
 
-### Lesson 3 -- duplicate imports/tables в database.dart (cosmetic, не error)
+### Lesson 3 — duplicate imports/tables в database.dart — CLOSED in D7 (Variant A)
 
-После Phase D5 fix `database.dart` содержит дубликаты:
-- 2x `import 'tables/sync_metadata_table.dart';` (один template fixed-line, второй из scan)
-- 2x `SyncMetadataTable,` и 2x `ConfigurationTable,` в `@DriftDatabase(tables: [...])`
+~~После Phase D5 fix `database.dart` содержит дубликаты~~ — fixed via D7 (2026-05-02 adversarial review).
 
-`flutter analyze` НЕ ругается (Drift молча игнорирует дубли, Dart разрешает дублирующиеся imports). errors=0. Визуально некрасиво. Orthogonal к TASK-011: template имеет fixed-line imports вне markers, scan их повторно вставляет внутри markers. Решение -- либо template переписать без fixed-line imports (всё через scan), либо в generator dedupe против template body. Architectural concern для будущего, не блокер.
+**D7 решение (Variant A — template fix):** удалены fixed-line imports `sync_metadata_table.dart`, `sync_queue_table.dart`, `configuration_table.dart` из template database.dart. Теперь scan-based AppDatabaseGenerator (`scanCoreTableFiles` + `scanAllFeatureTableFiles`) — единственный источник истины. Это упростило generator logic и устранило source duplicate. Regression test `D7 regression: template без fixed-line core imports → scan единственный источник, нет дублей` в `app_database_generator.test.ts`.
 
 ## Acceptance criteria
 
@@ -200,10 +219,119 @@ Phase F0 (re-add 4 tasks для E2E patcher proof) приводит template orc
 
 - [x] **Phase F4** generate-entity E2E demonstration на t152 (выявил BUG-009 -- out of scope)
 
+## D6-D12 — Adversarial review fixes (2026-05-02)
+
+**Trigger:** standard-review-report.md `APPROVE WITH NITS` + adversarial-review-report.md `DO NOT SHIP AS-IS`. User decision (Variant A): расширить scope TASK-011 закрыть adversarial concerns в той же feature branch перед merge.
+
+### D6 — BUG-009 fix (Adversarial Bomb #1)
+
+**Files changed:**
+- `src/features/generation/generators/orchestrator_patcher.ts` — `_substitutePlaceholders` принимает `tplFeatureSnake` / `targetFeatureSnake`, anchored substitution `features/<X>/` (через path prefix чтобы избежать ложных matches). `patch()` теперь использует `config.targetFeatureName` (`path.basename(targetFeaturePath)`).
+- `src/test/generators/orchestrator_patcher.test.ts` — 2 new tests с full-path assertion (positive + negative): `BUG-009: feature segment substitution для non-tasks feature` + `BUG-009: junction entity также получает правильный feature segment`. Existing `single entity add` test расширен на full-path assertion (включая negative `!result.includes('features/tasks/data/adapters/expense')`).
+
+**Adversarial complaint resolved:** substring tests anti-pattern → tests теперь assertion'ят full import path (`features/expense/data/adapters/expense/expense_remote_adapter.dart`).
+
+### D7 — Drift duplicate fix (Adversarial Bomb #2, Variant A)
+
+**Files changed:**
+- `G:/Templates/flutter/t115/t115_flutter/lib/core/data/datasources/local/database.dart` — удалены fixed-line imports `sync_metadata_table.dart`, `sync_queue_table.dart`, `configuration_table.dart` (lines 7-9 + lines 19-22 в @DriftDatabase). Заменено comment block с указанием на D7 fix rationale.
+- `src/test/generators/app_database_generator.test.ts` — new test `D7 regression: template без fixed-line core imports → scan единственный источник, нет дублей`.
+
+### D8 — pubspec regex idempotency (Adversarial Bomb #4)
+
+**Files changed:**
+- `src/core/services/project_bootstrapper.ts` — regex `(?:\.\.\/){4,}` → `(?:\.\.\/){4}` (exact 4 levels = template state; post-patch 5 levels не matches → no-op idempotent).
+- `src/test/services/project_bootstrapper.test.ts` — test "documents the bug" перепрошит на assertion `after1 === after2` + negative `!includes('../../../../../../Projects/')`.
+
+### D9 — Cleanup (Adversarial Bombs #5, #6 + miscellaneous)
+
+- D9.1: Удалён `tag_payload_codec.dart.tmp.37380.1777697814357` из template.
+- D9.2: F0 status updated на "done with caveat" — добавлена секция `Caveat: Phase F0 validation strength` с честным признанием что F0 demonstrated patcher idempotency, но не runtime correctness (BUG-007 cascade).
+- D9.3: TASK-013 в `backlog.md` priority bumped Low → Medium + scope expansion: "Audit weight 13 entities на junction-style без `Map` суффикса (UserPermission, RolePermission, ContractorTariff и подобные)".
+
+### D10 — Commutative test reformulated (Standard Finding #3)
+
+**Files changed:**
+- `src/test/generators/orchestrator_patcher.test.ts` — test renamed "commutative apply" → "eventual consistency apply". Honest claim: patcher НЕ true bytewise commutative (append-only behavior), но обеспечивает **set-equality** final state. Test проверяет:
+  - `extractRegistrationNames` set comparison (sorted arrays) — A→B vs B→A
+  - `extractImportPaths` set comparison
+  - Counts identity для дубликатов
+  - Sanity: оба содержат и Alpha и Beta
+
+**Architectural note:** True bytewise commutativity потребовала бы sort entries (по entity name) при insert — это более глубокая refactor работа, deferred (не блокер для TASK-011).
+
+### D11 — SectionReplacer noise suppressed (Standard Finding #4)
+
+**Files changed:**
+- `src/features/generation/generators/section_config.ts` — добавлен `SECTION_REPLACER_SKIP_MARKERS` whitelist (`syncImports`, `syncEntityTypes`, `syncRegistrations`). Эти markers patched через `OrchestratorPatcher` отдельно — `SectionReplacer.process()` теперь silently skip без warning.
+
+### D12 — Fresh t153 + verify validation
+
+**Step 2 — `create-project --name t153 --human`:** SUCCESS (189470ms). 9 modified + ~260 created.
+
+**Step 3 — `verify --name t153 --human` (свежий проект):** PASS errors=0
+```
+PASS: verify t153
+  project: G:\Projects\Flutter\serverpod\t153
+  ✓ flutterAnalyze — 4557ms (errors=0, warnings=3, infos=44)
+  ✓ pubGet — 4613ms
+  ✓ serverpodGenerate — 8796ms
+  ✓ buildRunner — 3829ms
+Total: 21798ms
+```
+
+**Step 4 — `generate-entity --yaml expense.spy.yaml --feature-path .../features/expense --workspace t153 --human`:** SUCCESS, 24 created + 2 modified (`sync_orchestrator_provider.dart` + `database.dart`).
+
+**Critical evidence (D6 fix validated):** в `t153_flutter/lib/core/sync/sync_orchestrator_provider.dart:24-30` patcher вставил imports с **правильным** feature segment:
+```dart
+import '../../features/expense/data/adapters/expense/expense_event_adapter.dart';
+import '../../features/expense/data/adapters/expense/expense_local_apply.dart';
+import '../../features/expense/data/adapters/expense/expense_payload_codec.dart';
+import '../../features/expense/data/adapters/expense/expense_pull_adapter.dart';
+import '../../features/expense/data/adapters/expense/expense_remote_adapter.dart';
+import '../../features/expense/data/datasources/local/daos/expense/expense_dao.dart';
+import '../../features/expense/domain/entities/expense/expense_entity.dart';
+```
+
+Сравните: до D6 fix этот же flow на t152 дал имена с **template's** `features/tasks/...` literal, что cascade-сломало 15 errors.
+
+**Step 5 — `verify --name t153 --human` после generate-entity:** PASS errors=0
+```
+PASS: verify t153
+  project: G:\Projects\Flutter\serverpod\t153
+  ✓ flutterAnalyze — 4332ms (errors=0, warnings=3, infos=44)
+  ✓ pubGet — 12772ms
+  ✓ serverpodGenerate — 9021ms
+  ✓ buildRunner — 19091ms
+Total: 45218ms
+```
+
+**BUG-009 fully closed.** Both verify runs (fresh project + post-generate-entity) PASS errors=0.
+
+### Tests final count
+
+**85 passing** (post-D6/D7/D10):
+- 62 baseline (pre-TASK-011)
+- +7 OrchestratorPatcher (initial)
+- +5 SectionReplacer
+- +6 patchPubspecPackagePaths (D8 test reformulated, count unchanged)
+- +2 AppDatabaseGenerator BUG-008 regression (Phase D5)
+- +2 OrchestratorPatcher D6 BUG-009 (full-path assertion)
+- +1 AppDatabaseGenerator D7 regression
+
 ## Status
 
-**Ready for review.** TASK-011 acceptance criteria все выполнены. Передаю управление teamlead.
+**Ready for re-review.** D6-D12 закрывают:
+- Adversarial Bomb #1 (BUG-009) — D6 ✅
+- Adversarial Bomb #2 (Drift duplicate) — D7 ✅
+- Adversarial Bomb #3 (junction heuristic) — TASK-013 priority bumped + scope expansion (audit weight 13 entities перед TASK-018)
+- Adversarial Bomb #4 (pubspec regex idempotency) — D8 ✅
+- Adversarial Bomb #5 (F0 evidence theatre) — D9.2 caveat documented
+- Adversarial Bomb #6 (t115 inconsistency) — обозначено как punt to follow-up
+- Standard Finding #3 (commutative test) — D10 honest reformulation ✅
+- Standard Finding #4 (SectionReplacer noise) — D11 ✅
+- Standard Finding #2 (.tmp file) — D9.1 ✅
 
-**После merge:**
-- TASK-012 (codegen -> todo real app generation + smoke) разблокирован (требует BUG-009 fix как prerequisite)
-- weight TASK-018 разблокирован после TASK-012
+**После re-review approval + merge:**
+- TASK-012 (codegen -> todo real app generation + smoke) полностью разблокирован (BUG-009 fixed, не prerequisite)
+- weight TASK-018 разблокирован после TASK-012 + TASK-013 audit acceptance

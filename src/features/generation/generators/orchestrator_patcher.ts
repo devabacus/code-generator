@@ -34,9 +34,9 @@ import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
 export class OrchestratorPatcher {
     constructor(private fileSystem: IFileSystem) {}
 
-    public async patch(_config: GenerationConfig, model: ServerpodModel): Promise<void> {
+    public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
         const orchestratorPath = path.join(
-            _config.targetFlutterProjectPath,
+            config.targetFlutterProjectPath,
             'lib',
             'core',
             'sync',
@@ -51,9 +51,19 @@ export class OrchestratorPatcher {
 
         const isJunction = model.className.endsWith('Map');
 
+        // Feature segment substitution (BUG-009 fix):
+        // template imports содержат hardcoded `features/tasks/` literal. Заменяем
+        // template feature name (config.templFeatureName, default 'tasks') на target
+        // feature segment (config.targetFeatureName — basename of targetFeaturePath).
+        // Это критично когда developer вызывает generate-entity --feature-path .../features/<X>
+        // где X != tasks. Без substitution все imports ссылаются на features/tasks/...
+        // которая не существует в свежем create-project'е → cascade uri_does_not_exist errors.
+        const tplFeatureSnake = toSnakeCase(config.templFeatureName);
+        const targetFeatureSnake = toSnakeCase(config.targetFeatureName);
+
         // Build all three snippets с substitutions подгоняя placeholders под
-        // model.className.
-        const importsSnippet = this._buildImportsSnippet(model, isJunction);
+        // model.className + feature segment.
+        const importsSnippet = this._buildImportsSnippet(model, isJunction, tplFeatureSnake, targetFeatureSnake);
         const entityTypeSnippet = this._buildEntityTypeSnippet(model);
         const registerSnippet = this._buildRegisterSnippet(model, isJunction);
 
@@ -179,8 +189,16 @@ export class OrchestratorPatcher {
 
     /**
      * Builds imports snippet (7 import lines) для regular или junction entity.
+     *
+     * BUG-009 fix: принимает `tplFeatureSnake` / `targetFeatureSnake` для подмены
+     * `features/tasks/` literal в template на актуальный target feature path.
      */
-    private _buildImportsSnippet(model: ServerpodModel, isJunction: boolean): string {
+    private _buildImportsSnippet(
+        model: ServerpodModel,
+        isJunction: boolean,
+        tplFeatureSnake: string,
+        targetFeatureSnake: string,
+    ): string {
         const tplEntity = isJunction ? 'taskTagMap' : 'category';
         const tplEntitySnake = toSnakeCase(tplEntity);
 
@@ -198,6 +216,8 @@ export class OrchestratorPatcher {
             targetPascal: cap(targetEntityCamel),
             targetCamel: targetEntityCamel,
             targetSnake: targetEntitySnake,
+            tplFeatureSnake,
+            targetFeatureSnake,
         });
     }
 
@@ -211,6 +231,9 @@ export class OrchestratorPatcher {
 
     /**
      * Builds register block snippet (12-18 lines) для regular или junction entity.
+     *
+     * Note: register snippet не содержит file paths, поэтому feature substitution
+     * не требуется (передаём empty values чтобы no-op в `_substitutePlaceholders`).
      */
     private _buildRegisterSnippet(model: ServerpodModel, isJunction: boolean): string {
         const tplEntity = isJunction ? 'taskTagMap' : 'category';
@@ -230,13 +253,26 @@ export class OrchestratorPatcher {
             targetPascal: cap(targetEntityCamel),
             targetCamel: targetEntityCamel,
             targetSnake: targetEntitySnake,
+            tplFeatureSnake: '',
+            targetFeatureSnake: '',
         });
     }
 
     /**
-     * Substitutes 3-form (PascalCase / camelCase / snake_case) placeholders
-     * в template snippet. Order matters — длинные substitutions сначала, чтобы
-     * не пересекаться (например `taskTagMap` matchиs `task` если не аккуратно).
+     * Substitutes placeholders в template snippet.
+     *
+     * Order matters:
+     *   1. **Feature path substitution** (BUG-009 fix) — `features/<tpl>/` → `features/<target>/`
+     *      anchored через `features/` prefix чтобы не задевать entity snake names.
+     *      Делается ПЕРВЫМ, иначе entity snake substitution может изменить literal `tasks`
+     *      внутри `features/tasks/` если entity = 'task' (substring overlap).
+     *   2. snake_case entity (e.g. `task_tag_map`) — длинный токен → раньше PascalCase/camelCase.
+     *   3. PascalCase entity (e.g. `TaskTagMap`).
+     *   4. camelCase entity (e.g. `taskTagMap`) — только если tplCamel != tplSnake (для regular
+     *      `category` они равны, second substitution no-op).
+     *
+     * Если `tplFeatureSnake` / `targetFeatureSnake` пустые (e.g. для register snippet,
+     * где feature path не используется) — feature substitution skip'ается.
      */
     private _substitutePlaceholders(
         template: string,
@@ -247,21 +283,33 @@ export class OrchestratorPatcher {
             targetPascal: string;
             targetCamel: string;
             targetSnake: string;
+            tplFeatureSnake: string;
+            targetFeatureSnake: string;
         }
     ): string {
-        // Order: snake (longest tokens), Pascal, camel.
-        // Use word boundaries / negative-lookahead-friendly approach where possible.
         let result = template;
 
-        // 1) snake_case form (e.g. `task_tag_map`) — заменяем literally,
+        // 1) Feature path substitution (BUG-009 fix). Anchored через `features/<X>/`
+        //    чтобы избежать ложных matches на entity snake_case строки.
+        if (
+            forms.tplFeatureSnake.length > 0 &&
+            forms.targetFeatureSnake.length > 0 &&
+            forms.tplFeatureSnake !== forms.targetFeatureSnake
+        ) {
+            const tplPath = `features/${forms.tplFeatureSnake}/`;
+            const targetPath = `features/${forms.targetFeatureSnake}/`;
+            result = this._replaceAll(result, tplPath, targetPath);
+        }
+
+        // 2) snake_case form (e.g. `task_tag_map`) — заменяем literally,
         //    т.к. в Dart code это всегда file/path/string-id context.
         result = this._replaceAll(result, forms.tplSnake, forms.targetSnake);
 
-        // 2) PascalCase (e.g. `TaskTagMap`) — заменяем literally (case-sensitive).
+        // 3) PascalCase (e.g. `TaskTagMap`) — заменяем literally (case-sensitive).
         result = this._replaceAll(result, forms.tplPascal, forms.targetPascal);
 
-        // 3) camelCase (e.g. `taskTagMap`) — заменяем literally.
-        //    Note: Это safe потому что snake_case (`task_tag_map`) уже заменили в шаге 1
+        // 4) camelCase (e.g. `taskTagMap`) — заменяем literally.
+        //    Note: Это safe потому что snake_case (`task_tag_map`) уже заменили в шаге 2
         //    и в template нет идентификаторов вида `task` без следующего символа `T`.
         //    Для regular entity (placeholder=`category`), tplCamel === tplSnake — second
         //    substitution no-op (string already replaced).
