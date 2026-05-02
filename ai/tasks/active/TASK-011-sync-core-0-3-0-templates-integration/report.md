@@ -55,6 +55,33 @@ User approved 2026-05-02 → A0 выполнен (drop'ы 28 imports + 4 entityT
 
 **Verification:** `flutter analyze lib/core/sync/sync_orchestrator_provider.dart` → **No issues found! (ran in 46.6s)** — markers comment-only, не ломают компиляцию.
 
+### ⚠ STOP-gate №5: Phase F2 — `codegen create-project --name t150`
+
+**Текущее состояние перед F2:**
+- Phase B + B5/B6/B7 + C0 + C + C7 + D + E + E5/E5.1 + E6 + F0 + F1 — все ✅ done
+- На feature branch: 2 commits (Phase A/B + Phase C/D)
+- npm test: **79 passing** (62 baseline + 7 orchestrator_patcher + 5 section_replacer + 6 project_bootstrapper) — 0 failures
+- Compile clean, lint warnings (16 pre-existing, 0 errors)
+- t115 после F0 re-add: 5 entities patched в orchestrator (Configuration baseline + Category + Task + Tag + TaskTagMap junction). 12 errors про `GetTasksByCategoryIdUseCase` — pre-existing relation_patcher limitation (template `category_usecases.dart` без `:oneToManyMethods` marker), **не TASK-011 регрессия**.
+
+**Что планирую делать в F2:**
+
+`codegen create-project --name t150 --templ-project t115`
+
+- Свежий проект на disk (~3 минуты, ~500MB).
+- Last test project: `t149` → следующий **`t150`**.
+- Цель: validate fresh project bootstrap c sync_core 0.3.0 baseline (Configuration + 3 marker pairs ready) + patched pubspec.yaml для sync_core path-dep.
+
+**Verification после F2 (Phase F3):**
+- `codegen verify --name t150` PASS errors=0 (Configuration-only baseline проект работает clean)
+- `flutter analyze` 0 errors / warnings ≤ 5
+- 8 файлов в `lib/core/sync/` (5 source + 3 .g.dart)
+- pubspec.yaml: `sync_core: path: ../../../../../Projects/Flutter/Packages/sync_core` (углублён на 1 уровень от template)
+
+**Жду:** `ok` или `делай` или `да` от teamlead'а на F2 (`create-project --name t150`).
+
+⏸ **PAUSE — возвращаю управление teamlead'у для STOP-gate №5 review.**
+
 ### STOP-gate №3 (legacy plan): Phase B — план оборачивания (выполнено выше)
 
 **Что планирую делать:**
@@ -256,7 +283,7 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 | E | Codegen docs cleanup (drop R1 references) | ⏭ pending | — |
 | **E5/E5.1** | README short bullet + new `docs-code-generator/sync-core-integration.md` | ⏭ pending | — |
 | **E6** | TASK-013 backlog placeholder (robust junction detection) | ⏭ pending | — |
-| **F0** | E2E patcher validation: re-add 4 tasks через `generate-entity` для t115 | ⏭ pending | — |
+| **F0** | E2E patcher validation: re-add 4 tasks через `generate-entity` для t115 | ✅ done 2026-05-02 — orchestrator_patcher восстановил 5 entities (Configuration + Category + Task + Tag + TaskTagMap), junction docstring корректный. **Pre-existing limitation:** relation_patcher не восстанавливает `:oneToManyMethods` marker блоки в task_usecases/providers/repository — template файлы без markers, regen ломает relation methods. 12 errors про `GetTasksByCategoryIdUseCase` — known issue, не TASK-011 регрессия. См. raw output ниже. | uncommitted |
 | F | DoD verify (t115 regression after F0 + fresh t<N+1>) | ⏭ pending | — |
 
 **Phase pipeline expanded** через [Discussion #1 archive](../../../discussions/archive/1-task-011-sync-core-templates-hardcoded-r/) (User decision 2026-05-02): Variant A acceptance + 6 phase amendments (A0/A0.6, B5/B6/B7, C0, C7, E5+new doc, F0).
@@ -277,6 +304,7 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 
 - `src/features/generation/generators/generation_service.ts` — подключён `OrchestratorPatcher` в `generate()` flow после `RelationPatcher.patch()` (только при entity-based generation).
 - `src/core/services/project_bootstrapper.ts` — `patchPubspecPackagePaths` extended regex для покрытия sync_core path-dep (`(?:\.\.\/){4,}Projects\/` pattern).
+- `src/adapters/cli/commands/generate_entity.ts` — добавлен `--projects-path` flag для override default `G:/Projects/Flutter/serverpod` (нужен для Phase F0 — E2E patcher validation на template directory).
 
 ### Изменено в t115 template
 
@@ -310,7 +338,18 @@ Task.md Phase A1: "8 файлов в `lib/core/sync/*.dart` (исключая `.
 - `t115_flutter/lib/core/sync/sync_orchestrator_provider.dart` — 3 marker pairs (`:syncImports`, `:syncEntityTypes`, `:syncRegistrations`) обёрнуты вокруг Configuration imports/entityType/register block. File grew 197 → 200 lines (6 marker строк, comment-only).
 
 ### Изменено в codegen docs
-(executor: agent_memory.md, architecture.md, CLAUDE.md sections)
+
+**Phase E (docs cleanup):**
+- `ai/docs/agent_memory.md` — секция "Sync-паттерн в шаблоне" переписана под sync_core 0.3.0 (drop R1, описание 5 source файлов + per-entity adapters + manifest types)
+- `ai/docs/architecture.md` — секция "Sync-паттерн (в шаблоне t115)" переписана с детальной структурой (5 source файлов + 5 adapters + 3 marker блока + 4 hooks)
+- `CLAUDE.md` (root) — обновлены: "Что НЕ генерируется автоматически" (drop R1, добавлен про custom hooks), "Создай новый проект" (Configuration baseline + tasks UI закомментирован), "Без парного sync_event" (sync_core 0.3.0 conventions), "ВНИМАНИЕ :base секции" (про idempotent marker блоки)
+
+**Phase E5/E5.1 (README + new doc):**
+- `README.md` — short bullet про sync_core 0.3.0 multi-entity sync + link на новый detailed doc
+- **`docs-code-generator/sync-core-integration.md`** (новый файл, ~120 строк) — детальное описание: что генерируется (create-project + generate-entity + 3 marker блока), YAML model requirements (6 fields + sync_event), limitations (junction heuristic / soft-delete / patcher prerequisites / pubspec idempotency), references (codegen src + sync_core docs + reference consumers + TASK-013 backlog).
+
+**Phase E6 (TASK-013 backlog placeholder):**
+- `ai/tasks/backlog.md` — добавлена запись TASK-013 (robust junction detection через YAML field analysis или explicit `junction: true` flag), trigger: weight TASK-018 false-negatives.
 
 ## Тесты
 
@@ -361,10 +400,10 @@ TBD
 - [x] **Phase C**: orchestrator_patcher.ts + 7 unit-tests passing — 2026-05-02
 - [x] **Phase C7**: commutative test (apply A→B == B→A) — included in patcher tests
 - [x] **Phase D**: patchPubspecPackagePaths covers sync_core path-dep — 2026-05-02, regex extension `(?:\.\.\/){4,}Projects\/` + 6 unit-tests
-- [ ] Phase E: docs cleanup (drop R1)
-- [ ] **Phase E5/E5.1**: README short bullet + `docs-code-generator/sync-core-integration.md`
-- [ ] **Phase E6**: TASK-013 backlog placeholder
-- [ ] **Phase F0**: re-add 4 tasks через `generate-entity` для t115 (E2E patcher validation)
+- [x] **Phase E**: docs cleanup (drop R1) — 2026-05-02, обновлены `agent_memory.md` + `architecture.md` + `CLAUDE.md` (root)
+- [x] **Phase E5/E5.1**: README short bullet + `docs-code-generator/sync-core-integration.md` — 2026-05-02, новый файл ~120 строк (что генерируется / YAML / limitations / references)
+- [x] **Phase E6**: TASK-013 backlog placeholder — 2026-05-02, в `ai/tasks/backlog.md`
+- [x] **Phase F0**: re-add 4 tasks через `generate-entity` для t115 (E2E patcher validation) — 2026-05-02, orchestrator_patcher восстановил 5 entities ✅. Pre-existing relation_patcher limitation: 12 errors про `GetTasksByCategoryIdUseCase` (template файлы без `:oneToManyMethods` marker) — known issue, **не TASK-011 регрессия**.
 - [ ] DoD t115 regression PASS errors=0 (после F0)
 - [ ] DoD fresh t<N+1> PASS errors=0 (Configuration-only baseline)
 - [ ] DoD generate-entity 5 adapters created + register patched

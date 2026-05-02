@@ -35,9 +35,24 @@ vscode используется через lazy `require('vscode')` в shared ut
 - `# manifest: entity` (в `table.dart`) — для entity-генерации
 - `// === generated_start:<section> ===` / `// === generated_end:<section> ===` — вставляемые блоки (`driftTableImports`, `driftTableColumns` и т.д.) — правятся через `replacing_file_processor.ts`
 
-### Sync-паттерн в шаблоне
+### Sync-паттерн в шаблоне (sync_core 0.3.0, после TASK-011)
 
-Каждая сущность имеет парный `*_sync_event.spy.yaml` + базовый `base_sync_repository.dart` + `sync_controller_provider` + `sync_registry`. Это offline-first sync (Drift локально + Serverpod remote).
+Шаблон t115 использует `sync_core` 0.3.0 — outbox-first multi-entity sync (validated cross-device на Windows + Android через t115/TASK-001 acceptance 2026-05-02). Архитектура:
+
+- **`lib/core/sync/`** — 5 source файлов (manifest: startProject): `app_lifecycle_provider`, `device_id_provider`, `drift_sync_queue_store`, `sync_orchestrator_provider`, `sync_queue_table`
+- **Per-entity adapters** — 5 файлов на сущность в `lib/features/<feature>/data/adapters/<entity>/`:
+  `*_remote_adapter.dart` (SyncRemoteWriteAdapter), `*_pull_adapter.dart` (SyncRemotePullAdapter),
+  `*_event_adapter.dart` (SyncRemoteEventAdapter), `*_payload_codec.dart`, `*_local_apply.dart`
+- **Configuration baseline** (manifest: startProject) — singleton сущность, копируется как есть в свежий проект
+- **Tasks reference** (manifest: entity / manyToMany) — Category/Task/Tag (regular) + TaskTagMap (junction) — генерируются через `generate-entity` + парный `*_sync_event.spy.yaml`
+- **Mutation-first Repository** — `_db.transaction { dao.insert + orchestrator.enqueue }` через manifest: entity (валидировано в Phase 2c/d t115/TASK-001)
+
+Orchestrator wire-up (`sync_orchestrator_provider.dart`) патчится автоматически через `OrchestratorPatcher` (3 marker блока: `:syncImports`, `:syncEntityTypes`, `:syncRegistrations`). Junction (`*Map` className) routing через docstring + manifest: manyToMany.
+
+См. также:
+- [docs-code-generator/sync-core-integration.md](../../docs-code-generator/sync-core-integration.md) — детальное описание + YAML requirements + limitations
+- sync_core conventions.md Pattern 6/7 — multi-entity registration + junction patterns
+- sync_core ADR-0004 — multi-entity runtime guidance (no lib/ changes для consumers)
 
 ### Обязательные поля entity YAML
 
