@@ -56,3 +56,4 @@
 4. **TASK-003 — fix BUG-002 (camelCase)** — Medium, очищает `dart analyze`
 5. **TASK-004 — unit-тесты для остального entity-генератора** — снизит вероятность регрессий
 6. **ADR-0001 (актуализация)** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md` в `ai/docs/decisions/`, обновить статус
+| TASK-011 | sync_core 0.3.0 templates integration | 🟡 In Progress | 2026-05-02 |
