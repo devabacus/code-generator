@@ -141,14 +141,34 @@ G:/Templates/flutter/t115/
 
 Обработка — в [replacing_file_processor.ts](../../src/features/generation/generators/replacing_file_processor.ts) и [marker_analyzer.ts](../../src/features/generation/generators/marker_analyzer.ts).
 
-## Sync-паттерн (в шаблоне t115)
+## Sync-паттерн (в шаблоне t115, sync_core 0.3.0 после TASK-011)
 
-Каждая сущность имеет парный `<entity>_sync_event.spy.yaml` + базу `core/sync/`:
-- `base_sync_repository.dart` — общий repo-миксин для offline-first операций
-- `sync_controller_provider.dart` — Riverpod провайдер контроллера синхронизации
-- `sync_registry.dart` — реестр синкающихся сущностей
+Шаблон t115 использует [sync_core](../../../../Projects/Flutter/Packages/sync_core) 0.3.0 — outbox-first sync engine с durable persistent backoff, mutation-first семантикой, coalescing operations. Validated cross-device на Windows + Android (t115/TASK-001 acceptance 2026-05-02).
 
-Offline-first: Drift локально + Serverpod remote. События синхронизации идут через `<entity>_sync_event`.
+**Архитектура:**
+- **`lib/core/sync/`** (5 source файлов, manifest: startProject):
+  - `app_lifecycle_provider.dart` — foreground/resume hook через WidgetsBindingObserver
+  - `device_id_provider.dart` — UUID v7 в SharedPreferences
+  - `drift_sync_queue_store.dart` — `SyncQueueStore` impl (CRUD + runInTransaction + afterCommit)
+  - `sync_orchestrator_provider.dart` — главный wire-up + 4 hooks (boot recovery / connectivity / foreground / scope change)
+  - `sync_queue_table.dart` — Drift schema для outbox queue (19 полей)
+- **Per-entity adapters** (5 файлов на сущность в `lib/features/<feature>/data/adapters/<entity>/`):
+  - `*_remote_adapter.dart` — `SyncRemoteWriteAdapter` (create/update/delete RPC)
+  - `*_pull_adapter.dart` — `SyncRemotePullAdapter` (incremental pull с checkpoint)
+  - `*_event_adapter.dart` — `SyncRemoteEventAdapter` (server-side event stream)
+  - `*_payload_codec.dart` — JSON serialization
+  - `*_local_apply.dart` — UPSERT в Drift через DAO
+- **Marker блоки в orchestrator** (patched через `OrchestratorPatcher`):
+  - `:syncImports` — adapter imports + DAO + entity
+  - `:syncEntityTypes` — `'<entityType>',` строки в `const List<String>` для requestPull loop
+  - `:syncRegistrations` — `orchestrator.register<XEntity>(...)` блоки
+
+**Generation flow:**
+1. `create-project` → копирует Configuration baseline (sync infra + 1 entity registered)
+2. `generate-entity` → создаёт 5 adapter файлов + патчит 3 marker блока в orchestrator идемпотентно
+3. Junction entities (`className.endsWith('Map')`) → routing через docstring update→createX + manifest: manyToMany
+
+См. [docs-code-generator/sync-core-integration.md](../../docs-code-generator/sync-core-integration.md) для детального описания + YAML requirements + limitations + references на sync_core docs.
 
 ## Обязательные поля entity YAML
 

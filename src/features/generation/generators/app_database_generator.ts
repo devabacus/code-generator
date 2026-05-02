@@ -39,7 +39,14 @@ export class AppDatabaseGenerator {
         // Сканируем ВСЕ feature-директории и собираем live table files (BUG-005).
         // Не полагаемся на инкрементальные правки existing-секций — это давало пустые
         // секции при определённом порядке вызовов.
-        const liveTableFiles = await this.scanAllFeatureTableFiles();
+        // BUG-008 (2026-05-02): дополнительно сканируем `lib/core/**/*_table.dart` —
+        // sync_core 0.3.0 кладёт `sync_queue_table.dart` в `lib/core/sync/` (вне `features/`).
+        // Без этого scan generated `database.dart` теряет SyncQueueTable → cascade 170+ analyzer errors.
+        const featureTableFiles = await this.scanAllFeatureTableFiles();
+        const coreTableFiles = await this.scanCoreTableFiles();
+        const liveTableFiles = [...featureTableFiles, ...coreTableFiles]
+            // Стабильный детерминированный порядок (BUG-005 idempotency invariant)
+            .sort((a, b) => a.fileName.localeCompare(b.fileName));
 
         const allImports = new Set(
             liveTableFiles.map(({ absolutePath }) => {
@@ -51,6 +58,19 @@ export class AppDatabaseGenerator {
         const liveTableClassesArr = liveTableFiles.map(({ fileName }) => `${snakeToPascalCase(fileName.replace(/\.dart$/, ''))},`);
         const allTableClasses = new Set(liveTableClassesArr);
         const liveTableClassNames = new Set(liveTableClassesArr.map(c => c.replace(/,\s*$/, '')));
+
+        // BUG-D7/Bomb#2 (defensive strip — independent of template state):
+        // Если template (или existing target file) содержит fixed-line `import '..._table.dart';`
+        // строки ВНЕ markers `:GENERATED_IMPORTS:` — и тот же файл уже найден scan'ом —
+        // удаляем дубликат из existing content ДО применения markers. То же для table class
+        // mentions ВНЕ `:GENERATED_TABLES:`. Это closes loop независимо от template repo state
+        // (см. round 2 reviews 2026-05-02 — fix template только в working tree → не воспроизводимо
+        // на fresh clone). Здесь generator сам — single source of truth, template-state-agnostic.
+        const scanImportFilenames = new Set(
+            liveTableFiles.map(({ fileName }) => fileName),
+        );
+        existingContent = this.stripDuplicateFixedLineImports(existingContent, scanImportFilenames);
+        existingContent = this.stripDuplicateFixedLineTables(existingContent, liveTableClassNames);
 
         let finalContent = this.updateSection(
             existingContent,
@@ -109,6 +129,97 @@ export class AppDatabaseGenerator {
         // Стабильный порядок (детерминированный вывод) — алфавитно по имени файла
         result.sort((a, b) => a.fileName.localeCompare(b.fileName));
         return result;
+    }
+
+    /**
+     * Сканирует `<flutterLib>/core/**` и возвращает live `*_table.dart` файлы (BUG-008).
+     * Любые core-уровневые tables (sync_core's `sync_queue_table.dart`, потенциальные
+     * future `core/auth/session_table.dart` и т.д.) попадают в `database.dart`.
+     * `*.g.dart` / `*.freezed.dart` / non-`*_table.dart` пропускаются.
+     */
+    private async scanCoreTableFiles(): Promise<{ absolutePath: string; fileName: string }[]> {
+        const coreDir = path.join(this.config.targetFlutterLibPath, 'core');
+        if (!await this.fileSystem.exists(coreDir)) { return []; }
+
+        const allCoreFiles = await this.fileSystem.readDirectoryRecursive(coreDir);
+        const result: { absolutePath: string; fileName: string }[] = [];
+
+        for (const absolutePath of allCoreFiles) {
+            const fileName = path.basename(absolutePath);
+            if (!fileName.endsWith('.dart')) { continue; }
+            if (fileName.endsWith('.g.dart') || fileName.endsWith('.freezed.dart')) { continue; }
+            if (!fileName.endsWith('_table.dart')) { continue; }
+            result.push({ absolutePath, fileName });
+        }
+        // Сортировка применяется в caller'е после merge с feature files.
+        return result;
+    }
+
+    /**
+     * Defensive strip: удаляет fixed-line `import '..._table.dart';` строки **вне** markers
+     * `:GENERATED_IMPORTS:` если соответствующий файл уже найден scan'ом и попадает внутрь
+     * markers. Это closes Bomb #2 robustly — не зависит от того, очищен ли template на disk
+     * (round 2 review 2026-05-02 нашёл что template fix живёт в uncommitted working tree
+     * t115 → fresh clone reproduces duplicate. Defensive strip в generator делает problem
+     * idempotent независимо от template state).
+     */
+    private stripDuplicateFixedLineImports(content: string, scanFilenames: Set<string>): string {
+        const importsStart = '// === GENERATED_IMPORTS_START ===';
+        const importsEnd = '// === GENERATED_IMPORTS_END ===';
+        const startIdx = content.indexOf(importsStart);
+        const endIdx = content.indexOf(importsEnd);
+
+        // Если markers нет — нечего защищать (no-op).
+        if (startIdx < 0 || endIdx < 0 || endIdx < startIdx) { return content; }
+
+        const before = content.slice(0, startIdx);
+        const inside = content.slice(startIdx, endIdx + importsEnd.length);
+        const after = content.slice(endIdx + importsEnd.length);
+
+        const importRegex = /^import\s+'([^']*_table\.dart)';\s*\r?\n/gm;
+        const stripFn = (segment: string): string =>
+            segment.replace(importRegex, (match, importPath: string) => {
+                const fileName = path.basename(importPath);
+                return scanFilenames.has(fileName) ? '' : match;
+            });
+
+        return stripFn(before) + inside + stripFn(after);
+    }
+
+    /**
+     * Defensive strip для `@DriftDatabase(tables: [...])`: удаляет fixed-line упоминания
+     * table classes (e.g. `SyncMetadataTable,` `ConfigurationTable,`) **вне** markers
+     * `:GENERATED_TABLES:` если class уже в scan list. Pair с {@link stripDuplicateFixedLineImports}.
+     */
+    private stripDuplicateFixedLineTables(content: string, liveTableClassNames: Set<string>): string {
+        const tablesStart = '// === GENERATED_TABLES_START ===';
+        const tablesEnd = '// === GENERATED_TABLES_END ===';
+        const driftDbRegex = /@DriftDatabase\s*\(\s*tables\s*:\s*\[([\s\S]*?)\]\s*\)/;
+        const m = content.match(driftDbRegex);
+        if (!m) { return content; }
+
+        const blockInner = m[1];
+        const startIdx = blockInner.indexOf(tablesStart);
+        const endIdx = blockInner.indexOf(tablesEnd);
+        if (startIdx < 0 || endIdx < 0) { return content; }
+
+        const beforeMarkers = blockInner.slice(0, startIdx);
+        const insideMarkers = blockInner.slice(startIdx, endIdx + tablesEnd.length);
+        const afterMarkers = blockInner.slice(endIdx + tablesEnd.length);
+
+        // Strip строки `ClassName,` (с возможным indent + trailing horizontal whitespace + newline)
+        // только если ClassName в scan list. Не трогаем чужие классы (developer-defined).
+        // ВАЖНО: после `,` используем только `[ \t]*\r?\n?` (горизонтальные whitespace + newline),
+        // НЕ `\s*` — иначе матч съест newline + indent следующей строки и regex `^` не сработает
+        // на ней (test edge case: 2 подряд class refs `SyncMetadataTable,\n    ConfigurationTable,`).
+        const classRefRegex = /^[ \t]*([A-Z][A-Za-z0-9_]*)[ \t]*,[ \t]*\r?\n?/gm;
+        const stripFn = (segment: string): string =>
+            segment.replace(classRefRegex, (matched, className: string) => {
+                return liveTableClassNames.has(className) ? '' : matched;
+            });
+
+        const newInner = stripFn(beforeMarkers) + insideMarkers + stripFn(afterMarkers);
+        return content.replace(driftDbRegex, `@DriftDatabase(tables: [${newInner}])`);
     }
 
     private removeStaleMigrationLines(content: string, liveTableClassNames: Set<string>): string {

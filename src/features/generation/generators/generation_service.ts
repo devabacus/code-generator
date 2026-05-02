@@ -11,6 +11,7 @@ import { FileManifest, MarkerAnalyzer } from './marker_analyzer';
 import { allManifests, manifestType } from './manifests';
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { RelationPatcher } from './relation_patcher';
+import { OrchestratorPatcher } from './orchestrator_patcher';
 import { scanWithIgnore } from '../../../utils/dir_handle_adv';
 import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
 
@@ -23,12 +24,14 @@ export class GenerationService {
     private readonly replacingProcessor: ReplacingFileProcessor;
     private readonly sectionReplacer: SectionReplacer;
     private readonly relationPatcher: RelationPatcher;
+    private readonly orchestratorPatcher: OrchestratorPatcher;
 
     constructor(fileSystem?: IFileSystem) {
         this.fileSystem = fileSystem || new DefaultFileSystem();
         this.replacingProcessor = new ReplacingFileProcessor(this.fileSystem);
         this.sectionReplacer = new SectionReplacer();
         this.relationPatcher = new RelationPatcher(this.fileSystem);
+        this.orchestratorPatcher = new OrchestratorPatcher(this.fileSystem);
     }
 
     /**
@@ -108,6 +111,13 @@ export class GenerationService {
         // Если есть модель и в ней найдены связи many-to-one, применяем патчер связей
         if (model && RelationAnalyzer.manyToOneFields(model.fields).length > 0) {
             await this.relationPatcher.patch(config, model);
+        }
+
+        // Patch orchestrator: добавление import + entityType + register block в
+        // sync_orchestrator_provider.dart. Работает только при entity-based generation
+        // (manifest: entity или manyToMany), для startProject — no-op.
+        if (model && isEntityBasedGeneration) {
+            await this.orchestratorPatcher.patch(config, model);
         }
     }
 

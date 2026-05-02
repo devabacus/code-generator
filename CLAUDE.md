@@ -72,7 +72,7 @@ fields:
 
 **Без 3 hard-required полей** (`userId`, `customerId`, `isDeleted`) генерация падает с понятной ошибкой.
 **Без парного `<table>_sync_event.spy.yaml`** в той же папке — тоже падает.
-M2M (junction `*Map`) — пропускают валидацию.
+M2M (junction `*Map`, sync_core 0.3.0 conventions Pattern 7) — пропускают валидацию.
 
 Escape hatch: CLI `--skip-validation`, VS Code → диалог `Generate anyway`.
 
@@ -134,7 +134,7 @@ G:/Projects/Flutter/serverpod/<name>/
 ### 4. Что НЕ генерируется автоматически
 
 - **UI-фабрики, формы, widget-тесты, helpers** — codegen их не патчит. Любое изменение `required` поля в YAML → ручная правка мест где `<Entity>(...)` создаётся.
-- Sync engine custom-код (sync_controller_provider, base_sync_repository) — частично template-managed, частично ручной.
+- **Кастом sync hooks** в `sync_orchestrator_provider.dart` (Hook 5+ за пределами 4 default'ов) — patcher трогает только 3 marker блока (`:syncImports` / `:syncEntityTypes` / `:syncRegistrations`). Любые user-добавленные hooks (custom scope listeners, telemetry) сохраняются вне marker блоков. Sync_core 0.3.0 generation покрыт codegen после TASK-011 (см. [docs-code-generator/sync-core-integration.md](docs-code-generator/sync-core-integration.md)).
 
 ---
 
@@ -185,6 +185,25 @@ G:/Projects/Flutter/serverpod/<name>/
 - `serverpod generate` — ~10 сек, нормально для повторов.
 - `flutter pub run build_runner build` — 30-60 сек.
 
+### Test-проекты — incremental numbering, агент НЕ удаляет (HARD RULE)
+
+**Политика 2026-05-02 (User decision):** агент **НЕ имеет прав** на удаление test-проектов в `G:/Projects/Flutter/serverpod/t<N>/`. Sandbox **намеренно блокирует** `rm -rf` / `Remove-Item -Recurse -Force` / подобные ops. Это **не bug**, это политика User'а.
+
+**Hard rule — НИКОГДА:**
+- НЕ пробовать workaround sandbox через PowerShell wrappers (`powershell.exe -Command "Remove-Item ..."`)
+- НЕ через `cmd /c rd /s /q ...`
+- НЕ через `node` child_process exec
+- НЕ через любые другие альтернативные shell paths
+
+**Что делать вместо удаления:**
+1. Узнай актуальный последний `t<N>` через `ls G:/Projects/Flutter/serverpod/`
+2. Используй `t<N+1>` (или `t<N+2>` если только что создавал `t<N+1>`)
+3. После validation — оставь broken проекты на disk **как есть**
+4. User сам удалит когда сочтёт нужным — это его зона
+5. Если sandbox error на delete attempt — flag User'у конкретную команду которую попытался, **не пробуй workaround**
+
+**Расширение incremental numbering** (BUG-005 lesson 2026-04-26): теперь явно запрещены **попытки удаления** broken `t<N>` directories. Это касается **всех TASK-XXX** где есть `create-project` или подобные disk-heavy operations.
+
 ---
 
 ## Task workflow (TASK-XXX через скрипты)
@@ -220,7 +239,7 @@ python ai/scripts/task.py finish    # pr + merge
 1. Прочитать [ai/docs/agent_memory.md](ai/docs/agent_memory.md) и этот файл.
 2. Отредактировать `<entity>.spy.yaml` в `<name>_server/lib/src/models/<entity>/`.
 3. `codegen generate-entity --yaml ... --feature-path ... --workspace ...` — относительно безопасно для добавления полей и relations (см. инварианты выше).
-4. **ВНИМАНИЕ:** `:base` секции (handleSyncEvent, createX, mappers) **перезапишутся**. Если в них есть кастомный код — забэкапить через `git diff` ПЕРЕД regen.
+4. **ВНИМАНИЕ:** `:base` секции (handleSyncEvent, createX, mappers) **перезапишутся**. Если в них есть кастомный код — забэкапить через `git diff` ПЕРЕД regen. `:syncImports` / `:syncEntityTypes` / `:syncRegistrations` marker блоки в orchestrator — патчатся идемпотентно (existing entries сохраняются + новый append'ится).
 5. `serverpod generate --experimental-features=all` (server)
 6. `flutter pub run build_runner build --delete-conflicting-outputs` (flutter)
 7. `flutter analyze` — проверить чистоту.
@@ -228,7 +247,7 @@ python ai/scripts/task.py finish    # pr + merge
 ### "Создай новый проект"
 1. `codegen create-project --name <name>` (~3 мин).
 2. **`codegen verify --name <name>` (Definition of Done гейт).** Должен вернуть `{ success: true }`. Цитировать `steps.flutterAnalyze.counts` в ответе пользователю.
-3. Проект должен сразу компилироваться: home_page.dart с Task/Category/Tag/TaskTagMap фичей, sync_controller подключен, pubspec пути правильные.
+3. Проект должен сразу компилироваться: home_page.dart с Configuration baseline (tasks UI закомментирован — TASK-002 default, раскомментируется после `generate-entity`), sync_orchestrator_provider подключен с Configuration register'ом, pubspec пути правильные (включая sync_core path-dep).
 4. Если что-то не так — это **баг генератора**, не патчить руками. Завести bug-report.
 
 ### "Почини баг генератора"

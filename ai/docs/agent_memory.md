@@ -35,9 +35,24 @@ vscode используется через lazy `require('vscode')` в shared ut
 - `# manifest: entity` (в `table.dart`) — для entity-генерации
 - `// === generated_start:<section> ===` / `// === generated_end:<section> ===` — вставляемые блоки (`driftTableImports`, `driftTableColumns` и т.д.) — правятся через `replacing_file_processor.ts`
 
-### Sync-паттерн в шаблоне
+### Sync-паттерн в шаблоне (sync_core 0.3.0, после TASK-011)
 
-Каждая сущность имеет парный `*_sync_event.spy.yaml` + базовый `base_sync_repository.dart` + `sync_controller_provider` + `sync_registry`. Это offline-first sync (Drift локально + Serverpod remote).
+Шаблон t115 использует `sync_core` 0.3.0 — outbox-first multi-entity sync (validated cross-device на Windows + Android через t115/TASK-001 acceptance 2026-05-02). Архитектура:
+
+- **`lib/core/sync/`** — 5 source файлов (manifest: startProject): `app_lifecycle_provider`, `device_id_provider`, `drift_sync_queue_store`, `sync_orchestrator_provider`, `sync_queue_table`
+- **Per-entity adapters** — 5 файлов на сущность в `lib/features/<feature>/data/adapters/<entity>/`:
+  `*_remote_adapter.dart` (SyncRemoteWriteAdapter), `*_pull_adapter.dart` (SyncRemotePullAdapter),
+  `*_event_adapter.dart` (SyncRemoteEventAdapter), `*_payload_codec.dart`, `*_local_apply.dart`
+- **Configuration baseline** (manifest: startProject) — singleton сущность, копируется как есть в свежий проект
+- **Tasks reference** (manifest: entity / manyToMany) — Category/Task/Tag (regular) + TaskTagMap (junction) — генерируются через `generate-entity` + парный `*_sync_event.spy.yaml`
+- **Mutation-first Repository** — `_db.transaction { dao.insert + orchestrator.enqueue }` через manifest: entity (валидировано в Phase 2c/d t115/TASK-001)
+
+Orchestrator wire-up (`sync_orchestrator_provider.dart`) патчится автоматически через `OrchestratorPatcher` (3 marker блока: `:syncImports`, `:syncEntityTypes`, `:syncRegistrations`). Junction (`*Map` className) routing через docstring + manifest: manyToMany.
+
+См. также:
+- [docs-code-generator/sync-core-integration.md](../../docs-code-generator/sync-core-integration.md) — детальное описание + YAML requirements + limitations
+- sync_core conventions.md Pattern 6/7 — multi-entity registration + junction patterns
+- sync_core ADR-0004 — multi-entity runtime guidance (no lib/ changes для consumers)
 
 ### Обязательные поля entity YAML
 
@@ -210,11 +225,26 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 ### Сервер не стартует с `errno = 10048, address = ::, port = 8082`
 
-→ Зомби `dart.exe` процесс держит порт после прошлого запуска. PowerShell:
-```powershell
-Get-NetTCPConnection -LocalPort 8082 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+→ Зомби `dart.exe` процесс держит порт после прошлого запуска. Бывает при остановке через `kill -9` или после crash без graceful shutdown.
+
+**⚠ PowerShell tool broken (2026-05-02 verified)** — Exit 1 даже на `"hello"`. Использовать **Bash tool** с pwsh wrapper.
+
+**Resolve (через Bash tool):**
+
+```bash
+# Найти процесс на порту 8082:
+pwsh -NoProfile -Command "Get-NetTCPConnection -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue | Select-Object OwningProcess"
+
+# Убить dart.exe процессы:
+pwsh -NoProfile -Command "Stop-Process -Name dart -Force -ErrorAction SilentlyContinue"
+
+# Или одной командой (kill всех dart на порту):
+pwsh -NoProfile -Command "Get-NetTCPConnection -LocalPort 8082 -State Listen | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force }"
 ```
-Бывает при остановке через `kill -9` или после crash без graceful shutdown.
+
+**НЕ использовать** `tasklist /FI` через Bash — Git Bash path-translation ломает `/FI` → `C:/Program Files/Git/FI`. Через pwsh -Command — clean.
+
+Если порт другой (8181, 8000) — заменить `8082` в команде.
 
 ### `DatabaseQueryException: password authentication failed for user "postgres"` на работающем сервере
 
@@ -226,13 +256,19 @@ docker compose up -d          # свежий postgres с правильным п
 dart bin/main.dart --apply-migrations
 ```
 
-### Цикл итераций при правке генератора (политика 2026-04-26)
+### Цикл итераций при правке генератора (политика 2026-04-26 + 2026-05-02 update)
 
 User: "если будешь чинить генератора значит создавать 142 и так далее пока все не сработает с первого раза"
 
 → Каждое **исправление генератора** требует свежего `create-project --name t<N+1>` + `verify --name t<N+1>` без ручных правок target-проекта. Если verify FAIL → починить генератор → `t<N+2>`. Не патчить руками target проект чтобы скрыть баг.
 
+**Update 2026-05-02 — агент НЕ удаляет test-проекты.** Sandbox блокирует `rm -rf` для `G:/Projects/Flutter/serverpod/t<N>/` — это ожидаемо. Агент **никогда не workaround'ит через PowerShell `Remove-Item -Force`** или подобное. При failed `t<N>` агент **просто использует `t<N+1>`** и оставляет broken проект на disk — User удалит сам когда сочтёт нужным. Это касается всех TASK-XXX где есть `create-project`.
+
 Реальная история ветки `feature--fix-codegen-regen-bugs`:
 - `t141` → 327 errors (BUG-005: пустые секции database.dart) → fix scan-based
 - `t142` → 48 errors (widgets копировались в `features/home/`, не в `features/tasks/`) → fix явное копирование widgets в autoGen
 - `t143` → **PASS errors=0** + runtime HTTP 200 + все таблицы в Postgres
+
+TASK-011 (2026-05-02):
+- `t150` → broken (post-F0 orchestrator state mismatch) → variant A rollback
+- `t151` → 170 errors (новый блокер AppDatabaseGenerator теряет SyncQueueTable import + table) → t152 после root cause fix

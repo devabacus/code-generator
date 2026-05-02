@@ -20,6 +20,7 @@ interface GenerateEntityOptions {
     stdin?: boolean;
     featurePath: string;
     workspace: string;
+    projectsPath?: string;
     templatesPath: string;
     templProject: string;
     templEntity: string;
@@ -37,6 +38,7 @@ export function registerGenerateEntity(program: Command): void {
         .option('--stdin', 'Read YAML from stdin instead of file')
         .requiredOption('--feature-path <path>', 'Target feature directory path')
         .requiredOption('--workspace <path>', 'Workspace root path')
+        .option('--projects-path <path>', 'Base path for projects (overrides default G:/Projects/Flutter/serverpod, used for E2E template re-population)')
         .option('--templates-path <path>', 'Path to templates', 'G:/Templates')
         .option('--templ-project <id>', 'Template project ID', 't115')
         .option('--templ-entity <name>', 'Template entity placeholder', 'category')
@@ -88,6 +90,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
         const config = new GenerationConfig({
             templProject: opts.templProject,
             workspacesPath: opts.workspace,
+            projectsPath: opts.projectsPath,
             templFeatureName: opts.templFeature,
             targetFeaturePath: opts.featurePath,
             targetEntity: snakeToCamelCase(model.tableName),
