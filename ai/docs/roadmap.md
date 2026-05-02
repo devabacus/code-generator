@@ -37,25 +37,28 @@
 
 **Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия codegen TASK-X2 acceptance. Это hard gate без Soft Launch — sync_core teamlead координирует через `G:/Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md`.
 
-### Hard gate: junction detection audit (TASK-013)
+### Hard gate: TASK-013 junction detection (revised post round 3)
 
-**weight TASK-018 НЕ стартует пока junction detection audit не done.**
+**weight TASK-018 НЕ стартует пока TASK-013 не closed.**
 
 `OrchestratorPatcher` использует heuristic `model.className.endsWith('Map')` для детекции junction (many-to-many) entities. Если weight имеет junction-style entity (2+ FK + минимум domain полей) БЕЗ `Map` суффикса → false-negative routing через regular template → silent data divergence на out-of-order writes.
 
-**Audit результат (TASK-011 Phase G4, 2026-05-02):**
-- Все 14 sync entities в weight (имеют `*_sync_event.spy.yaml`) проверены — см. [`ai/bug-reports/junction-detection-audit.md`](../bug-reports/junction-detection-audit.md).
-- **Trivially passed** — junction-style без `Map` суффикса entities не найдено.
-- TASK-013 priority остаётся **Medium** (не блокер для текущего state weight'а).
+**Audit результат (TASK-011 Phase G4 + round 3 follow-up, 2026-05-02):**
+- Initial audit (Phase G4) проверил 14 sync entities (имеют `*_sync_event.spy.yaml`) — verdict "trivially passed".
+- **Round 3 adversarial follow-up: failed — 2 false-negative cases confirmed.** Initial audit использовал leaky selection criterion (только existing sync entities) и не учёл junction-style entities которые уже на disk но не в sync set yet.
+  - `RolePermission` — pure 2-FK junction (`roleId` + `permissionId`), file `weight_server/lib/src/models/user/role_permission.spy.yaml`.
+  - `CustomerUser` — 3-FK + 1 nullable FK junction-style, file `weight_server/lib/src/models/user/customer_user.spy.yaml`.
+- См. [`ai/bug-reports/junction-detection-audit.md`](../bug-reports/junction-detection-audit.md) — секция "False-negative discovered post-audit (round 3 adversarial)".
 
-**Re-trigger TASK-013 priority bump на High если:**
-- weight в production добавит entity типа `UserPermission(userId, permissionId)` или `RolePermission(roleId, permissionId)` без `Map` суффикса.
-- Cross-device data divergence для permission/relationship-table-style entity замечен.
+**Hard gate (revised):** TASK-018 blocking until TASK-013 closed. Это fixed gate, не trigger-based. Без TASK-013 fix RolePermission/CustomerUser получают broken routing на момент migration в sync set.
+
+**TASK-013 priority bumped Medium → High** ([backlog.md](../tasks/backlog.md)). Scope: replace `endsWith('Map')` heuristic на YAML field analysis (2+ FK + ≤1 non-FK поле → junction) ИЛИ explicit `junction: true` flag в YAML.
 
 **Критерии завершения Фазы 1.5:**
 - TASK-X1 merged → t115 regression PASS (existing template работает после маркеров + патчер)
 - TASK-X2 merged → fresh todo app sync working cross-device
-- Junction detection audit done (✅ TASK-011 Phase G4, 2026-05-02)
+- Junction detection audit done (✅ TASK-011 Phase G4) + post-audit findings documented (✅ round 3, 2026-05-02)
+- **TASK-013 closed** (junction false-negative fix shipped)
 - weight TASK-018 unblocked
 
 ---

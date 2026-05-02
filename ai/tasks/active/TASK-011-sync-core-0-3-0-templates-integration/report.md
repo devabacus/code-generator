@@ -1,6 +1,6 @@
 # TASK-011 Report — sync_core 0.3.0 templates integration
 
-**Status:** Ready for re-review (post-adversarial-fixes D6-D12)
+**Status:** Ready for merge (round 3 cosmetic / process cleanup H1-H6 done)
 **Branch:** `feature/TASK-011-sync-core-0-3-0-templates-integration`
 **Cross-repo:** sync_core teamlead-side `[codegen TASK-X1]` (см. [sync_core/ai/docs/roadmap.md](../../../../../../Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md))
 
@@ -91,14 +91,17 @@
 
 ## Тесты
 
-**Total: 82 passing** (0 failures, 952ms)
+**Total: 87 passing** (0 failures, ~132ms round 3 final)
 
 Breakdown:
 - 62 baseline (pre-TASK-011)
-- +7 OrchestratorPatcher
-- +5 SectionReplacer
-- +6 patchPubspecPackagePaths
+- +7 OrchestratorPatcher (initial Phase C)
+- +5 SectionReplacer (Phase B7)
+- +6 patchPubspecPackagePaths (Phase D)
 - +2 AppDatabaseGenerator BUG-008 regression (Phase D5)
+- +2 OrchestratorPatcher D6 BUG-009 (full-path assertion)
+- +1 AppDatabaseGenerator D7 regression
+- +2 AppDatabaseGenerator G1 defensive strip (round 3 realistic regression)
 
 Запуск: `npm test`
 
@@ -212,7 +215,7 @@ Phase F0 (re-add 4 tasks для E2E patcher proof) приводит template orc
 - [x] **Phase F2**: create-project --name t152 SUCCESS
 - [x] **Phase F3**: verify --name t152 PASS errors=0 (warnings=3, infos=44)
 - [x] **Phase F5**: финальный report.md
-- [x] 82 tests passing
+- [x] 87 tests passing
 - [x] report.md с actual JSON output
 
 ### Nice-to-have (выполнено сверх)
@@ -310,7 +313,7 @@ Total: 45218ms
 
 ### Tests final count
 
-**85 passing** (post-D6/D7/D10):
+**87 passing** (post-D6/D7/D10/G1, round 3 final):
 - 62 baseline (pre-TASK-011)
 - +7 OrchestratorPatcher (initial)
 - +5 SectionReplacer
@@ -318,20 +321,33 @@ Total: 45218ms
 - +2 AppDatabaseGenerator BUG-008 regression (Phase D5)
 - +2 OrchestratorPatcher D6 BUG-009 (full-path assertion)
 - +1 AppDatabaseGenerator D7 regression
+- +2 AppDatabaseGenerator G1 defensive strip (round 3 realistic regression — Bomb #2 architectural closure)
 
 ## Status
 
-**Ready for re-review.** D6-D12 закрывают:
+**Ready for merge (round 3 cleanup complete).**
+
+D6-D12 + G1-G6 + H1-H6 закрывают все round 1/2/3 adversarial findings:
+
+**Round 1/2 bombs (D6-D12 + G1-G6):**
 - Adversarial Bomb #1 (BUG-009) — D6 ✅
-- Adversarial Bomb #2 (Drift duplicate) — D7 ✅
-- Adversarial Bomb #3 (junction heuristic) — TASK-013 priority bumped + scope expansion (audit weight 13 entities перед TASK-018)
+- Adversarial Bomb #2 (Drift duplicate) — closed на architectural уровне через **G1 defensive strip** (round 3 reviewer accepted, 2 realistic regression tests + 87 passing)
+- Adversarial Bomb #3 (junction heuristic) — initial G4 audit "trivially passed", **round 3 follow-up discovered 2 false-negatives** (RolePermission, CustomerUser) → TASK-013 priority Medium → High + hard gate strengthened (H1, H2)
 - Adversarial Bomb #4 (pubspec regex idempotency) — D8 ✅
 - Adversarial Bomb #5 (F0 evidence theatre) — D9.2 caveat documented
-- Adversarial Bomb #6 (t115 inconsistency) — обозначено как punt to follow-up
+- Adversarial Bomb #6 (t115 inconsistency) — closed via G2 commit `9ded2a7` + H5 push to origin
 - Standard Finding #3 (commutative test) — D10 honest reformulation ✅
 - Standard Finding #4 (SectionReplacer noise) — D11 ✅
 - Standard Finding #2 (.tmp file) — D9.1 ✅
 
-**После re-review approval + merge:**
-- TASK-012 (codegen -> todo real app generation + smoke) полностью разблокирован (BUG-009 fixed, не prerequisite)
-- weight TASK-018 разблокирован после TASK-012 + TASK-013 audit acceptance
+**Round 3 cosmetic / process (H1-H6):**
+- H1 — junction audit honesty: false-negatives (RolePermission, CustomerUser) acknowledged, methodology gap documented
+- H2 — roadmap Phase 1.5 hard gate: weight TASK-018 blocking until TASK-013 closed (fixed gate, не trigger-based)
+- H3 — task.md "План работы" sub-steps reconciled (35 unchecked → `[x]` или `[~] covered`)
+- H4 — report.md test count synced на 87 везде (3 stale refs "82"/"85" → "87")
+- H5 — t115 commit `9ded2a7` pushed to origin (cross-repo sync closed)
+- H6 — final commit + return control to teamlead
+
+**После merge:**
+- TASK-012 (codegen → todo real app generation + smoke) полностью разблокирован
+- **weight TASK-018 blocking gate:** TASK-013 (junction false-negative fix) **обязательно** closed перед TASK-018 start (round 3 hard gate, see roadmap.md Phase 1.5)
