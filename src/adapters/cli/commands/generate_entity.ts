@@ -96,6 +96,11 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             targetEntity: snakeToCamelCase(model.tableName),
             targetEntity1: model.entity1,
             targetEntity2: model.entity2,
+            // TASK-014: для junction передаём PascalCase className (`RolePermission`)
+            // в targetJunctionClassName — это позволяет `_getDestinationPath` +
+            // `replacement_util.MANY_TO_MANY` правильно substitut'ить `task_tag_map`
+            // → `role_permission` (включая `TaskTagMap` PascalCase в классах).
+            targetJunctionClassName: model.isRelation ? model.className : undefined,
             manifest: features,
             templatesPath: opts.templatesPath,
         });

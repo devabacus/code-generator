@@ -96,7 +96,7 @@ export class GenerationService {
 
                 // Добавляем задачу обработки файла в очередь
                 const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
-                const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
+                const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config, model));
 
                 if (processedDestinations.has(destinationPath)) { continue; }
                 processedDestinations.add(destinationPath);
@@ -135,7 +135,7 @@ export class GenerationService {
     ): Promise<void> {
         // Вычисляем относительный путь и целевой путь назначения
         const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
-        const destinationPath = precomputedDestinationPath || path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config));
+        const destinationPath = precomputedDestinationPath || path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config, model));
 
         const destinationExists = await this.fileSystem.exists(destinationPath);
         // Проверяем наличие маркера "base", который указывает на то, что нужно объединять контент, а не перезаписывать полностью
@@ -209,13 +209,81 @@ export class GenerationService {
     /**
      * Преобразует относительный путь шаблона в путь назначения,
      * заменяя плейсхолдеры сущности и проекта на реальные имена.
+     *
+     * **TASK-014:** для junction entities (`model.isRelation === true`) применяем
+     * two-entity rewrite — template directory `task_tag_map/` → `<targetSnakeCase>/`
+     * и file prefix `task_tag_map_` → `<targetSnakeCase>_`. Также заменяем токены
+     * `task` / `tag` (template entity1/entity2) на target FK names. Это закрывает
+     * Bomb #2 из TASK-013 adversarial review — non-Map junctions (RolePermission,
+     * CustomerUser) больше не получают пути под `task_tag_map/`.
+     *
+     * Backward compat: TaskTagMap target → `task_tag_map` substitution идентична
+     * (no-op replacement). Single-entity rewrite (config.templEntity → targetEntity)
+     * остаётся для regular entities — детектится через `model?.isRelation !== true`.
      */
-    private _getDestinationPath(relativePath: string, config: GenerationConfig): string {
-        // BUG-002: пути на диске должны быть snake_case (lower_case_with_underscores).
-        // targetEntity приходит как camelCase (например, 'correctionButton'), а имена файлов/папок
-        // в Dart-конвенции — snake_case ('correction_button_table.dart', 'correction_button/').
-        const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
-        let destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
+    private _getDestinationPath(relativePath: string, config: GenerationConfig, model?: ServerpodModel): string {
+        // Определяем junction context: `model.isRelation` set parser'ом через
+        // JunctionDetector (TASK-013). Если model нет (legacy startProject flow) —
+        // single-entity rewrite применяется по дефолту.
+        const isJunction = model?.isRelation === true;
+
+        let destinationRelativePath = relativePath;
+
+        if (isJunction) {
+            // TASK-014: junction-aware two-entity rewrite. Source template path содержит:
+            //   - directory `task_tag_map/`
+            //   - file prefix `task_tag_map_`
+            //   - также fragments `task` / `tag` для FK name references
+            // (например `task_tag_map_dao.dart`, `tasks/data/adapters/task_tag_map/...`).
+            //
+            // Target snake = snake_case(model.className), e.g. `RolePermission` → `role_permission`.
+            const tplE1 = toSnakeCase(unCap(config.templEntity1));            // 'task'
+            const tplE2 = toSnakeCase(unCap(config.templEntity2));            // 'tag'
+            const tplJunctionSnake = `${tplE1}_${tplE2}_map`;                  // 'task_tag_map'
+
+            // Determine target junction snake. Prefer explicit targetJunctionClassName
+            // (from `model.className`). Fallback на `<E1>_<E2>_map` shape если class
+            // name отсутствует (defensive — не должно случиться при generate-entity flow).
+            let targetJunctionSnake: string;
+            if (config.targetJunctionClassName && config.targetJunctionClassName.length > 0) {
+                targetJunctionSnake = toSnakeCase(unCap(config.targetJunctionClassName));
+            } else if (config.targetEntity1 && config.targetEntity2) {
+                targetJunctionSnake = `${toSnakeCase(unCap(config.targetEntity1))}_${toSnakeCase(unCap(config.targetEntity2))}_map`;
+            } else {
+                targetJunctionSnake = tplJunctionSnake;
+            }
+
+            const targetE1 = toSnakeCase(unCap(config.targetEntity1 || tplE1));
+            const targetE2 = toSnakeCase(unCap(config.targetEntity2 || tplE2));
+
+            // 1) Replace junction directory + file prefix ПЕРВЫМ (длинный токен).
+            //    Backward compat: TaskTagMap target → identity replacement.
+            destinationRelativePath = destinationRelativePath.replaceAll(tplJunctionSnake, targetJunctionSnake);
+
+            // 2) Replace entity1/entity2 tokens (FK names) в остальных path segments.
+            //    Только если они отличаются от template (избегаем no-op).
+            //    Use word-boundary-like lookahead на `_`/`/`/`.` чтобы не задеть e.g.
+            //    `tasks` (но `task` без следующего символа `s` — заменим).
+            if (targetE1 !== tplE1) {
+                destinationRelativePath = destinationRelativePath.replace(
+                    new RegExp(`${tplE1}(?=_|/|\\.|$)`, 'g'),
+                    targetE1,
+                );
+            }
+            if (targetE2 !== tplE2) {
+                destinationRelativePath = destinationRelativePath.replace(
+                    new RegExp(`${tplE2}(?=_|/|\\.|$)`, 'g'),
+                    targetE2,
+                );
+            }
+        } else {
+            // BUG-002: пути на диске должны быть snake_case (lower_case_with_underscores).
+            // targetEntity приходит как camelCase (например, 'correctionButton'), а имена файлов/папок
+            // в Dart-конвенции — snake_case ('correction_button_table.dart', 'correction_button/').
+            const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
+            destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
+        }
+
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
         return destinationRelativePath;
     }

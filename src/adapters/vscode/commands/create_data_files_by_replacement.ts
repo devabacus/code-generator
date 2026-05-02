@@ -47,6 +47,10 @@ export async function createDataFilesByReplacement() {
         targetEntity: snakeToCamelCase(model.tableName),
         targetEntity1: model.entity1,
         targetEntity2: model.entity2,
+        // TASK-014: prokid'аем PascalCase className для junction — необходимо для
+        // правильного rewrite `task_tag_map/` → `<target>/` в `_getDestinationPath`
+        // и replacement_util.MANY_TO_MANY (RolePermission case).
+        targetJunctionClassName: model.isRelation ? model.className : undefined,
         manifest: features,
         templatesPath: templatesPath
     });

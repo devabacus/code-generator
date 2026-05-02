@@ -134,3 +134,125 @@ class CargoTypeDao {
         assert.strictEqual(rules.length, 0);
     });
 });
+
+// ── TASK-014: M2M rules — junction file path/class generation ──────────────────
+
+function m2mConfig(opts: {
+    targetEntity1: string;
+    targetEntity2: string;
+    targetJunctionClassName?: string;
+    templEntity1?: string;
+    templEntity2?: string;
+}): GenerationConfig {
+    return new GenerationConfig({
+        templProject: 't115',
+        templEntity: 'category',
+        targetEntity: '',
+        targetEntity1: opts.targetEntity1,
+        targetEntity2: opts.targetEntity2,
+        targetJunctionClassName: opts.targetJunctionClassName,
+        templEntity1: opts.templEntity1,
+        templEntity2: opts.templEntity2,
+        templatesPath: '/test/templates',
+        projectsPath: '/test/projects',
+        targetProject: 'weight',
+        templFeatureName: 'tasks',
+        targetFeaturePath: '/test/dest',
+        workspacesPath: '/test',
+    });
+}
+
+suite('Replacement Dictionary — MANY_TO_MANY rules (TASK-014)', () => {
+
+    test('TASK-014 backward compat: TaskTagMap target → identical substitutions for class names + paths', () => {
+        // Backward compat: TaskTagMap caller (default templEntity1='task'/templEntity2='tag'
+        // + targetJunctionClassName='TaskTagMap') → all junction substitutions identity (no-op)
+        // for TaskTagMap-targeted generation.
+        const rules = getDictionaryRules(
+            [Dictionaries.MANY_TO_MANY],
+            m2mConfig({
+                targetEntity1: 'task',
+                targetEntity2: 'tag',
+                targetJunctionClassName: 'TaskTagMap',
+            }),
+        );
+
+        // PascalCase class — identity.
+        assert.strictEqual(
+            applyRules('class TaskTagMap extends Entity {}', rules),
+            'class TaskTagMap extends Entity {}',
+        );
+        // snake_case path — identity.
+        assert.strictEqual(
+            applyRules("import '../adapters/task_tag_map/task_tag_map_dao.dart';", rules),
+            "import '../adapters/task_tag_map/task_tag_map_dao.dart';",
+        );
+        // camelCase identifier — identity.
+        assert.strictEqual(
+            applyRules('final taskTagMap = TaskTagMap();', rules),
+            'final taskTagMap = TaskTagMap();',
+        );
+    });
+
+    test('TASK-014: RolePermission target → правильные substitutions без Map suffix leak', () => {
+        // Critical case: non-Map junction. `TaskTagMap` literals в template должны
+        // замениться на `RolePermission` (НЕ `RolePermissionMap`). Это закрывает
+        // adversarial Bomb #2 — раньше template `Map` суффикс leak'ал в class name.
+        const rules = getDictionaryRules(
+            [Dictionaries.MANY_TO_MANY],
+            m2mConfig({
+                targetEntity1: 'role',
+                targetEntity2: 'permission',
+                targetJunctionClassName: 'RolePermission',
+            }),
+        );
+
+        // Class name: TaskTagMap → RolePermission (NO Map suffix).
+        assert.strictEqual(
+            applyRules('class TaskTagMap extends Entity {}', rules),
+            'class RolePermission extends Entity {}',
+        );
+        // Path: task_tag_map → role_permission (NO _map suffix).
+        assert.strictEqual(
+            applyRules("import '../adapters/task_tag_map/task_tag_map_dao.dart';", rules),
+            "import '../adapters/role_permission/role_permission_dao.dart';",
+        );
+        // camelCase identifier.
+        assert.strictEqual(
+            applyRules('final taskTagMap = TaskTagMap();', rules),
+            'final rolePermission = RolePermission();',
+        );
+        // Plural form.
+        assert.strictEqual(
+            applyRules('Future<List<TaskTagMap>> getTaskTagMaps();', rules),
+            'Future<List<RolePermission>> getRolePermissions();',
+        );
+    });
+
+    test('TASK-014: legacy fallback (no targetJunctionClassName) → <E1><E2>Map shape (VS Code path backward compat)', () => {
+        // Если targetJunctionClassName empty (legacy VS Code call path), substitution
+        // produces `<E1><E2>Map` shape — это identical к pre-TASK-014 output для
+        // backward compat: VS Code не set'ил `targetJunctionClassName`, и до TASK-014
+        // словарь только заменял `task→role` / `tag→permission` (Map оставлял).
+        const rules = getDictionaryRules(
+            [Dictionaries.MANY_TO_MANY],
+            m2mConfig({
+                targetEntity1: 'role',
+                targetEntity2: 'permission',
+                // targetJunctionClassName не set — fallback path.
+            }),
+        );
+
+        // Class — RolePermissionMap (legacy *Map shape).
+        assert.strictEqual(
+            applyRules('class TaskTagMap extends Entity {}', rules),
+            'class RolePermissionMap extends Entity {}',
+        );
+        // Path — role_permission_map.
+        assert.strictEqual(
+            applyRules("import '../adapters/task_tag_map/task_tag_map_dao.dart';", rules),
+            "import '../adapters/role_permission_map/role_permission_map_dao.dart';",
+        );
+    });
+});
+

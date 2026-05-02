@@ -12,6 +12,21 @@ export interface IGenerationConfig {
     targetEntity?: string;
     targetEntity1?: string;
     targetEntity2?: string;
+    /**
+     * TASK-014: template junction entity names. Default = `task` / `tag` (соответствует
+     * t115 TaskTagMap baseline directory `task_tag_map/` + file prefix). Используются
+     * в `replacement_util.MANY_TO_MANY` + `generation_service._getDestinationPath` +
+     * `orchestrator_patcher._JUNCTION_REGISTER_TEMPLATE` для two-entity rename.
+     */
+    templEntity1?: string;
+    templEntity2?: string;
+    /**
+     * TASK-014: PascalCase className целевой junction (e.g. `RolePermission`). Используется
+     * `_getDestinationPath` + `JUNCTION_REGISTER_TEMPLATE` для substitution
+     * `task_tag_map/` → `<targetSnakeCase>/`. Если не set — fallback в
+     * `${targetEntity1}_${targetEntity2}_map` (legacy *Map shape для backward compat).
+     */
+    targetJunctionClassName?: string;
     sourceFeaturePath?: string;
     workspacesPath?: string;
     templatesPath?: string;
@@ -25,6 +40,11 @@ export class GenerationConfig {
     public targetEntity: string;
     public targetEntity1: string;
     public targetEntity2: string;
+    /** TASK-014: template junction entity names (default `task`/`tag` для t115 baseline). */
+    public templEntity1: string;
+    public templEntity2: string;
+    /** TASK-014: PascalCase className целевой junction (e.g. `RolePermission`). */
+    public targetJunctionClassName: string;
     public sourceFeaturePath: string;
     public templFeatureName: string;
     public targetFeaturePath: string;
@@ -48,6 +68,13 @@ export class GenerationConfig {
         this.targetEntity = config.targetEntity || '';
         this.targetEntity1 = config.targetEntity1 || '';
         this.targetEntity2 = config.targetEntity2 || '';
+        // TASK-014: template junction entity names. Default `task`/`tag` соответствуют
+        // t115 TaskTagMap baseline (директория `task_tag_map/`, file prefix `task_tag_map_`,
+        // class `TaskTagMap`). Backward compat: TaskTagMap caller'ы вообще их не передают
+        // и получают тот же template как до TASK-014.
+        this.templEntity1 = config.templEntity1 || 'task';
+        this.templEntity2 = config.templEntity2 || 'tag';
+        this.targetJunctionClassName = config.targetJunctionClassName || '';
         this.sourceFeaturePath = config.sourceFeaturePath || path.join(this.templatesPath, 'flutter', this.templProject, `${this.templProject}_flutter`, 'lib', 'features', this.templFeatureName);
     }
 

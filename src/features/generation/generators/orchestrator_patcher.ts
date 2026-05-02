@@ -1,7 +1,7 @@
 import path from 'path';
 import { IFileSystem } from '../../../core/interfaces/file_system';
 import { GenerationConfig } from '../config/generation_config';
-import { ServerpodModel } from '../parsers/formatters/types';
+import { ServerpodModel, ServerpodField } from '../parsers/formatters/types';
 import { JunctionDetector } from '../parsers/junction_detector';
 import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
 
@@ -240,6 +240,11 @@ export class OrchestratorPatcher {
      *
      * Note: register snippet не содержит file paths, поэтому feature substitution
      * не требуется (передаём empty values чтобы no-op в `_substitutePlaceholders`).
+     *
+     * **TASK-014:** для junction template — substitute hardcoded FK literals (`task+tag`,
+     * `ByTaskAndTag`) на actual FK names из model. Используем placeholders
+     * `__FK1__` / `__FK2__` / `__FK1Pascal__` / `__FK2Pascal__` (специальные tokens
+     * чтобы не конфликтовать с PascalCase/snake substitution из existing flow).
      */
     private _buildRegisterSnippet(model: ServerpodModel, isJunction: boolean): string {
         const tplEntity = isJunction ? 'taskTagMap' : 'category';
@@ -248,11 +253,34 @@ export class OrchestratorPatcher {
         const targetEntityCamel = unCap(model.className);
         const targetEntitySnake = toSnakeCase(targetEntityCamel);
 
-        const template = isJunction
-            ? this._JUNCTION_REGISTER_TEMPLATE
-            : this._ENTITY_REGISTER_TEMPLATE;
+        if (isJunction) {
+            // TASK-014: extract FK names из model для junction docstring substitution.
+            // Берём первые 2 FK fields в порядке declaration (per task.md Option A).
+            // Fallback на `task`/`tag` если FK extraction не работает (defensive).
+            const fkFields = model.fields.filter((f: ServerpodField) => f.isRelation === true);
+            const fk1Name = fkFields.length >= 1 ? this._extractEntityNameFromField(fkFields[0]) : 'task';
+            const fk2Name = fkFields.length >= 2 ? this._extractEntityNameFromField(fkFields[1]) : 'tag';
 
-        return this._substitutePlaceholders(template, {
+            // Substitute с FK literals + entity tokens. FK substitutions делаем через
+            // `_substituteJunctionFKs` (специализированный — заменяет только в docstring
+            // и method-name fragments, не задевая class names или snake_case identifiers).
+            let snippet = this._substituteJunctionFKs(this._JUNCTION_REGISTER_TEMPLATE, fk1Name, fk2Name);
+
+            // Standard entity substitution (taskTagMap → roleP_permission, etc).
+            snippet = this._substitutePlaceholders(snippet, {
+                tplPascal: cap(tplEntity),
+                tplCamel: tplEntity,
+                tplSnake: tplEntitySnake,
+                targetPascal: cap(targetEntityCamel),
+                targetCamel: targetEntityCamel,
+                targetSnake: targetEntitySnake,
+                tplFeatureSnake: '',
+                targetFeatureSnake: '',
+            });
+            return snippet;
+        }
+
+        return this._substitutePlaceholders(this._ENTITY_REGISTER_TEMPLATE, {
             tplPascal: cap(tplEntity),
             tplCamel: tplEntity,
             tplSnake: tplEntitySnake,
@@ -262,6 +290,36 @@ export class OrchestratorPatcher {
             tplFeatureSnake: '',
             targetFeatureSnake: '',
         });
+    }
+
+    /**
+     * TASK-014: extracts entity name из FK field (e.g. `roleId` → `role`).
+     * Mirrors logic из `server_yaml_parser.ts:extractEntityNameFromField`.
+     */
+    private _extractEntityNameFromField(field: ServerpodField): string {
+        if (field.relatedModel) {
+            return field.relatedModel.toLowerCase();
+        }
+        return field.name.replace(/Id$/, '').toLowerCase();
+    }
+
+    /**
+     * TASK-014: junction-specific FK substitution. Заменяет в template:
+     *   - `__FK1__` → fk1 (lowercase, e.g. `role`)
+     *   - `__FK2__` → fk2 (e.g. `permission`)
+     *   - `__FK1Pascal__` → cap(fk1) (e.g. `Role`)
+     *   - `__FK2Pascal__` → cap(fk2) (e.g. `Permission`)
+     *
+     * Используем uppercase markers `__FK1__` чтобы их substitution не конфликтовала с
+     * standard entity name substitution (которая работает на `task`/`taskTagMap`/etc).
+     */
+    private _substituteJunctionFKs(template: string, fk1: string, fk2: string): string {
+        let result = template;
+        result = this._replaceAll(result, '__FK1Pascal__', cap(fk1));
+        result = this._replaceAll(result, '__FK2Pascal__', cap(fk2));
+        result = this._replaceAll(result, '__FK1__', fk1);
+        result = this._replaceAll(result, '__FK2__', fk2);
+        return result;
     }
 
     /**
@@ -381,12 +439,19 @@ import '../../features/tasks/domain/entities/task_tag_map/task_tag_map_entity.da
      * Register block template для junction entity (с docstring о routing
      * update→createX и delete→noop).
      *
+     * **TASK-014:** docstring и method-name fragments параметризованы через
+     * `__FK1__` / `__FK2__` / `__FK1Pascal__` / `__FK2Pascal__` placeholders
+     * (заменяются `_substituteJunctionFKs` ДО standard entity substitution).
+     * Это закрывает Bomb #6 из TASK-013 adversarial — RolePermission получает
+     * docstring `junction FK→role+permission` (NOT `task+tag`) и method-name
+     * `deleteRolePermissionByRoleAndPermission` (NOT `...ByTaskAndTag`).
+     *
      * Reference: t115/TASK-001 Phase 2d TaskTagMap register block.
      */
-    private readonly _JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: TaskTagMap (junction FK→task+tag) ───────────────────
+    private readonly _JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: TaskTagMap (junction FK→__FK1__+__FK2__) ───────────────────
   // Junction-specific: server has no \`updateTaskTagMap\` RPC, only
   // \`createTaskTagMap\` (idempotent create + resurrect) and
-  // \`deleteTaskTagMapByTaskAndTag\` (soft-delete via business key).
+  // \`deleteTaskTagMapBy__FK1Pascal__And__FK2Pascal__\` (soft-delete via business key).
   // \`update()\` adapter routes через \`createTaskTagMap\`; \`delete()\` is
   // a noop (Repository должен решать delete-flow — см.
   // task_tag_map_remote_adapter.dart docstring).
