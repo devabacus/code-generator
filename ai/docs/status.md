@@ -20,7 +20,9 @@
 | ID | Описание | Статус | Дата |
 |---|---|---|---|
 | TASK-010 | `codegen verify --runtime` + sync_smoke_test шаблон | 🟡 New (Open) | 2026-04-26 |
-| TASK-012 | codegen → todo real app + cross-device smoke (Phase 1.5 final gate) | ⏭ Next | — |
+| TASK-012 | codegen → todo real app + cross-device smoke | 🟡 In Progress (closing partial per Discussion #3) | 2026-05-02 |
+| BUG-012 | parser игнорирует `relation(parent=X)` directive — FK alias broken | ❌ Open High (blocking weight TASK-018) | 2026-05-03 |
+| BUG-013 | template markers gap repository_impl + usecases | ❌ Open High (blocking weight TASK-018) | 2026-05-03 |
 
 ## Недавно завершено
 
@@ -58,12 +60,36 @@
 | TASK-008 | relation_patcher идемпотентный (BUG-003 fix) — moved active→done | 2026-05-02 |
 | TASK-009 | EntityYamlValidator (BUG-004 fix) — moved active→done | 2026-05-02 |
 
-## Следующий фокус
+## Следующий фокус (updated 2026-05-03 per Discussion #4 — re-sequence)
 
-1. **TASK-012** (Phase 1.5 final gate) — `codegen create-project --name todo` + 3-5 entities (FK + junction, ProjectMember pattern из t157) + flutter analyze 0 errors + cross-device runtime smoke (manual user testing). После acceptance ✅ → weight TASK-018 unblocked.
-2. **TASK-002 — fix BUG-001 (Ref disposed)** — единственный открытый High баг, production-блокер weight
-3. **TASK-010** — `codegen verify --runtime` (docker + server + integration test) — закрывает DoD-дыру для runtime-гарантий
-4. **TASK-004** — unit-тесты для `code_formatter`, `server_yaml_parser` (BUG-010 fix входит сюда)
-5. **TASK-015** (backlog) — robust junction FK extraction (deferred from TASK-014, нужен для weight CustomerUser-style)
-6. **ADR-0001** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md`, обновить статус Proposed→Accepted
+**Phase 1.5 НЕ closed. TASK-012 partial closure только. Weight TASK-018 blocked.**
+
+Sequence per Discussion #4 Decision (re-sequenced — BUG-013 first):
+
+1. **Setup commit на TASK-012 ветке** (codegen uncommitted state): doc fixes (CLAUDE.md/agent_memory) + 3 bug-reports (011/012/013) + Discussion #3 archive + Discussion #4 + Patch Record. **БЕЗ active→done movement** (TASK-012 stays active per Q4=a). Затем `git checkout master`.
+
+2. **PR 2 — BUG-013 fix** (chore branch `chore/bug-013-template-markers-fill` от свежего master). **First в sequence** потому что executor verify показал что reduced scope ≥1 FK не может PASS до BUG-013 fix.
+   - **5-min audit gate ДО start:** symbols missing matrix в `task_usecases.dart` + `.g.dart`, provider source need, build_runner regen path
+   - **Approach A:** marker block seed `:oneToManyMethods` в `task_repository_impl.dart` + `task_usecases.dart` (top-level EOF, НЕ внутри class)
+   - **Provider plumbing** в `task_usecase_providers.dart` если audit revealed need
+   - **90-min hard ceiling.** Crosses без clear path → STOP + Discussion #5
+   - **Scope expansion guard:** class def + provider plumbing = BUG-013 scope. Качественно новый layer (build infra/version mismatch) = новый BUG-014
+
+3. **PR 1 — TASK-012 partial close** (после PR 2 merge): checkout TASK-012 ветка, rebase from master, re-verify (must PASS errors=0), TASK-012 active → done с reduced report.md (явно: BUG-012 не exercised).
+
+4. **PR 3 — BUG-012 fix** (feature branch `feature/BUG-012-parser-parent-directive`): parser parses `relation(parent=X)` directive + 5-layer regression tests + multi-agent code review. ~1-2 days. Standalone, после PR 1 merge.
+
+5. **PR 4 — Re-acceptance TASK** (после merge PR 2 + PR 3): новый TASK через `new_task.py`, full FK alias scenario, criteria 8 чекбоксов per Discussion #3 Decision.
+
+**Параллельная работа (если ресурс):** PR 2 и PR 3 НЕ можно parallel — PR 2 нужен first для PR 1 unblock. PR 3 после PR 1. PR 4 hard-зависит от обоих PR 2 + PR 3.
+
+**После re-acceptance closed ✅ → weight TASK-018 unblocked.**
+
+**Не блокирующий backlog:**
+- **TASK-002** — fix BUG-001 (Ref disposed) — единственный открытый High баг, production-блокер weight
+- **TASK-010** — `codegen verify --runtime` (docker + server + integration test)
+- **TASK-004** — unit-тесты для `code_formatter`, `server_yaml_parser` (BUG-010 fix входит сюда)
+- **TASK-015** (backlog) — robust junction FK extraction (deferred from TASK-014)
+- **HOTFIX-001** — `new_task.py` сканирует только `active/`, не учитывает `done/` (collision risk при создании 3 new TASK'ов в Sequence). Manual rename acceptable, но fix как отдельный mini-chore.
+- **ADR-0001** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md`, обновить статус Proposed→Accepted
 | TASK-012 | todo real app generation cross-device smoke (Phase 1.5 final gate) | 🟡 In Progress | 2026-05-02 |

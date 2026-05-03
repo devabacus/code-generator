@@ -17,25 +17,48 @@
 - 25 adapter файлов в `lib/features/*/data/adapters/<entity>/` — нет `// manifest: entity` / `manyToMany` → не генерируются при `generate-entity`
 - `sync_orchestrator_provider.dart` — нет marker блоков для патчинга `register<X>` + `syncEntityTypes`
 
-**Pipeline (approved sync_core teamlead 2026-05-02):**
+**Pipeline (approved sync_core teamlead 2026-05-02; updated 2026-05-03 per Discussion #3):**
 
 ```
-[codegen TASK-X1] sync_core 0.3.0 templates integration
-   ─ Phase A: manifest markers в t115 template (STOP-gate, прогон create-project + verify regression)
-   ─ Phase B: orchestrator marker блоки (:syncImports / :syncRegistrations / :syncEntityTypes)
-   ─ Phase C: orchestrator_patcher.ts (analog relation_patcher) + tests
-   ─ Phase D: patchPubspecPackagePaths fix (sync_core вне Packages monorepo)
-   ─ Phase E: codegen agent_memory + architecture cleanup (drop R1 stack)
-   ─ DoD: create-project --name t<N+1> + verify --name t<N+1> PASS errors=0
+[codegen TASK-X1] sync_core 0.3.0 templates integration ✅ done (PR #2)
    ▼
-[codegen TASK-X2] todo real app generation + smoke
-   ─ create-project --name todo + generate-entity для 3-5 entities (FK + junction)
-   ─ flutter analyze 0 errors
+[codegen TASK-013] junction detection robust YAML field analysis ✅ done (PR #3)
+   ▼
+[codegen TASK-014] junction adapter file path generation для non-Map entities ✅ done (PR #4)
+   ▼
+[codegen BUG-013] template markers fill (Approach A — marker block seed)
+   🟡 PR 2 — re-sequenced first per Discussion #4 (BUG-013 blocks reduced-scope verify)
+   ─ Approach A: marker block seed в task_repository_impl.dart + task_usecases.dart
+   ─ Provider plumbing в task_usecase_providers.dart если audit need
+   ─ 5-min audit gate ДО start + 90-min hard ceiling
+   ─ Marker в usecases на top-level (EOF), не в class — критично для relation_patcher
+   ▼
+[codegen TASK-012] todo real app generation — partial close
+   🟡 PR 1 — после PR 2 merge: TASK-012 ветка rebase + re-verify должен PASS errors=0
+   ─ Reduced scope: drop assigneeId, ≥1 FK + 1 junction
+   ─ Runtime evidence в report.md (verify counts, regression checks)
+   ─ TASK-012 active → done partial, явная пометка: BUG-012 не exercised
+   ▼
+[codegen BUG-012] parser relation(parent=X) directive parsing
+   ─ PR 3 — independent от PR 2/1, ~1-2 days
+   ─ 5-layer regression tests, multi-agent code review
+   ─ Closes weight TASK-018 production landmine (defaultTerminalSetId)
+   ▼ (after BUG-013 + BUG-012 BOTH merged)
+[codegen TASK-XXX re-acceptance] full FK alias scenario
+   ─ Fresh project + entity с FK alias (assigneeId, parent=member)
+   ─ codegen verify PASS errors=0 без manual patches
+   ─ flutter analyze clean на template directly (BUG-013 DoD verified)
    ─ cross-device runtime smoke (2 устройства sync через Serverpod)
-   ▼ acceptance gate ✅ (двойной gate перед weight TASK-018)
+   ▼ acceptance gate ✅ (Phase 1.5 finally closes)
 ```
 
-**Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия codegen TASK-X2 acceptance. Это hard gate без Soft Launch — sync_core teamlead координирует через `G:/Projects/Flutter/Packages/sync_core/ai/docs/roadmap.md`.
+**Cross-repo blocking:** weight TASK-018 (13 entities production migration) **не стартует** до закрытия **re-acceptance TASK** (НЕ TASK-012 partial). Hard gate без Soft Launch.
+
+**Phase 1.5 status — НЕ closed.** TASK-012 partial closure ≠ Phase 1.5 done. Confirmed production landmine в weight: `customer_user.spy.yaml defaultTerminalSetId, parent=terminal_set` (strip-Id ≠ parent) точно сломает migration без BUG-012 fix.
+
+**Doc corrections (2026-05-03, Discussion #3 finalization):**
+- CLAUDE.md L118 + agent_memory.md убрали ложь про «8 layers patcher» — реально 1 layer markers (interface) + 4-5 hardcoded inheritance + **2 broken** (repository_impl, usecases). См. [BUG-013](../bug-reports/013-template-markers-gap-repository-impl-usecases.md).
+- См. [BUG-012](../bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md) re parser gap.
 
 ### Hard gate: TASK-013 + TASK-014 junction detection — ✅ Resolved (2026-05-02)
 
@@ -77,11 +100,15 @@ Detection rules: structural (2+ FK relations + 0 non-FK fields outside base whit
 - File path generation ✅ closed (TASK-014) — non-Map junctions (RolePermission, CustomerUser) генерируются в правильную directory с правильными class refs.
 - **Production migration weight TASK-018 unblocked** после TASK-X2 (todo smoke) acceptance ✅.
 
-**Критерии завершения Фазы 1.5:**
-- TASK-X1 merged → t115 regression PASS (existing template работает после маркеров + патчер)
-- TASK-X2 merged → fresh todo app sync working cross-device
-- Junction detection audit done (✅ TASK-011 Phase G4) + post-audit findings documented (✅ round 3, 2026-05-02) + **detection fix shipped (✅ TASK-013, 2026-05-02)** + **file path generation fixed (✅ TASK-014, 2026-05-02)**
-- weight TASK-018 unblocked после TASK-X2 acceptance ✅
+**Критерии завершения Фазы 1.5 (updated 2026-05-03 per Discussion #3):**
+- ✅ TASK-X1/TASK-011 merged
+- ✅ TASK-013 (junction detection) merged
+- ✅ TASK-014 (junction file path generation) merged
+- 🟡 TASK-012 partial (reduced scope, drop assigneeId — НЕ exercises FK alias)
+- ❌ BUG-012 (parser parent= directive) — **pending**, blocking
+- ❌ BUG-013 (template markers gap) — **pending**, blocking
+- ❌ Re-acceptance TASK с full FK alias scenario — **pending**, blocking
+- weight TASK-018 unblocked **только после** re-acceptance TASK closed ✅ (НЕ после TASK-012 partial)
 
 ---
 
