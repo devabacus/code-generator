@@ -15,9 +15,12 @@ export class RelationPatcher {
     public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
         console.log('Relations detected, starting patching process...');
 
-        const relationTemplateEntity = 'task';
-        const templateRelatedEntity = 'category';
-        const markerName = 'oneToManyMethods';
+        // TASK-022 / Phase B1: literals читаются из config.templateConfig.relationPatcher
+        // (default = t115TemplateConfig() через GenerationConfig constructor).
+        // Pre-TASK-022 hardcoded values: 'task' / 'category' / 'oneToManyMethods' / ['feature/', 'server/'].
+        const relationTemplateEntity = config.templateConfig.relationPatcher.templateMainEntity;
+        const templateRelatedEntity = config.templateConfig.relationPatcher.templateRelatedEntity;
+        const markerName = config.templateConfig.relationPatcher.markerName;
         const startMarker = `// === generated_start:${markerName} ===`;
         const endMarker = `// === generated_end:${markerName} ===`;
         const blockRegex = new RegExp(`${startMarker}([\\s\\S]*?)${endMarker}`);
@@ -33,7 +36,7 @@ export class RelationPatcher {
             return;
         }
 
-        const directories = ['feature/', 'server/'];
+        const directories = config.templateConfig.relationPatcher.scanDirectories;
 
         for (const dirKey of directories) {
             const { sourceBasePath, destinationBasePath } = getPathInfo(config, dirKey);
@@ -130,7 +133,7 @@ export class RelationPatcher {
                 }
 
                 const relativePath = path.relative(sourceBasePath, templateFilePath).replace(/\\/g, '/');
-                const destinationPath = path.join(destinationBasePath, this._getDestinationPath(new GenerationConfig({ ...config, templEntity: 'category' }), relativePath));
+                const destinationPath = path.join(destinationBasePath, this._getDestinationPath(new GenerationConfig({ ...config, templEntity: templateRelatedEntity }), relativePath));
 
                 if (!await this.fileSystem.exists(destinationPath)) {
                     continue;

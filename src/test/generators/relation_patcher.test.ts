@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import { RelationPatcher } from '../../features/generation/generators/relation_patcher';
 import { GenerationConfig } from '../../features/generation/config/generation_config';
+import { t115TemplateConfig } from '../../features/generation/config/template_config';
 import { ServerpodModel, ServerpodField } from '../../features/generation/parsers/formatters/types';
 import { MockFileSystem } from '../mocks/mock_file_system';
 
@@ -551,6 +552,141 @@ class TaskUseCaseProviders {
                 `[${layer.name}] template PascalCase CategoryId MUST NOT remain`
             );
         }
+    });
+
+    // ====================================================================================
+    // TASK-022 / Phase B1 — TemplateConfig injection tests
+    //
+    // Verifies что `RelationPatcher` читает literals из `config.templateConfig.relationPatcher.*`
+    // вместо hardcoded `'task'` / `'category'` / `'oneToManyMethods'` / `['feature/', 'server/']`.
+    // ====================================================================================
+
+    test('TASK-022 / TemplateConfig: t115 config produces hardcoded-equivalent literals (regression)', async () => {
+        // Verify что default GenerationConfig (без explicit templateConfig) использует
+        // t115TemplateConfig() literals → behavior identical to pre-TASK-022 hardcoded.
+        const config = makeConfig();
+        // Sanity: default config содержит t115 literals.
+        assert.strictEqual(config.templateConfig.name, 't115', 'default template config name = t115');
+        assert.strictEqual(config.templateConfig.relationPatcher.templateMainEntity, 'task');
+        assert.strictEqual(config.templateConfig.relationPatcher.templateRelatedEntity, 'category');
+        assert.strictEqual(config.templateConfig.relationPatcher.markerName, 'oneToManyMethods');
+        assert.deepStrictEqual(config.templateConfig.relationPatcher.scanDirectories, ['feature/', 'server/']);
+
+        // Behavioral: используя default config, regular relation patching должен работать
+        // как до TASK-022 (zero-diff invariant).
+        const dest = `// === generated_start:base ===
+class WeighingDao {
+  Future<void> placeholder() => Future.value();
+  // === generated_end:base ===
+}
+`;
+        mockFs.setFile(DEST_DAO_PATH, dest);
+        await patcher.patch(config, makeModel([relationField('contractorId', 'contractor')]));
+
+        const result = await mockFs.readFile(DEST_DAO_PATH);
+        assert.ok(result.includes('// === generated_start:oneToManyMethods ==='),
+            't115 config: marker block inserted с oneToManyMethods (default markerName)');
+        assert.ok(result.includes('getWeighingsByContractorId'),
+            't115 config: relation method present (template behavior preserved)');
+    });
+
+    test('TASK-022 / TemplateConfig: alternate config (mock simplified-shaped) produces alt literals', async () => {
+        // Mock alt-shaped TemplateConfig: подменяем `templateMainEntity` / `templateRelatedEntity` /
+        // `markerName` на альтернативные literals. Эта tест демонстрирует proof-of-extensibility
+        // (TASK-B2 simplified config будет plug-and-play).
+        //
+        // NOTE: alt config использует те же template files что и t115 (мы не создаём alternate
+        // template fixtures — это TASK-B2 scope). Цель теста: verify что patcher reads literals
+        // FROM CONFIG (по которым он строит markers + scan + entity swap), НЕ из hardcoded.
+        const altMarkerName = 'altRelations';
+        const altMainEntity = 'taskAlt'; // не существует в template files → patcher должен skip
+        const altRelatedEntity = 'categoryAlt';
+        const altConfigBuilder = (): GenerationConfig => new GenerationConfig({
+            templProject: 't115',
+            templEntity: altRelatedEntity, // sentinel для filter
+            targetEntity: 'weighing',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: 'weight',
+            templFeatureName: 'tasks',
+            targetFeaturePath: DEST_BASE,
+            workspacesPath: `${PROJECTS_PATH}/weight`,
+            templateConfig: {
+                name: 't115',
+                relationPatcher: {
+                    templateMainEntity: altMainEntity,
+                    templateRelatedEntity: altRelatedEntity,
+                    markerName: altMarkerName,
+                    scanDirectories: ['feature/', 'server/'],
+                },
+                orchestrator: t115TemplateConfig().orchestrator,
+                database: t115TemplateConfig().database,
+            },
+        });
+
+        const dest = `// === generated_start:base ===
+class WeighingDao {
+  Future<void> placeholder() => Future.value();
+  // === generated_end:base ===
+}
+`;
+        mockFs.setFile(DEST_DAO_PATH, dest);
+
+        // Existing TASK_DAO_PATH ('task_dao.dart') не matches `altMainEntity` ('taskAlt'),
+        // поэтому patcher не найдёт template → no marker block insertion.
+        await patcher.patch(altConfigBuilder(), makeModel([relationField('contractorId', 'contractor')]));
+
+        const result = await mockFs.readFile(DEST_DAO_PATH);
+        // Negative: марker block с altMarkerName НЕ должен быть в output (template файлов под
+        // altMainEntity нет → patcher returns early).
+        assert.ok(!result.includes(`generated_start:${altMarkerName}`),
+            'alt config: no marker block т.к. template files не matches altMainEntity');
+        // Negative: hardcoded `oneToManyMethods` literal не должен утечь
+        assert.ok(!result.includes('generated_start:oneToManyMethods'),
+            'alt config: hardcoded oneToManyMethods marker НЕ должен присутствовать (config-driven)');
+        // Sanity: file content unchanged (patcher returned early, no destination write)
+        assert.strictEqual(result, dest, 'alt config: dest file unchanged когда template missing');
+    });
+
+    test('TASK-022 / TemplateConfig: existing relation patching behavior unchanged под explicit t115 config (regression)', async () => {
+        // Same as default makeConfig() but with EXPLICIT templateConfig: t115TemplateConfig()
+        // — verify equivalence (zero-diff invariant с pre-TASK-022 hardcoded behavior).
+        const explicitConfig = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: 'weighing',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: 'weight',
+            templFeatureName: 'tasks',
+            targetFeaturePath: DEST_BASE,
+            workspacesPath: `${PROJECTS_PATH}/weight`,
+            templateConfig: t115TemplateConfig(),
+        });
+
+        const dest = `// === generated_start:base ===
+class WeighingDao {
+  Future<void> placeholder() => Future.value();
+  // === generated_end:base ===
+}
+`;
+        mockFs.setFile(DEST_DAO_PATH, dest);
+
+        await patcher.patch(explicitConfig, makeModel([relationField('vehicleId', 'vehicle')]));
+
+        const resultExplicit = await mockFs.readFile(DEST_DAO_PATH);
+
+        // Reset + run with default config (no explicit templateConfig).
+        const mockFs2 = new MockFileSystem();
+        const patcher2 = new RelationPatcher(mockFs2);
+        mockFs2.setFile(CATEGORY_DAO_PATH, CATEGORY_DAO_TEMPLATE);
+        mockFs2.setFile(TASK_DAO_PATH, TASK_DAO_TEMPLATE);
+        mockFs2.setFile(DEST_DAO_PATH, dest);
+        await patcher2.patch(makeConfig(), makeModel([relationField('vehicleId', 'vehicle')]));
+        const resultDefault = await mockFs2.readFile(DEST_DAO_PATH);
+
+        assert.strictEqual(resultExplicit, resultDefault,
+            'explicit t115TemplateConfig() output identical to default config output (regression)');
     });
 
     test('multi-word target entity: destination path uses snake_case (BUG-002)', async () => {
