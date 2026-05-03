@@ -18,14 +18,24 @@ Per [Discussion #3 Decision](../discussions/archive/3-phase-15-scope-reconsidera
 - FK alias workaround (`assigneeId → memberId`) НЕ использовать как acceptance evidence
 - Manual patch на target проект НЕ использовать (DoD violation)
 
-**Sequence (re-sequenced 2026-05-03 per Discussion #4):**
-1. Setup commit codegen uncommitted state на TASK-012 ветке
-2. PR 2 (BUG-013 markers fill — Approach A): chore branch от master, 5-min audit gate, 90-min ceiling, marker block seed (top-level EOF в usecases). **First** потому что reduced scope ≥1 FK не может PASS verify до BUG-013 fix
-3. PR 1 (TASK-012 partial close): после PR 2 merge → TASK-012 ветка rebase → re-verify must PASS errors=0 → close partial
-4. PR 3 (BUG-012 parser fix): independent feature branch, after PR 1
-5. PR 4 (re-acceptance new TASK): after PR 2 + PR 3 merged
+**Sequence (Discussion #4 + #5):**
+1. ✅ PR 2 / PR #6 (BUG-013 markers fill 4 layers Approach A) — merged 2026-05-03
+2. ✅ PR 1 / PR #7 (TASK-012 partial close) — merged 2026-05-03
+3. 🟡 PR 3 / TASK-016 (BUG-012 parser fix + consumer context normalization) — current, expanded scope per Discussion #5
+4. ⏭ PR 4 (re-acceptance new TASK): after PR 3 merged
 
-**Critical PR 2 technical (Gemini_1):** marker block (НЕ hardcoded body), top-level EOF placement в usecases (иначе syntax garbage от `isBlockInClass` heuristic), provider plumbing в `task_usecase_providers.dart` если audit need. Scope expansion guard: build infra/version mismatch = новый BUG-014.
+**TASK-016 expanded scope per [Discussion #5](../discussions/archive/5-task-016-bug-012-parser-fix-pre-implemen/) (4-agent consensus):**
+- Parser strategy = `fullDefinition` подход (regex на full string до split, parts split ломается на comma внутри `relation(...)` parens)
+- Helper `snakeToLowerCamelCase` в `text_util.ts` с throw на ill-formed (regex `/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/`)
+- **Consumer context normalization core requirement** (НЕ Phase 4 expansion!) — без этого `relatedModel='terminalSet'` correct metadata, но `terminalSet_table.dart` broken filename. 4 contexts: path (snake), class (Pascal), method (lowerCamel), comparison (audit).
+- Phase 1 mandatory deliverable = grep+classify report `relatedModel` usages
+- Phase 3 5 mandatory test cases (member alias, terminal_set production-shaped, junction snake-snake, backwards compat, negative test substring `relation`)
+- Phase 6 = Standard+Adversarial fresh subagents
+- Side-fix scope: `parts.toString().includes('relation')` → `\brelation\s*\(` regex
+- Estimate 8-16h hard ceiling
+- 8 STOP-gates (>7 distinct semantic usage sites → escalate Discussion #6)
+
+**Critical Discussion #5 insight (consensus 4 agents):** parser fix без consumer normalization = formal closure без production blocker resolution. Confirmed weight landmine `defaultTerminalSetId, parent=terminal_set` в `customer_user.spy.yaml`.
 
 ---
 

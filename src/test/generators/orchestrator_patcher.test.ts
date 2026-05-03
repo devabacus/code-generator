@@ -270,9 +270,10 @@ suite('OrchestratorPatcher Test Suite', () => {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         // TASK-013: junction fixture теперь требует FK relation fields (не className suffix).
+        // BUG-012 (TASK-016): relatedModel хранится в lowerCamel form (parser convention).
         const userPermissionMap = makeJunctionModel('UserPermissionMap', [
-            fkField('userId', 'User'),
-            fkField('permissionId', 'Permission'),
+            fkField('userId', 'user'),
+            fkField('permissionId', 'permission'),
         ]);
         await patcher.patch(configWithCustomFeature, userPermissionMap);
 
@@ -328,8 +329,8 @@ suite('OrchestratorPatcher Test Suite', () => {
         // entity с правильной junction signature (2 FK + base only) всё ещё
         // detected как junction.
         const userPermissionMap = makeJunctionModel('UserPermissionMap', [
-            fkField('userId', 'User'),
-            fkField('permissionId', 'Permission'),
+            fkField('userId', 'user'),
+            fkField('permissionId', 'permission'),
         ]);
         await patcher.patch(makeConfig(), userPermissionMap);
 
@@ -540,8 +541,8 @@ void wireUp() {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         const rolePermission = makeJunctionModel('RolePermission', [
-            fkField('roleId', 'Role'),
-            fkField('permissionId', 'Permission'),
+            fkField('roleId', 'role'),
+            fkField('permissionId', 'permission'),
         ]);
 
         await patcher.patch(makeConfig(), rolePermission);
@@ -578,10 +579,11 @@ void wireUp() {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         const customerUser = makeJunctionModel('CustomerUser', [
-            fkField('customerId', 'Customer'),
+            fkField('customerId', 'customer'),
             { name: 'userId', type: 'int', nullable: false },
-            fkField('roleId', 'Role'),
-            { name: 'defaultTerminalSetId', type: 'UuidValue', nullable: true, isRelation: true, relationType: 'manyToOne', relatedModel: 'TerminalSet' },
+            fkField('roleId', 'role'),
+            // BUG-012 (TASK-016): relatedModel = lowerCamel `terminalSet` (после snake→camel в parser)
+            { name: 'defaultTerminalSetId', type: 'UuidValue', nullable: true, isRelation: true, relationType: 'manyToOne', relatedModel: 'terminalSet' },
         ]);
 
         await patcher.patch(makeConfig(), customerUser);
@@ -632,8 +634,8 @@ void wireUp() {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         const taskTagMap = makeJunctionModel('TaskTagMap', [
-            fkField('taskId', 'Task'),
-            fkField('tagId', 'Tag'),
+            fkField('taskId', 'task'),
+            fkField('tagId', 'tag'),
         ]);
 
         await patcher.patch(makeConfig(), taskTagMap);
@@ -659,8 +661,8 @@ void wireUp() {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         const rolePermission = makeJunctionModel('RolePermission', [
-            fkField('roleId', 'Role'),
-            fkField('permissionId', 'Permission'),
+            fkField('roleId', 'role'),
+            fkField('permissionId', 'permission'),
         ]);
 
         await patcher.patch(makeConfig(), rolePermission);
@@ -697,8 +699,8 @@ void wireUp() {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
         const taskTagMap = makeJunctionModel('TaskTagMap', [
-            fkField('taskId', 'Task'),
-            fkField('tagId', 'Tag'),
+            fkField('taskId', 'task'),
+            fkField('tagId', 'tag'),
         ]);
 
         await patcher.patch(makeConfig(), taskTagMap);
@@ -728,7 +730,7 @@ void wireUp() {
             fields: [
                 { name: 'id', type: 'UuidValue', nullable: true },
                 { name: 'userId', type: 'int', nullable: false },
-                fkField('customerId', 'Customer'),
+                fkField('customerId', 'customer'),
                 { name: 'feature', type: 'String', nullable: false },
                 { name: 'status', type: 'String', nullable: false },
             ],
@@ -746,6 +748,47 @@ void wireUp() {
         assert.ok(
             result.includes('register<SubscriptionEntity>'),
             'Subscription register block присутствует (regular template)',
+        );
+    });
+
+    // ── BUG-012 (TASK-016) regression — multi-word lowerCamel parent ──────────
+
+    test('BUG-012: junction с multi-word snake parent (terminalSet) → docstring/methods используют lowerCamel form', async () => {
+        // Discussion #5 confirmed weight production landmine: customer_user.spy.yaml
+        // имеет defaultTerminalSetId, parent=terminal_set. Parser даёт relatedModel='terminalSet'
+        // (snake→lowerCamel). Junction docstring + method name должны использовать lowerCamel
+        // (не lowercase 'terminalset' который ломал cap() → 'Terminalset' вместо 'TerminalSet').
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        const customerTerminal = makeJunctionModel('CustomerTerminalLink', [
+            fkField('customerId', 'customer'),
+            { name: 'defaultTerminalSetId', type: 'UuidValue', nullable: false, isRelation: true, relationType: 'manyToOne', relatedModel: 'terminalSet' },
+        ]);
+
+        await patcher.patch(makeConfig(), customerTerminal);
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Docstring lowerCamel form (не lowercase 'terminalset').
+        assert.ok(
+            result.includes('junction FK→customer+terminalSet'),
+            'BUG-012: docstring должен содержать lowerCamel `terminalSet` (НЕ lowercase `terminalset`)',
+        );
+
+        // Method name PascalCase (cap('terminalSet')='TerminalSet').
+        assert.ok(
+            result.includes('ByCustomerAndTerminalSet'),
+            'BUG-012: method-name должен использовать PascalCase `TerminalSet` (НЕ `Terminalset`)',
+        );
+
+        // Negative — no broken lowercase variant.
+        assert.ok(
+            !result.includes('terminalset'),
+            'BUG-012: lowercase `terminalset` (broken old behavior) НЕ должен присутствовать',
+        );
+        assert.ok(
+            !result.includes('Terminalset'),
+            'BUG-012: incorrect PascalCase `Terminalset` НЕ должен присутствовать',
         );
     });
 });

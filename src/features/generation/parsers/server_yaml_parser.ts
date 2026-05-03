@@ -2,6 +2,7 @@ import * as yaml from 'js-yaml';
 import { ServerpodModel, ServerpodField, ServerpodIndex } from './formatters/types';
 import { RelationAnalyzer } from './relation-analyzer';
 import { JunctionDetector } from './junction_detector';
+import { snakeToLowerCamelCase } from '../../../utils/text_work/text_util';
 
 export class ServerpodYamlParser {
 
@@ -59,10 +60,18 @@ export class ServerpodYamlParser {
     }
 
     private static extractEntityNameFromField(field: ServerpodField): string | null {
+        // BUG-012 (TASK-016): возвращаем `relatedModel` в lowerCamel form (после
+        // parser fix `parent=terminal_set` → `relatedModel='terminalSet'`).
+        // Previous `.toLowerCase()` ломало multi-word entities — `'terminalSet'`
+        // → `'terminalset'` ломает downstream MANY_TO_MANY dictionary substitution
+        // (cap/unCap/toSnakeCase ожидают lowerCamel input для produce
+        // `TerminalSet`/`terminalSet`/`terminal_set`).
         if (field.relatedModel) {
-            return field.relatedModel.toLowerCase();
+            return field.relatedModel;
         }
-        return field.name.replace(/Id$/, '').toLowerCase();
+        // Fallback: strip-Id from name, no lowerCase. Name is already lowerCamel
+        // (Serverpod field convention `defaultTerminalSetId`).
+        return field.name.endsWith('Id') ? field.name.slice(0, -2) : field.name;
     }
 
     private static parseFields(fieldsObj: any): ServerpodField[] {
@@ -84,13 +93,36 @@ export class ServerpodYamlParser {
     }
 
     private static parseField(name: string, definition: string): ServerpodField {
+        // BUG-012 (Discussion #5): preserve raw `definition` string для regex matching
+        // ДО naive split по запятой. Naive split ломается на comma внутри `relation(...)`:
+        //   "UuidValue?, relation(parent=member, onDelete=SetNull)"
+        // → parts = ["UuidValue?", "relation(parent=member", "onDelete=SetNull)"]
+        // Therefore relation directive parsing requires `fullDefinition` подход —
+        // regex на полную raw строку, не на parts.
+        const fullDefinition = definition;
         const parts = definition.split(',').map(part => part.trim());
         const typePart = parts[0];
 
         const nullable = typePart.endsWith('?');
         const type = nullable ? typePart.slice(0, -1) : typePart;
 
-        const isRelation = parts.toString().includes('relation');
+        // BUG-012 side-fix #2 (Adversarial review post-Path-C): strip quoted string
+        // defaults из definition ДО `relation(` detection. Без этого regex matches
+        // inside string literals — production landmine:
+        //   `notes: String, default='See relation(parent=foo) docs'`
+        // → false `isRelation=true`, `relatedModel='foo'` (silent corruption).
+        // Approach: blank quoted regions in the working copy (preserve length для
+        // accurate match positioning if needed later, replace content с пробелами).
+        const definitionWithoutStrings = fullDefinition.replace(
+            /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g,
+            (m) => "'" + ' '.repeat(Math.max(0, m.length - 2)) + "'"
+        );
+
+        // BUG-012 side-fix (acceptance #9): replace `parts.toString().includes('relation')`
+        // с anchored regex `\brelation\s*\(` чтобы избежать false-positives когда
+        // `relation` встречается как substring в string default
+        // (e.g. `description: String, default='this relation is broken'`).
+        const isRelation = /\brelation\s*\(/.test(definitionWithoutStrings);
         const isEnum = !isRelation && this.isEnumType(type);
 
         const field: ServerpodField = {
@@ -103,7 +135,32 @@ export class ServerpodYamlParser {
 
         if (isRelation) {
             field.relationType = RelationAnalyzer.analyzeRelationType(type);
-            field.relatedModel = name.replace(/(.*)Id/, '$1');
+
+            // Defensive fallback (acceptance #4): `name.endsWith('Id') ? name.slice(0, -2) : name`.
+            // Replaces previous `name.replace(/(.*)Id/, '$1')` which behaved странно
+            // на names с `Id` НЕ в конце (e.g., `IdleTimeout` → `Idle`).
+            field.relatedModel = name.endsWith('Id') ? name.slice(0, -2) : name;
+
+            // BUG-012 core: override через explicit `relation(parent=X)` directive.
+            // Regex extracts parent= identifier из directive's parameter list.
+            // X expected in snake_case (Serverpod convention), converted to lowerCamel
+            // через `snakeToLowerCamelCase` для consistency с downstream consumers
+            // (which expect Pascal/lowerCamel/snake variants — see Discussion #5).
+            // Use definitionWithoutStrings (per side-fix #2) для regex match —
+            // защита от `parent=` внутри string default.
+            const relationMatch = definitionWithoutStrings.match(/\brelation\(([^)]*)\)/);
+            if (relationMatch) {
+                const parentMatch = relationMatch[1].match(/(?:^|,\s*)parent\s*=\s*([a-z_][a-z0-9_]*)\b/);
+                if (parentMatch) {
+                    try {
+                        field.relatedModel = snakeToLowerCamelCase(parentMatch[1]);
+                    } catch (e) {
+                        throw new Error(
+                            `Field '${name}' has malformed parent= directive: ${(e as Error).message}`
+                        );
+                    }
+                }
+            }
         }
 
         for (let i = 1; i < parts.length; i++) {

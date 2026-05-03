@@ -1,6 +1,27 @@
 # BUG-012: server_yaml_parser игнорирует `relation(parent=X)` directive — FK alias resolution broken
 
-**Статус:** Open (High, blocking weight TASK-018)
+**Статус:** 🟡 Partially Resolved (parser + helper + path/class normalization closed via TASK-016 Path C, 2026-05-03; **method body substitution rewrite deferred to TASK-017** per Discussion #5 STOP-gate #2)
+
+## Resolution evidence (TASK-016 Path C, 2026-05-03)
+
+**Closed:**
+- Parser `relation(parent=X)` directive parsing через `fullDefinition` подход
+- Helper `snakeToLowerCamelCase` в `text_util.ts` (throw на ill-formed, strict regex)
+- Defensive fallback `name.endsWith('Id') ? name.slice(0, -2) : name`
+- Side-fix `\brelation\s*\(` regex (anchored detection)
+- **Adversarial post-Phase-6 fix:** quote-stripping для skip `relation(...)` substring inside string defaults (DEAL-BREAKER — silent String→FK miscategorization)
+- Path context normalization в `relation_generation.ts:19` (`toSnakeCase` → `terminal_set_table.dart`)
+- Comparison context audit fix в 2 sites (removed `.toLowerCase()` smells)
+- 158 tests passing (122 baseline + 36 new)
+
+**Verify evidence (t160 partial PASS):**
+- ✅ `invoice_table.dart` import correct snake_case
+- ✅ Pascal class refs correct
+- ⚠ Method body parent-derived names (deferred TASK-017)
+
+**Что НЕ closed (TASK-017 scope):** `relation_patcher.ts:78-91` ENTITY substitution заменяет field name indiscriminately → broken DAO column refs. Pre-implementation Discussion #6 mandatory. weight TASK-018 blocked до TASK-017.
+
+
 **Обнаружено:** 2026-05-03 (TASK-012 executor шаг 8 verify FAIL)
 **Источник:** TASK-012 executor + Standard/Adversarial multi-agent review
 **Критичность:** High (production blocker для weight TASK-018 на CustomerUser migration)
