@@ -36,7 +36,6 @@
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | TASK-020-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | TASK-020-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| HOTFIX-001 | Low | `new_task.py` сканирует только `active/` | Quick mini-chore Month 1 |
 | TASK-CI-001 | Medium | Minimal automated gate (3 test suites + verify smoke) | Named — before Initiative Phase A |
 
 ---
@@ -44,7 +43,7 @@
 ## Approved sequence (Discussion #9, 5-6 months realistic, 6 hard ceiling)
 
 **Month 1:**
-- HOTFIX-001 (~30 min)
+- ✅ HOTFIX-001 closed — `new_task.py` сканирует active/ + done/ + blocked/
 - TASK-CI-001 (CI gate before Initiative)
 - Initiative Phase A (architectural design + ADR + sync_core integration audit + backend strategy + test inventory + dual-running risk audit)
 

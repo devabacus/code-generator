@@ -16,6 +16,8 @@ import argparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 TASKS_DIR = os.path.join(PROJECT_ROOT, "tasks", "active")
+DONE_DIR = os.path.join(PROJECT_ROOT, "tasks", "done")
+BLOCKED_DIR = os.path.join(PROJECT_ROOT, "tasks", "blocked")
 TEMPLATE_DIR = os.path.join(PROJECT_ROOT, "tasks", "_template")
 DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
 QUICK_TASKS_FILE = os.path.join(TASKS_DIR, "QUICK_TASKS.md")
@@ -23,19 +25,25 @@ STATUS_FILE = os.path.join(DOCS_DIR, "STATUS.md")
 
 
 def get_next_task_id():
-    """Find the next available TASK-XXX ID."""
-    existing = [d for d in os.listdir(TASKS_DIR) 
-                if os.path.isdir(os.path.join(TASKS_DIR, d)) and d.startswith("TASK-")]
-    
+    """Find the next available TASK-XXX ID across active/, done/, blocked/.
+
+    Scanning only active/ leads to ID conflicts with merged tasks already in done/
+    (HOTFIX-001 закрытие per Discussion #9 sequence).
+    """
     max_id = 0
-    for folder in existing:
-        try:
-            parts = folder.split("-")
-            if len(parts) >= 2 and parts[1].isdigit():
-                max_id = max(max_id, int(parts[1]))
-        except:
-            pass
-    
+    for scan_dir in (TASKS_DIR, DONE_DIR, BLOCKED_DIR):
+        if not os.path.isdir(scan_dir):
+            continue
+        for folder in os.listdir(scan_dir):
+            if not (os.path.isdir(os.path.join(scan_dir, folder)) and folder.startswith("TASK-")):
+                continue
+            try:
+                parts = folder.split("-")
+                if len(parts) >= 2 and parts[1].isdigit():
+                    max_id = max(max_id, int(parts[1]))
+            except (ValueError, IndexError):
+                pass
+
     return max_id + 1
 
 

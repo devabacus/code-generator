@@ -167,7 +167,7 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 
 **Запрещено** создавать `ai/tasks/active/TASK-XXX-*/task.md` или `ai/discussions/active/N-*.md` через `Write` tool вручную.
 
-**HOTFIX-001 known issue:** `new_task.py` сканирует только `active/` — может назначить ID который уже в `done/`. Workaround: rename folder вручную после `new_task.py`.
+**HOTFIX-001 closed:** `new_task.py` сканирует `active/ + done/ + blocked/` — auto-ID больше не конфликтует с merged tasks.
 
 ---
 
@@ -198,7 +198,7 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 
 **Next steps:**
 1. ✅ TASK-019 closure done (Phase 1.5 ceremony)
-2. HOTFIX-001 (`new_task.py` scan only `active/` — quick mini-chore Month 1)
+2. ✅ HOTFIX-001 closed — `new_task.py` scan active/ + done/ + blocked/
 3. TASK-CI-001 (minimal automated gate, 3 test suites: universal + t115 regression + simplified) — **before Initiative Phase A start**
 4. **Initiative Phase A** (architectural design + ADR + sync_core integration audit + backend strategy decision + test inventory audit + dual-running risk audit)
 5. Initiative Phase B-D (generate-vs-not-generate divider + synthetic t<200> reference + `--template` CLI flag)
