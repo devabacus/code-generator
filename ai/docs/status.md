@@ -30,7 +30,7 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-(Empty — Phase A merged PR #16 + stack-lock chore merged PR #17. **Ready for TASK-B1 creation per Discussion #11 12-point Decision.**)
+| TASK-022 | **B1 codegen core multi-template infrastructure** — refactor hardcoded literals в `RelationPatcher` / `OrchestratorPatcher` / `AppDatabaseGenerator` → `TemplateConfig` injection. Phase B sequenced TASKs (B1→B2→B3) per Discussion #11 12-point Decision. Estimate ~2-2.5 нед per ClaudeAdv evidence. См. [task.md](../tasks/active/TASK-022-b1-codegen-core-multi-template-infrastructure/task.md). | 🟡 in progress | 2026-05-03 |
 
 ---
 
