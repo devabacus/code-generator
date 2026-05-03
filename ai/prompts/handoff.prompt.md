@@ -82,7 +82,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 | Репо | Branch / version | Status |
 |---|---|---|
-| `devabacus/code-generator` (this) | master `841764e` (post TASK-020 CI gate) + TASK-021 PR #16 ready for merge | 163 tests + CI workflow, Phase 1.5 closed, 10 discussions archived (Discussion #10 = Initiative Phase A organization), TASK-021 ready: ADR-0005 ✅ accepted (clean-slate amendment 2026-05-03 — User confirmed weight v1 NOT in production, dual-running N/A, decision matrix N/A, t115 deprecated, default = simplified, estimate ~3-4 months) |
+| `devabacus/code-generator` (this) | master `2438660` (post TASK-021 Phase A merge) | 163 tests + CI workflow, Phase 1.5 + Phase A ✅ closed, 10 discussions archived. **⚠ CRITICAL Stack-lock decision 2026-05-03 (Discussion #11):** стэк t115 baseline (Riverpod `@riverpod` annotations + Drift + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval; package versions update к latest stable (включая Serverpod); simplified философия = ТОЛЬКО architecture ceremony reduction. Discussion #11 in progress (Phase B design). |
 | `devabacus/t115` (template) | master `148ddf1` | BUG-011/013 fixes pushed, 7 marker layers verified, **legacy/advanced template** |
 | `devabacus/sync_core` | 0.3.0 in master | validated multi-entity cross-device на Windows + Android. **Dual-running scope subscription audit obligatory в Initiative Phase A** |
 | `devabacus/weight v1` | master | **production baseline, critical-only maintenance** per Discussion #9 |

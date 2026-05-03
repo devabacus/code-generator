@@ -36,6 +36,8 @@
 
 **All Sub-A6 STOP-gates ✅ resolved.** Phase A section closed. Clean-slate decision (User 2026-05-03) удалила dual-running concerns + decision matrix requirement. Awaiting Phase B/C/D execution для full Phase A-D gate close (final TeamLead + User counter-sign at end of Phase D).
 
+**⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 User_2 override + ADR-0005 amendment):** Стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony (NO usecases / business notifiers / validation / repository interfaces по умолчанию / app services / mappers separate class / Either-Result / datasource interfaces). ADR-0005 Section 7.1/7.2/7.3 TBD placeholders RESOLVED via stack lock. Phase B-D + weight build all inherit this constraint. Future agents treat stack lock как hard architectural invariant.
+
 ### Phase A Risks documented for Phase B-D
 
 **Post clean-slate decision (2026-05-03):** Sub-A3 dual-running risks (sync-core-audit #1-#5) NOT applicable для weight build — see [sync-core-audit.md](sync-core-audit.md) "Reference-only" status pinning. Useful single-app applicable findings retained:
