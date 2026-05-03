@@ -29,6 +29,28 @@
 
 Это защита от запуска с неполным контекстом.
 
+## ⚠ CRITICAL — Stack-lock principle (User decision 2026-05-03 Discussion #11)
+
+**Стэк t115 baseline НЕ меняется без явного User approval.** Locked package set:
+
+- **Riverpod** через `@riverpod` annotations (codegen-based) — same as t115
+- **Drift** as ORM — same as t115 conventions (table per entity, DAO method naming, FK references inline)
+- **Clean directory layout** preserved (`lib/features/<feature>/data/datasources/local/tables/`)
+- **sync_core 0.3.0** — same package, mutation-first contract preserved
+- **Serverpod** as backend framework — same package
+- **Manifest markers** — same 13-marker scheme as t115
+
+**MUST update (НЕ stack change, version refresh):** все package versions → latest stable, **включая Serverpod**. Verify через **Dart MCP + Context7 MCP** перед simplified template emission (per global CLAUDE.md "never guess library versions").
+
+**Simplified философия меняет ТОЛЬКО architecture ceremony reduction:**
+- ❌ NO usecases generation (CRUD = noise per ADR-0005 Section 3.2)
+- ❌ NO business notifiers с custom logic generation
+- ❌ NO validation rules generation
+- ❌ NO repository interfaces по умолчанию (`--with-interfaces` flag default OFF)
+- ❌ NO application services / mappers separate class / Either-Result / datasource interfaces
+
+**Treat stack lock как hard architectural invariant.** Если reviewer (Standard или Adversarial) предлагает изменить любой stack element — **flag как scope violation** unless User explicitly approved change. См. [ADR-0005 Section 7](../docs/decisions/adr-0005-multi-template-plurality.md) + [Discussion #11 archive](../discussions/archive/11-initiative-phase-b-simplified-template-i/) + project memory `feedback_t115_stack_locked.md`.
+
 ## ⚠ Definition of Done — `codegen verify` обязателен
 
 Любая правка в `src/features/generation/`, `src/adapters/cli/commands/{create_project,generate_entity}.ts` или в шаблоне `G:/Templates/flutter/t115/` НЕ готова к показу user'у пока:
