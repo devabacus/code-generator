@@ -1,6 +1,18 @@
 # TASK-010: `codegen verify --runtime` + sync_smoke_test шаблон
 
-## Ветка
+## ⚠ Status: Abandoned (per Discussion #8 Q7 + Discussion #9 supersession, 2026-05-03)
+
+**Решение:** TASK-010 abandoned — runtime docker verify не блокирует roadmap. Phase 1.5 static verify (pub get + serverpod generate + build_runner + flutter analyze) sufficient для current needs.
+
+**Если still relevant** — runtime test concern может быть merged в **Initiative Phase A scope** (Discussion #9, "Simplified Template Initiative") когда Phase A architectural design phase оценивает CI infrastructure (TASK-CI-001 covers minimal gate, runtime verify = potential extension).
+
+**Не actionable как self-standing TASK** — moved active→done без implementation.
+
+См. [Discussion #8 archive Q7](../../../discussions/archive/8-roadmap-approval-sequence-phase-15-closu/) + [Discussion #9 archive](../../../discussions/archive/9-weight-v2-fresh-build-на-simplified-temp/).
+
+---
+
+## Ветка (изначальная — не использована)
 
 `feature--codegen-verify-runtime` (новая, после мерджа `feature--fix-codegen-regen-bugs`)
 
