@@ -28,7 +28,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 ### Month 1 — Phase 1.5 ceremony cleanup + Initiative kickoff
 
 - ✅ TASK-019 closure (Phase 1.5 final gate)
-- ⏭ HOTFIX-001 (`new_task.py` scan only `active/`, ~30 min)
+- ✅ HOTFIX-001 (`new_task.py` scan active/ + done/ + blocked/)
 - ⏭ TASK-CI-001 (minimal automated gate — `npm test` + static verify smoke) — **before Initiative Phase A start**
 - ⏭ Initiative Phase A: Architectural design (ADR + sync_core integration sanity check + backend strategy + test inventory audit + dual-running risk audit + User decision points)
 

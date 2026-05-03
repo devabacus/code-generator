@@ -55,7 +55,7 @@
 - **Generate vs не-generate divider:** Generate Drift table/DAO/Repository/sync adapters/mappings. Do NOT generate usecases (CRUD = noise)/services/notifiers с business logic/validation.
 
 **Approved sequence (Discussion #9, 5-6 months realistic, 6 hard ceiling):**
-1. **HOTFIX-001** (~30 min) — `new_task.py` scan only `active/`
+1. ✅ **HOTFIX-001** closed — `new_task.py` scan active/ + done/ + blocked/
 2. **TASK-CI-001** (3 test suites: universal + t115 regression + simplified) — **before Initiative Phase A**
 3. **Initiative Phase A-D** — ADR architectural decision + synthetic t<200> reference + `--template` CLI flag + multi-agent review
 4. **Phase A-D gate close** — 5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign artifact
@@ -108,7 +108,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 8. **Template t115 — отдельный git репо** (`devabacus/t115`). Изменения там НЕ tracked codegen репо.
 
-9. **HOTFIX-001 known issue:** `new_task.py` сканирует только `active/`, может назначить ID который уже в `done/`. Workaround: rename folder вручную. Fix запланирован как первая задача Month 1.
+9. ~~**HOTFIX-001 known issue**~~ — closed. `new_task.py` сканирует active/ + done/ + blocked/.
 
 10. **Phase A-D gate enforcement:** TeamLead обязан verify checklist closed + User counter-sign `closure-report.md` до `new_task.py "TASK-020-..."` invocation.
 
@@ -141,7 +141,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 ## Что я (предшественник) НЕ сделал — для тебя
 
-- HOTFIX-001 — отдельный мини-PR (~30 min). **Первое** в Month 1 sequence.
+- ✅ HOTFIX-001 — done.
 - TASK-CI-001 — minimal automated gate before Initiative
 - Initiative Phase A — architectural design + ADR + sync_core integration audit + backend strategy + test inventory audit + dual-running risk audit
 - TASK-020 weight v2 build — только after Phase A-D gate closed
@@ -154,7 +154,6 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 3. Жди User'а instructions
 
 User скорее всего скажет одно из:
-- **"стартуй HOTFIX-001"** — quick mini-chore через `task.py start chore/hotfix-001-new-task-scan-active-and-done` + fix `ai/scripts/new_task.py` + PR
 - **"стартуй TASK-CI-001"** — minimal CI gate (`.github/workflows/test.yml` + 3 test suites)
 - **"стартуй Initiative Phase A"** — architectural design + ADR + design discussions для sync_core integration + backend strategy options для User
 
