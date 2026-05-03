@@ -202,7 +202,7 @@ G:/Templates/flutter/t115/
 
 - **Единственный шаблон `t115`** — хардкод в `create_new_project.ts:36` и `create_project.ts:44`. Плагинная архитектура (Фаза 3 roadmap) — в будущем.
 - **Активная ветка `feature--fix-codegen-regen-bugs`** — 14 коммитов с фиксами BUG-002/003/004/005/006 + verify CLI команда + autoGenerateTasksFeature. Решение о мерже в master — отдельный вопрос User.
-- **Тестов 62 passing** (relation_patcher, entity_yaml_validator, replacement_util, app_database_generator, verify_analyzer_parser, etc.). TASK-004 в roadmap — расширить покрытие.
+- **Тестов 163 passing** (mocha workaround `--ignore extension.test.js` per agent_memory.md; relation_patcher, entity_yaml_validator, replacement_util, app_database_generator, verify_analyzer_parser, sync_core integration tests, etc.). Та же команда в CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)). TASK-004 в roadmap — расширить покрытие (хотя за время Phase 1.5 покрытие выросло с 62 до 163).
 - **Windows-only path assumptions** — `G:/Templates`, `G:/Projects/Flutter/serverpod` хардкод в дефолтах CLI (можно переопределить флагами). Cross-platform не цель Фазы 1.
 - **`python/services/workflow_modifier.ts` как фасад** — оставлен для back-compat. Постепенно `project_creator.ts` может мигрировать на прямое использование `core/services/workflow/*`.
 

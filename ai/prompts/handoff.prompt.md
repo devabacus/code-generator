@@ -39,9 +39,10 @@
 ## Краткий контекст (для тебя сразу)
 
 **Состояние master:**
-- `master 29bcf9f` — Phase 1.5 closed + handoff prep + Discussion #9 docs updates
-- 163 unit tests passing, compile clean
-- 11 PRs merged (Phase 1.5 + handoff)
+- `master 77145a3` — Phase 1.5 closed + handoff prep + Discussion #9 docs updates + HOTFIX-001 + TASK-020 in flight
+- 163 unit tests passing, compile clean, lint clean
+- 14 PRs merged (Phase 1.5 + handoff + HOTFIX-001), TASK-020 (CI) ready for review
+- CI: [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal automated gate
 - Working tree должен быть clean
 
 **Что произошло (1 day intense, 9 discussions archived):**
@@ -56,12 +57,12 @@
 
 **Approved sequence (Discussion #9, 5-6 months realistic, 6 hard ceiling):**
 1. ✅ **HOTFIX-001** closed — `new_task.py` scan active/ + done/ + blocked/
-2. **TASK-CI-001** (3 test suites: universal + t115 regression + simplified) — **before Initiative Phase A**
+2. ✅ **TASK-CI-001** closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): compile + lint + 163 unit tests. 3-suite split (universal + t115 regression + simplified) deferred to Initiative Phase A test inventory audit.
 3. **Initiative Phase A-D** — ADR architectural decision + synthetic t<200> reference + `--template` CLI flag + multi-agent review
 4. **Phase A-D gate close** — 5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign artifact
-5. **TASK-020 weight v2 build** — only after gate closed (cross-repo TASK)
+5. **Weight v2 build TASK** — only after gate closed (cross-repo TASK; ID = next через `new_task.py`, **NB:** TASK-020 уже занят CI gate, не reusing)
 6. **Initiative Phase E-G** parallel с late v2 work (acceptance + docs + closure)
-7. **Cutover prep basic** в TASK-020 closure (full execution = separate later TASK)
+7. **Cutover prep basic** в weight v2 closure (full execution = separate later TASK)
 
 **Hard ceiling action:** scope cut (drop UI parity, manual cutover, defer cross-device smoke), НЕ timeline extension.
 
@@ -80,7 +81,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 | Репо | Branch / version | Status |
 |---|---|---|
-| `devabacus/code-generator` (this) | master `29bcf9f` | 163 tests, Phase 1.5 closed, 9 discussions archived |
+| `devabacus/code-generator` (this) | master `77145a3` (post HOTFIX-001) | 163 tests + CI workflow, Phase 1.5 closed, 9 discussions archived, TASK-020 (CI gate) ready for review |
 | `devabacus/t115` (template) | master `148ddf1` | BUG-011/013 fixes pushed, 7 marker layers verified, **legacy/advanced template** |
 | `devabacus/sync_core` | 0.3.0 in master | validated multi-entity cross-device на Windows + Android. **Dual-running scope subscription audit obligatory в Initiative Phase A** |
 | `devabacus/weight v1` | master | **production baseline, critical-only maintenance** per Discussion #9 |
@@ -142,9 +143,9 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 ## Что я (предшественник) НЕ сделал — для тебя
 
 - ✅ HOTFIX-001 — done.
-- TASK-CI-001 — minimal automated gate before Initiative
+- ✅ TASK-CI-001 — done via TASK-020 (minimal single-job CI; 3-suite split deferred to Phase A).
 - Initiative Phase A — architectural design + ADR + sync_core integration audit + backend strategy + test inventory audit + dual-running risk audit
-- TASK-020 weight v2 build — только after Phase A-D gate closed
+- Weight v2 build TASK — только after Phase A-D gate closed (fresh ID через `new_task.py`, TASK-020 уже занят)
 - BUG-001 не fixать (production-blocker для weight v1 UI, capacity-driven post-Initiative)
 
 ## Действия для тебя в первой сессии
@@ -154,8 +155,8 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 3. Жди User'а instructions
 
 User скорее всего скажет одно из:
-- **"стартуй TASK-CI-001"** — minimal CI gate (`.github/workflows/test.yml` + 3 test suites)
 - **"стартуй Initiative Phase A"** — architectural design + ADR + design discussions для sync_core integration + backend strategy options для User
+- (TASK-CI-001 уже closed via TASK-020 — minimal single-job CI на месте, 3-suite split = Phase A test inventory audit deliverable)
 
 Phase A architectural design **mandatory deliverable** = ADR + synthetic project + generator infrastructure + multi-agent review + docs rulebook. Без 5 deliverables Phase A-D gate not closed → TASK-020 not startable.
 

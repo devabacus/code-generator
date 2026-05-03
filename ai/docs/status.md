@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot)
+**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot + TASK-CI-001 closed via TASK-020)
 
 ---
 
@@ -14,15 +14,18 @@
 
 ### Master state
 
-- **Branch:** `master 29bcf9f` (post handoff prompt commit)
-- **Tests:** 163 passing, 0 failing
+- **Branch:** `master 77145a3` (post HOTFIX-001 + TASK-020 in flight)
+- **Tests:** 163 passing, 0 failing (mocha workaround `--ignore extension.test.js`)
 - **Compile:** clean
+- **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + 163 unit tests)
 
 ---
 
 ## Активные задачи
 
-(Empty — Phase 1.5 closed, next sequence pending User start)
+| ID | Описание | Status | Started |
+|---|---|---|---|
+| TASK-020 | CI minimal gate (TASK-CI-001) — `.github/workflows/test.yml` | 🟡 Ready for review | 2026-05-03 |
 
 ---
 
@@ -32,11 +35,11 @@
 |---|---|---|---|
 | BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или TASK-020-driven |
-| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | TASK-020-driven |
-| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | TASK-020-driven (data integrity) |
+| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-v2-build TASK>`-driven |
+| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-v2-build TASK>`-driven |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-v2-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| TASK-CI-001 | Medium | Minimal automated gate (3 test suites + verify smoke) | Named — before Initiative Phase A |
+| ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 (PR pending) — minimal single-job CI. 3-suite split deferred to Phase A test inventory audit. |
 
 ---
 
@@ -44,7 +47,7 @@
 
 **Month 1:**
 - ✅ HOTFIX-001 closed — `new_task.py` сканирует active/ + done/ + blocked/
-- TASK-CI-001 (CI gate before Initiative)
+- ✅ TASK-CI-001 closed via TASK-020 — minimal CI gate ([.github/workflows/test.yml](../../.github/workflows/test.yml)): compile + lint + 163 unit tests on PR/push to master
 - Initiative Phase A (architectural design + ADR + sync_core integration audit + backend strategy + test inventory + dual-running risk audit)
 
 **Month 2:**
@@ -52,7 +55,7 @@
 - **Phase A-D gate close** (5-deliverable checklist + closure-report.md TeamLead + User counter-sign)
 
 **Month 3:**
-- TASK-020 weight v2 build start (only after Phase A-D gate closed)
+- `<weight-v2-build TASK>` start — fresh build на simplified template (only after Phase A-D gate closed). NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`.
 - Initiative Phase E (acceptance side-by-side comparison)
 
 **Month 4:**
@@ -61,7 +64,7 @@
 
 **Month 5:**
 - Weight v2 cross-device runtime smoke
-- Initiative Phase G (closure docs + multi-agent review + cutover plan basic в TASK-020 closure)
+- Initiative Phase G (closure docs + multi-agent review + cutover plan basic в `<weight-v2-build TASK>` closure)
 
 **Month 6+ (post hard ceiling):**
 - Weight v1 → v2 production cutover (separate later TASK)
@@ -73,11 +76,11 @@
 
 ## Cross-repo state
 
-- **codegen репо** (`devabacus/code-generator`): master `29bcf9f` (post handoff prompt), 163 tests baseline
+- **codegen репо** (`devabacus/code-generator`): master `77145a3` (post HOTFIX-001), 163 tests baseline + CI workflow
 - **t115 template** (`devabacus/t115`): master `148ddf1`, BUG-011/013 fixes pushed (legacy/advanced template)
 - **sync_core** (`devabacus/sync_core` 0.3.0): in master, validated multi-entity cross-device. Dual-running scope subscription audit obligatory в Initiative Phase A
 - **weight v1** (`devabacus/weight`): production baseline, **critical-only maintenance** per Discussion #9 decision matrix
-- **weight v2** (TBD): fresh build на simplified template (TASK-020), starts only after Initiative Phase A-D gate closed
+- **weight v2** (TBD): fresh build на simplified template (`<weight-v2-build TASK>` — next available ID), starts only after Initiative Phase A-D gate closed
 
 ---
 
@@ -87,8 +90,8 @@
 |---|---|---|---|
 | Backend strategy (Option 1 same / 2 forked / 3 fresh) | Phase A start | User | +1 week per delay |
 | Decision matrix v1 maintenance approval | Phase A start | User | +1 week per delay |
-| Phase A-D gate sign-off (closure-report.md) | Before TASK-020 | User | +2 weeks if iteration |
-| Cutover plan review | TASK-020 closure | User | +1-2 weeks |
+| Phase A-D gate sign-off (closure-report.md) | Before `<weight-v2-build TASK>` | User | +2 weeks if iteration |
+| Cutover plan review | `<weight-v2-build TASK>` closure | User | +1-2 weeks |
 
 **Recommendation для Q-open backend:** Option 1 (same backend) default. Option 2 только если schema redesign. Option 3 — overkill.
 

@@ -2,7 +2,7 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot)
+**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot + TASK-CI-001 closed via TASK-020)
 
 ---
 
@@ -29,7 +29,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 
 - ✅ TASK-019 closure (Phase 1.5 final gate)
 - ✅ HOTFIX-001 (`new_task.py` scan active/ + done/ + blocked/)
-- ⏭ TASK-CI-001 (minimal automated gate — `npm test` + static verify smoke) — **before Initiative Phase A start**
+- ✅ TASK-CI-001 closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): `npm ci` + `npm run compile` + `npm run lint` + mocha 163 unit tests on PR/push to master. 3-suite split (universal + t115 regression + simplified) deferred to Initiative Phase A test inventory audit deliverable. Verify smoke deferred (heavy, requires real test project).
 - ⏭ Initiative Phase A: Architectural design (ADR + sync_core integration sanity check + backend strategy + test inventory audit + dual-running risk audit + User decision points)
 
 ### Month 2 — Initiative Phase B-D + synthetic acceptance
@@ -38,18 +38,20 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 - Initiative Phase C: New t<200>-series reference template (с manifest markers, 5-7 entities synthetic)
 - Initiative Phase D: Codegen `--template <name>` selection mechanism
 
-**Phase A-D gate (mandatory before TASK-020 weight v2 starts):**
+**Phase A-D gate (mandatory before `<weight-v2-build TASK>` starts):**
 - [ ] ADR architectural decision document
 - [ ] Synthetic reference project t<200> minimal viable (5-7 entities, verify PASS errors=0)
 - [ ] Generator infrastructure (`--template` flag, manifest markers, junction regression PASS)
 - [ ] Multi-agent review pattern applied (Standard + Adversarial на 5 specific deliverables, catch rate ≥1)
 - [ ] Documentation rulebook ("what generator generates / what agents write manually")
 
-**Gate verification artifact:** `ai/tasks/initiative-phase-a-d/closure-report.md` TeamLead-signed + User counter-signed. Без артефакта → TASK-020 cannot start.
+**Gate verification artifact:** `ai/tasks/initiative-phase-a-d/closure-report.md` TeamLead-signed + User counter-signed. Без артефакта → `<weight-v2-build TASK>` cannot start.
 
-### Month 3 — TASK-020 weight v2 bootstrap + Initiative Phase E
+### Month 3 — `<weight-v2-build TASK>` bootstrap + Initiative Phase E
 
-- TASK-020 created **only after Phase A-D gate closed**
+> NB: TASK-020 уже занят CI gate (TASK-CI-001). Weight v2 build получит next available ID через `new_task.py` (e.g. TASK-021 если ID не conflict'нет с другими).
+
+- `<weight-v2-build TASK>` created **only after Phase A-D gate closed**
 - Weight v2 entity build (13 entities + sync infrastructure через generator)
 - Initiative Phase E: Acceptance — synthetic t<200> + first weight v2 entities side-by-side comparison
 
@@ -66,7 +68,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 
 - Weight v2 cross-device runtime smoke
 - Initiative Phase G: closure docs + multi-agent review (Standard + Adversarial fresh)
-- Basic cutover plan в TASK-020 closure (data source, migration strategy, rollback, transition, smoke, **dual-running window**)
+- Basic cutover plan в `<weight-v2-build TASK>` closure (data source, migration strategy, rollback, transition, smoke, **dual-running window**)
 
 ### Month 6+ (post hard ceiling)
 
@@ -80,7 +82,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 
 ### Track 1: weight v1 production baseline (critical-only maintenance)
 
-**Decision matrix (TASK-020 task.md):**
+**Decision matrix (`<weight-v2-build TASK>` task.md):**
 
 | Issue type | v1 action | v2 action |
 |---|---|---|
@@ -129,18 +131,18 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 |---|---|---|---|
 | BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative refactors |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или TASK-020-driven (если weight v2 имеет cross-feature junctions) |
-| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | TASK-020-driven |
-| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | TASK-020-driven (data integrity) |
+| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-v2-build TASK>`-driven (если weight v2 имеет cross-feature junctions) |
+| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-v2-build TASK>`-driven |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-v2-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| HOTFIX-001 | Low | `new_task.py` сканирует только `active/` | Quick mini-chore Month 1 |
-| TASK-CI-001 | Medium | Minimal automated gate (`npm test` + verify smoke + 3 suites: universal + t115 regression + simplified) | Named — before Initiative Phase A start |
+| ~~HOTFIX-001~~ | ~~Low~~ | ~~`new_task.py` сканирует только `active/`~~ | ✅ Closed (PR #14) |
+| ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Closed via TASK-020 — minimal single-job, [.github/workflows/test.yml](../../.github/workflows/test.yml). 3-suite split + verify smoke deferred to Phase A. |
 
 ---
 
 ## Deferred (post Months 1-6)
 
-- **Phase 2 (Microservices feature parity)** — defer until Initiative + TASK-020 done
+- **Phase 2 (Microservices feature parity)** — defer until Initiative + `<weight-v2-build TASK>` done
 - **Phase 3 (UX/DevEx)** — cherry-pick urgent items only (CLI --help examples, plugin templates, cross-platform paths)
 - **Phase 4 (CI/CD + публикация)** — VS Code Marketplace publish, npm publish CLI. TASK-CI-001 partial coverage.
 
@@ -172,8 +174,8 @@ Per Phase A architectural decisions требуют User input — explicit timel
 |---|---|---|---|
 | Backend strategy (Option 1/2/3) | Phase A start | User | +1 week per delay week |
 | Decision matrix v1 maintenance | Phase A start | User | +1 week per delay week |
-| Phase A-D gate sign-off | Before TASK-020 | User | +2 weeks if iteration needed |
-| Cutover plan review | TASK-020 closure | User | +1-2 weeks |
+| Phase A-D gate sign-off | Before `<weight-v2-build TASK>` | User | +2 weeks if iteration needed |
+| Cutover plan review | `<weight-v2-build TASK>` closure | User | +1-2 weeks |
 
 Total potential User-side latency: 4-8 weeks. Estimate уже implicitly budgets, но explicit tracking = best practice.
 
@@ -184,4 +186,4 @@ Total potential User-side latency: 4-8 weeks. Estimate уже implicitly budgets
 - Roadmap = живой документ
 - Architectural decisions через Discussion process (multi-agent review + Adversarial pass)
 - Маркеры задач: `[ ]` TODO, `[~]` in progress, `[x]` done, `[!]` blocked, `[~]` superseded
-- **Phase A-D gate enforcement:** TeamLead обязан verify checklist closed + User counter-sign closure-report.md до `new_task.py` invocation для TASK-020
+- **Phase A-D gate enforcement:** TeamLead обязан verify checklist closed + User counter-sign closure-report.md до `new_task.py` invocation для `<weight-v2-build TASK>` (TASK-020 ID уже занят CI gate)

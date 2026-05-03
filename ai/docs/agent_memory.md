@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-03 (Phase 1.5 closure + Discussion #8 finalization)
+**Последнее обновление:** 2026-05-03 (Phase 1.5 closure + Discussion #8 finalization + TASK-CI-001 minimal CI gate)
 
 ---
 
@@ -199,13 +199,13 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 **Next steps:**
 1. ✅ TASK-019 closure done (Phase 1.5 ceremony)
 2. ✅ HOTFIX-001 closed — `new_task.py` scan active/ + done/ + blocked/
-3. TASK-CI-001 (minimal automated gate, 3 test suites: universal + t115 regression + simplified) — **before Initiative Phase A start**
+3. ✅ TASK-CI-001 closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): compile + lint + 163 unit tests. 3-suite split (universal + t115 regression + simplified) deferred to Phase A test inventory audit deliverable.
 4. **Initiative Phase A** (architectural design + ADR + sync_core integration audit + backend strategy decision + test inventory audit + dual-running risk audit)
 5. Initiative Phase B-D (generate-vs-not-generate divider + synthetic t<200> reference + `--template` CLI flag)
 6. **Phase A-D gate close** (5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign)
-7. **TASK-020 weight v2 build** (only after Phase A-D gate closed; новый cross-repo TASK)
+7. **`<weight-v2-build TASK>`** (only after Phase A-D gate closed; новый cross-repo TASK; NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`)
 8. Initiative Phase E-G (acceptance + documentation reconciliation + closure)
-9. Cutover prep basic в TASK-020 closure (full execution = separate later TASK)
+9. Cutover prep basic в `<weight-v2-build TASK>` closure (full execution = separate later TASK)
 
 **Estimate:** 5-6 months calendar realistic, 6 hard ceiling.
 
@@ -230,7 +230,15 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 
 ### VS Code self-update background
 
-`CodeSetup-stable...exe` background обновление блокирует vscode-test runner. **Workaround:** mocha через `npx mocha --ui tdd "out/test/**/*.test.js"` (НЕ vscode-test).
+`CodeSetup-stable...exe` background обновление блокирует vscode-test runner. **Workaround:** mocha напрямую (НЕ vscode-test):
+
+```bash
+node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
+```
+
+`--ignore "out/test/extension.test.js"` обязателен — этот тест требует vscode runtime, доступный только vscode-test runner'у. Baseline 2026-05-03: **163 passing**.
+
+⚠ Использовать **explicit `node node_modules/mocha/bin/mocha.js`**, НЕ `npx mocha` — mocha = transitive dep через `@vscode/test-cli`. `npx` fallback'нул бы на latest из реестра при `npm prune --production` или patch bump cli, breaking workflow silently. Эта же команда работает в CI ([.github/workflows/test.yml](../../.github/workflows/test.yml), TASK-CI-001 / TASK-020). Соответствует prior-art TASK-013/016.
 
 ### Server port blocking
 

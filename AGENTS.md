@@ -57,7 +57,8 @@ Executor ведёт прогресс в **трёх секциях самого t
 
 ```bash
 npm run compile          # tsc -p ./
-npm test                  # vscode-test (62 passing baseline)
+npm test                  # vscode-test (full suite, includes extension.test.js)
+node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"   # mocha workaround (163 passing baseline) — также используется в CI
 npm run lint              # eslint
 node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт
 ```
@@ -144,7 +145,7 @@ python ai/scripts/task.py merge -y    # без prompt (для скриптов)
 1. `git pull --ff-only` (task.py merge делает это сам).
 2. `npm ci` или `npm install` — если менялся `package.json` / `package-lock.json`.
 3. `npm run compile` — clean compile должен проходить.
-4. `npm test` — все тесты passing (62 passing baseline на 2026-04-26).
+4. mocha workaround — 163 passing baseline (на 2026-05-03). Команда: `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`. `npm test` (vscode-test runner) тоже OK если VS Code self-update не мешает.
 5. **Если merged PR трогал генератор или шаблон t115** — обязательно `codegen create-project --name t<N+1>` + `codegen verify --name t<N+1>`. Зафиксировать `errors=N, warnings=M` в финальном отчёте user'у.
 6. Только после п.4-5 писать пользователю «merged + master зелёный».
 
@@ -206,7 +207,7 @@ code-generator — TypeScript: VS Code extension + CLI `codegen`. Тестиро
 | Инструмент | Канал | Назначение |
 |-----------|-------|-----------|
 | `npm run compile` (Bash) | CLI | tsc — проверка типов TypeScript |
-| `npm test` (Bash) | CLI | Unit-тесты на vscode-test + MockFileSystem (62 passing baseline) |
+| `node node_modules/mocha/bin/mocha.js …` (Bash) | CLI | Unit-тесты на mocha workaround + MockFileSystem (163 passing baseline 2026-05-03; та же команда в CI). См. agent_memory.md → "VS Code self-update background" |
 | `npm run lint` (Bash) | CLI | eslint статический анализ |
 | `codegen verify --name <X>` (Bash) | CLI | **DoD-гейт**: pub get + serverpod generate + build_runner + flutter analyze на свежем сгенерированном проекте |
 | `codegen create-project` + ручной `flutter run` | GUI | Smoke runtime проверка сгенерированного проекта — зона user'а |
@@ -241,16 +242,16 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 3. **Build + test check** обязателен (из корня репо):
    ```bash
-   npm run compile          # tsc -p ./
-   npm test                  # vscode-test (62 passing baseline на 2026-04-26)
-   npm run lint              # eslint
-   node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт для генератора
+   npm run compile                                                                                              # tsc -p ./
+   node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"  # mocha workaround (163 passing baseline на 2026-05-03; та же команда в CI)
+   npm run lint                                                                                                 # eslint
+   node out/adapters/cli/index.js verify --name <test_project> --human                                          # DoD-гейт для генератора
    ```
 
 4. **В `report.md` обязательно** приводить реальный вывод CLI:
    ```
-   [npm test] npm test
-   → 62 passing (115ms)
+   [mocha workaround] node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
+   → 163 passing (39ms)
 
    [verify] node out/adapters/cli/index.js verify --name t144 --human
    → PASS: verify t144
@@ -286,7 +287,16 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 ## CI Workflows
 
-*(Добавятся по мере создания — пока CI минимальный.)*
+**Active workflows:**
+
+- [.github/workflows/test.yml](.github/workflows/test.yml) — `Test` (TASK-CI-001 / TASK-020). Триггер: `pull_request` в master + `push` на master. Один job на `ubuntu-latest` с `timeout-minutes: 10` + `concurrency: { group: test-${{ github.ref }}, cancel-in-progress: true }` + `permissions: { contents: read }`. Steps: checkout@v4 → setup-node@v4 (Node 20, npm cache) → `npm ci` → `npm run compile` → `npm run lint` → `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"` (explicit binary path вместо `npx mocha` — mocha = transitive dep через `@vscode/test-cli`, `npx` fallback'нул бы на latest при prune). Baseline: 163 passing, ожидаемый runtime <2 минут.
+
+**Deferred (Initiative Phase A test inventory audit deliverable):**
+
+- 3-suite split: universal / t115 regression / simplified (Discussion #9 Addition #12)
+- `codegen verify --name <test_project>` smoke в CI (heavy, требует реального target проекта)
+- Branch protection rules (User configuration через GitHub Settings UI)
+- Code coverage / Codecov
 
 ## Branch Protection (master)
 
@@ -294,6 +304,10 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 - ✅ Require pull request before merging
 - ✅ Block force push
+- ✅ Require status checks to pass before merging:
+  - Required: `test / Compile + Lint + Unit tests` (from [.github/workflows/test.yml](.github/workflows/test.yml))
+
+> NB: branch protection enforcement = User configuration через GitHub Settings UI, не часть workflow YAML scope. После merge TASK-020 (CI gate) — User должен включить status check requirement, иначе CI = cosmetic green badge без enforcement.
 
 ## Hotfix процесс
 

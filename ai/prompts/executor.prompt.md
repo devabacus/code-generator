@@ -97,10 +97,10 @@
 
 **Всегда через Bash из корня репо:**
 ```bash
-npm run compile         # tsc -p ./ — проверка TypeScript
-npm test                # vscode-test runner (последний baseline 2026-04-26: 62 passing)
-npm run lint            # eslint
-node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-гейт
+npm run compile                                                                                              # tsc -p ./ — проверка TypeScript
+node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"  # mocha workaround (последний baseline 2026-05-03: 163 passing; та же команда в CI)
+npm run lint                                                                                                 # eslint
+node out/adapters/cli/index.js verify --name <test_project> --human                                          # DoD-гейт
 ```
 
 ## Структура проекта — где что лежит
