@@ -1,97 +1,97 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-02
+**Обновлено:** 2026-05-03 (Phase 1.5 closure + Discussion #8 finalization)
+
+---
 
 ## Текущая фаза
 
-**Фаза 1 — Стабилизация (после CLI-рефакторинга)**
+**Phase 1.5 ✅ CLOSED** (2026-05-03).
 
-- ✅ **CLI реализован и верифицирован** — 10 команд, `codegen --help` работает, `create-project --name t139` отработала за 193 сек (проект создан в `G:/Projects/Flutter/serverpod/t139/`)
-- ✅ **VS Code декуплен от core** — все 11 команд регистрируются в `extension.ts`, `src/core/*` не импортирует `vscode`
-- ✅ **BUG-002 / BUG-003 / BUG-004 / BUG-005 / BUG-006 исправлены** (2026-04-25/26, ветка `feature--fix-codegen-regen-bugs`) — snake_case filenames, relation_patcher идемпотентный, pre-flight валидация YAML, AppDatabaseGenerator scan-based, migration-ветки append вместо prepend (production-блокер на Android, найден внешними агентами TASK-015 в weight)
-- ✅ **Тесты — 62 passing:** `openapi_parser`, `python_endpoint_generator`, `template_service`, `mock_file_system`, **`relation_patcher`**, **`entity_yaml_validator`**, **`replacement_util`**, **`app_database_generator`**, **`verify_analyzer_parser`**
-- ✅ **End-to-end pipeline проверен на t143** (свежий `create-project`, **с первого раза**): verify PASS errors=0, server поднялся (HTTP 200), все 5 sync-таблиц в Postgres присутствуют
-- ✅ **`codegen verify --name <project>` команда добавлена** (2026-04-26) — Definition of Done гейт. Запускает pub get → serverpod generate → build_runner → flutter analyze, JSON с counts (errors/warnings/infos)
-- ✅ **`autoGenerateTasksFeature` + pubspec post-process в create-project** — сразу после создания проект компилируется и работает с tasks-фичей (Category/Tag/Task/TaskTagMap)
-- 🟡 Tech debt — `code_formatter`, `server_yaml_parser` не покрыты тестами
+После 9 PRs в Phase 1.5 sequence — codegen acceptance gate clean (verify PASS errors=0 на production-shaped FK alias scenarios на t164). Architectural pivot decision принят (Multi-template plurality per Discussion #7), sequence approved (Discussion #8).
+
+### Master state
+
+- **Branch:** `master` (Phase 1.5 work merged via PR #6/#7/#8/#9 + TASK-019 closure pending merge)
+- **Tests:** 163 passing, 0 failing
+- **Compile:** clean
+- **Last verify:** t164 PASS errors=0, warnings=1 (unrelated), infos=67
+
+---
 
 ## Активные задачи
 
-| ID | Описание | Статус | Дата |
+| ID | Описание | Статус |
+|---|---|---|
+| TASK-019 | Re-acceptance Phase 1.5 final gate | 🟡 Closing (Phase 5 PASS, Phase 6 closure docs commit pending merge) |
+
+---
+
+## Открытые backlog (trigger-based per Discussion #8)
+
+| ID | Severity | Description | Action |
 |---|---|---|---|
-| TASK-010 | `codegen verify --runtime` + sync_smoke_test шаблон | 🟡 New (Open) | 2026-04-26 |
-| TASK-012 | codegen → todo real app + cross-device smoke | 🟡 In Progress (closing partial per Discussion #3) | 2026-05-02 |
-| BUG-012 | parser игнорирует `relation(parent=X)` directive — FK alias broken | ❌ Open High (blocking weight TASK-018) | 2026-05-03 |
-| BUG-013 | template markers gap repository_impl + usecases | ❌ Open High (blocking weight TASK-018) | 2026-05-03 |
+| BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-TASK-018 |
+| BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
+| BUG-015 | High codegen | Cross-feature junction generation broken | TASK-018 Phase 0 audit-driven |
+| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | TASK-018 Phase 0 audit-driven |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | TASK-018 Phase 0 audit-driven |
+| BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
+| HOTFIX-001 | Low | `new_task.py` сканирует только `active/` (ID collision risk) | Quick mini-chore (~30 min) before TASK-018 Phase 0 |
+| TASK-CI-001 | Medium | Minimal automated gate (`npm test` + static verify smoke) | Named backlog, before Initiative Phase A start |
 
-## Недавно завершено
+---
 
-| ID | Описание | Дата |
-|---|---|---|
-| BUG-005 fix | AppDatabaseGenerator scan-based: подключает все таблицы из всех фич сразу (5 тестов) | 2026-04-26 |
-| t143 e2e | Свежий create-project + verify PASS + server runtime HTTP 200 + Postgres tables — с первого раза | 2026-04-26 |
-| TASK-008 | relation_patcher: один маркер-блок, идемпотентный replace через callback, recovery от дубликатов | 2026-04-25 |
-| TASK-009 | EntityYamlValidator: 6-field pattern + paired sync-event, wired в CLI и vscode | 2026-04-25 |
-| — | CLI-адаптер + 10 команд (коммит `7335eda`) | 2026-04-XX |
-| — | Чистка мёртвого кода, миграция legacy `addMicroservice` (коммит `cece8a5`) | 2026-04-18 |
-| — | Регистрация всех 11 VS Code-команд напрямую в `extension.ts` | 2026-04-18 |
-| — | Замена `antigravity -g` на `code` в 3 местах | 2026-04-18 |
+## Sequence (next 3-5 months per Discussion #8)
 
-## Риски / Открытые вопросы
+**Month 1:**
+- TASK-019 closure → HOTFIX-001 → TASK-018 Phase 0 preflight audit → TASK-018 production migration
 
-- **BUG-001 (Open, High):** Ref disposed в сгенерированных state_providers — единственный открытый High баг. May surface в TASK-012 todo app generation (не блокер acceptance, noise в production). [ai/bug-reports/001-state-provider-ref-disposed.md](../bug-reports/001-state-provider-ref-disposed.md)
-- **BUG-007 (Open, Medium):** relation_patcher silent no-op без `:oneToManyMethods` markers — pre-existing limitation для regen на template directory. [ai/bug-reports/007-relation-patcher-misses-template-without-markers.md](../bug-reports/007-relation-patcher-misses-template-without-markers.md)
-- **BUG-010 (Open, Medium-High):** `code_formatter.ts:81 !field.name.includes('Map')` silent data loss landmine для fields с "Map" в имени. [ai/bug-reports/010-code-formatter-field-name-includes-map-silent-data-loss.md](../bug-reports/010-code-formatter-field-name-includes-map-silent-data-loss.md)
-- **BUG-002/003/004/005/006/008/009 — Resolved.** 008 closed via TASK-011 Phase D5 + G1, 009 closed via TASK-013 D6 (commit a299f52, 2026-05-02).
-- **BUG-003 part 2 (backlog):** перезапись `:base` секций при regen теряет custom code — требует архитектурного решения (per-method markers или patch-only mode).
-- **Cross-repo gate:** weight TASK-018 (13 entities production migration) blocked до TASK-012 acceptance ✅
-- **TASK-015 (backlog):** robust junction FK extraction для non-FK pseudo-keys — НЕ блокер TASK-012, flag для weight TASK-018 (CustomerUser-style)
-- **Tech debt:** `code_formatter`, `server_yaml_parser`, workflow-модули, `project_creator.ts` не покрыты unit-тестами
-- **HOTFIX-001 (backlog):** `scripts/new_task.py` добавляет запись `status.md` после таблицы, а не в неё
+**Month 2:**
+- TASK-018 spillover/closure
+- BUG-015/016/017 fixes if Phase 0 triggered
+- TASK-CI-001 (minimal CI gate)
+- Simplified Template Initiative — Phase A-D start
 
-## Недавно завершено (Phase 1.5)
+**Month 3:**
+- Initiative Phase E-G (codegen `--template` flag + acceptance project + docs)
+- BUG-001 fix capacity-permitting
 
-| ID | Описание | Дата |
-|---|---|---|
-| TASK-011 | sync_core 0.3.0 templates integration (PR #2) | 2026-05-02 |
-| TASK-013 | junction detection robust YAML field analysis (PR #3) — закрыл BUG-009 в D6 | 2026-05-02 |
-| TASK-014 | junction adapter file path generation для non-Map entities (PR #4) | 2026-05-02 |
-| TASK-001 | базовая документация — done через TASK-011 docs work | 2026-05-02 |
-| TASK-008 | relation_patcher идемпотентный (BUG-003 fix) — moved active→done | 2026-05-02 |
-| TASK-009 | EntityYamlValidator (BUG-004 fix) — moved active→done | 2026-05-02 |
+**Month 4-5 (buffer):**
+- Initiative spillover + backlog cleanup + post-decisions (Phase 2 timing, weight modernization)
 
-## Следующий фокус (updated 2026-05-03 per Discussion #4 — re-sequence)
+См. [roadmap.md](roadmap.md) для full sequence + tracks.
 
-**Phase 1.5 НЕ closed. TASK-012 partial closure только. Weight TASK-018 blocked.**
+---
 
-Sequence per Discussion #4 Decision (re-sequenced — BUG-013 first):
+## Cross-repo state
 
-1. **Setup commit на TASK-012 ветке** (codegen uncommitted state): doc fixes (CLAUDE.md/agent_memory) + 3 bug-reports (011/012/013) + Discussion #3 archive + Discussion #4 + Patch Record. **БЕЗ active→done movement** (TASK-012 stays active per Q4=a). Затем `git checkout master`.
+- **codegen репо** (`devabacus/code-generator`): master 530cd28 (TASK-017 merged), 163 tests baseline
+- **t115 template** (`devabacus/t115`): master `148ddf1` (BUG-011/013 fixes pushed)
+- **sync_core** (`devabacus/sync_core` 0.3.0): in master, validated multi-entity cross-device на Windows + Android
+- **weight** (`devabacus/weight`): TASK-018 production migration unblocked после TASK-019 + Phase 0 preflight
 
-2. **PR 2 — BUG-013 fix** (chore branch `chore/bug-013-template-markers-fill` от свежего master). **First в sequence** потому что executor verify показал что reduced scope ≥1 FK не может PASS до BUG-013 fix.
-   - **5-min audit gate ДО start:** symbols missing matrix в `task_usecases.dart` + `.g.dart`, provider source need, build_runner regen path
-   - **Approach A:** marker block seed `:oneToManyMethods` в `task_repository_impl.dart` + `task_usecases.dart` (top-level EOF, НЕ внутри class)
-   - **Provider plumbing** в `task_usecase_providers.dart` если audit revealed need
-   - **90-min hard ceiling.** Crosses без clear path → STOP + Discussion #5
-   - **Scope expansion guard:** class def + provider plumbing = BUG-013 scope. Качественно новый layer (build infra/version mismatch) = новый BUG-014
+---
 
-3. **PR 1 — TASK-012 partial close** (после PR 2 merge): checkout TASK-012 ветка, rebase from master, re-verify (must PASS errors=0), TASK-012 active → done с reduced report.md (явно: BUG-012 не exercised).
+## Architectural pivot context (Discussion #7)
 
-4. **PR 3 — BUG-012 fix** (feature branch `feature/BUG-012-parser-parent-directive`): parser parses `relation(parent=X)` directive + 5-layer regression tests + multi-agent code review. ~1-2 days. Standalone, после PR 1 merge.
+**Decision:** Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative" parallel track.
 
-5. **PR 4 — Re-acceptance TASK** (после merge PR 2 + PR 3): новый TASK через `new_task.py`, full FK alias scenario, criteria 8 чекбоксов per Discussion #3 Decision.
+**Insight:** Не Clean Architecture как идея плоха, а её automatic generation для каждого CRUD method. Generated CRUD usecases = architectural noise. Generator должен генерировать infrastructure boilerplate, business layer = manual.
 
-**Параллельная работа (если ресурс):** PR 2 и PR 3 НЕ можно parallel — PR 2 нужен first для PR 1 unblock. PR 3 после PR 1. PR 4 hard-зависит от обоих PR 2 + PR 3.
+См. [Discussion #7 archive](../discussions/archive/7-clean-architecture-overhead-стоит-ли-упр/) + [Discussion #8 archive](../discussions/archive/8-roadmap-approval-sequence-phase-15-closu/).
 
-**После re-acceptance closed ✅ → weight TASK-018 unblocked.**
+---
 
-**Не блокирующий backlog:**
-- **TASK-002** — fix BUG-001 (Ref disposed) — единственный открытый High баг, production-блокер weight
-- **TASK-010** — `codegen verify --runtime` (docker + server + integration test)
-- **TASK-004** — unit-тесты для `code_formatter`, `server_yaml_parser` (BUG-010 fix входит сюда)
-- **TASK-015** (backlog) — robust junction FK extraction (deferred from TASK-014)
-- **HOTFIX-001** — `new_task.py` сканирует только `active/`, не учитывает `done/` (collision risk при создании 3 new TASK'ов в Sequence). Manual rename acceptable, но fix как отдельный mini-chore.
-- **ADR-0001** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md`, обновить статус Proposed→Accepted
-| TASK-012 | todo real app generation cross-device smoke (Phase 1.5 final gate) | 🟡 In Progress | 2026-05-02 |
-| TASK-011 | fix BUG-012 server_yaml_parser relation parent directive | 🟡 In Progress | 2026-05-03 |
-| TASK-017 | DAO substitution rewrite preserve field name in method body | 🟡 In Progress | 2026-05-03 |
+## Closed (история Phase 1.5)
+
+Sequence per Discussion #4:
+- ✅ PR #6 BUG-013 (template markers fill 4 layers Approach A)
+- ✅ PR #7 TASK-012 partial close (reduced scope verify PASS)
+- ✅ PR #8 TASK-016 (parser `relation(parent=X)` directive + helper + path/class normalization + quote-stripping landmine)
+- ✅ PR #9 TASK-017 (DAO substitution rewrite Approach A — full BUG-012 closure)
+- 🟡 TASK-019 (re-acceptance, pending merge)
+
+**Closed BUGs:** BUG-002/003/004/005/006/008/009/011/012/013.
+
+См. [TASK-019 report](../tasks/active/TASK-019-re-acceptance-full-fk-alias-scenario-verify-phase-1-5-final-gate/report.md) для full Phase 1.5 closure evidence.

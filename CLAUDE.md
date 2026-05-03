@@ -323,5 +323,6 @@ ai/tasks/active/               # текущие задачи
 
 ---
 
-**Последнее обновление:** 2026-05-02
-**Активная ветка:** `master` (Phase 1.5 active — sync_core 0.3.0 templates integration)
+**Последнее обновление:** 2026-05-03 (Phase 1.5 closure + handoff prep)
+**Активная ветка:** `master` (Phase 1.5 ✅ CLOSED — TASK-019 pending merge; next sequence per Discussion #8 — TASK-018 Phase 0 preflight + Simplified Template Initiative)
+**Architectural pivot принят (Discussion #7):** Multi-template plurality. Для handoff onboarding читай [INDEX.md](ai/docs/INDEX.md) → [agent_memory.md](ai/docs/agent_memory.md) → [roadmap.md](ai/docs/roadmap.md) → [status.md](ai/docs/status.md).
