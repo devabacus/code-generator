@@ -125,10 +125,26 @@ node -e "const yaml = require('js-yaml'); const fs = require('fs'); const parsed
 
 ## CI evidence
 
-⚠ **CI run URL заполнит teamlead после `task.py pr` push.** Этот блок будет дополнен:
-- CI run URL: TBD после push
-- Status: TBD
-- Total runtime: TBD (ожидается <2 минут)
+✅ **First CI run PASS на PR #15 (feature branch):**
+
+- **Run URL:** https://github.com/devabacus/code-generator/actions/runs/25276547469
+- **Status:** completed / success
+- **Duration:** 26 секунд (ожидалось <2 минут — значительно быстрее, npm cache hit на первом же run благодаря `actions/setup-node@v4 cache: 'npm'`)
+- **Title:** TASK 020 ci minimal gate task ci 001 github actions npm test
+- **Job:** `Compile + Lint + Unit tests`
+- **Steps (все success):**
+  1. ✅ Set up job
+  2. ✅ Checkout
+  3. ✅ Setup Node.js 20
+  4. ✅ Install dependencies
+  5. ✅ Compile TypeScript
+  6. ✅ Lint
+  7. ✅ Run unit tests (mocha workaround, excludes vscode-runtime extension.test.js)
+  8. ✅ Post Setup Node.js 20
+  9. ✅ Post Checkout
+  10. ✅ Complete job
+
+**Acceptance criteria #4 + #8 теперь ✅** — CI gate реально работает, mocha workaround команда устойчива на ubuntu-latest, hardening (concurrency / timeout / permissions) применился без проблем.
 
 ## Acceptance criteria status
 
@@ -137,13 +153,13 @@ node -e "const yaml = require('js-yaml'); const fs = require('fs'); const parsed
 | `.github/workflows/test.yml` создан, синтаксис валиден | ✅ | js-yaml parse PASS, structural keys verified (concurrency / permissions / timeout) |
 | Workflow триггерится на `pull_request` к master + `push` на master | ✅ | YAML `on:` содержит оба события |
 | Steps: checkout → setup-node 20 → `npm ci` → `npm run compile` → `npm run lint` → mocha с `--ignore extension.test.js` | ✅ | 6 steps, mocha команда **hardened** (explicit binary path вместо npx — DEAL-BREAKER #1) |
-| Workflow PASS на feature branch (run URL + status) | ⏭ deferred to teamlead post-push | будет заполнено в этом report после первого CI run |
+| Workflow PASS на feature branch (run URL + status) | ✅ | https://github.com/devabacus/code-generator/actions/runs/25276547469 — success, 26s |
 | Реальные числа в report.md: `163 passing`, compile clean, lint clean | ✅ | см. блок "Тесты" |
 | `agent_memory.md` обновлён | ✅ | mocha команда hardened с предупреждением про npx fragility, CI workflow link |
 | `status.md` / `roadmap.md` обновлены | ✅ | TASK-CI-001 closed, master hash 77145a3, TASK-020 ID drift fixed |
-| report.md содержит CI run URL + screenshot/log первого PASS | ⏭ deferred to teamlead post-push | заполнится после `task.py pr` |
+| report.md содержит CI run URL + screenshot/log первого PASS | ✅ | см. блок "CI evidence" — URL + всех 10 steps success + 26s duration |
 
-**Итого: 6/8 ✅, 2/8 deferred to teamlead post-push (justified).**
+**Итого: 8/8 ✅.**
 
 ## Решения / Заметки
 
