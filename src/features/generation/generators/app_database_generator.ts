@@ -18,7 +18,14 @@ export class AppDatabaseGenerator {
         const destinationDir = this.config.coreDataLocalPath;
         const coreDatabasePath = path.join(destinationDir, 'database.dart');
 
-        const templateDatabasePath = path.join(this.config.templFlutterLibPath, 'core', 'data', 'datasources', 'local', 'database.dart');
+        // TASK-022 / Phase B1: template database path components читаются из
+        // config.templateConfig.database.templateRelativePath (default = t115TemplateConfig()
+        // через GenerationConfig constructor).
+        // Pre-TASK-022 hardcoded values: ['core', 'data', 'datasources', 'local', 'database.dart'].
+        const templateDatabasePath = path.join(
+            this.config.templFlutterLibPath,
+            ...this.config.templateConfig.database.templateRelativePath,
+        );
 
         let existingContent = '';
         let existingTableClasses: Set<string> = new Set();
