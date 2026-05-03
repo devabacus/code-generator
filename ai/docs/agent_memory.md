@@ -200,12 +200,12 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 1. ✅ TASK-019 closure done (Phase 1.5 ceremony)
 2. ✅ HOTFIX-001 closed — `new_task.py` scan active/ + done/ + blocked/
 3. ✅ TASK-CI-001 closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): compile + lint + 163 unit tests. 3-suite split (universal + t115 regression + simplified) deferred to Phase A test inventory audit deliverable.
-4. 🟡 **Initiative Phase A (TASK-021 Sub-A6 finalize)** — Discussion #10 archived (4-agent convergence, 13-point Decision). Single TASK с 7 sub-phases done (Sub-A0..A5). [ADR-0005 promoted](../docs/decisions/adr-0005-multi-template-plurality.md): multi-template plurality + simplified architecture + generate-vs-not-generate divider + Phase C amendment clause + TBD placeholders Q7=e REJECT. 3 audits ✅: weight v1 schema (0.5/4 triggers active), sync_core dual-running (1 HIGH-pending-verification + Option C dedicated v2 testing scope), test inventory (78% universal cases / 72% files, living document). Sub-A5 4 reviewers → 49 findings (5 CRITICAL/DEAL-BREAKER + 14 HIGH applied; pattern validated 6-й precedent). User Option 1 backend ✅ confirmed. **Pending Sub-A6 STOP-gates:** ADR text counter-sign + decision matrix v1 maintenance approval.
+4. 🟢 **Initiative Phase A (TASK-021 ready for merge)** — Discussion #10 archived (4-agent convergence, 13-point Decision). [ADR-0005 promoted + accepted](../docs/decisions/adr-0005-multi-template-plurality.md): multi-template plurality + simplified architecture + generate-vs-not-generate divider + Phase C amendment clause + TBD placeholders Q7=e REJECT. 3 audits ✅. Sub-A5 4 reviewers → 49 findings (5 CRITICAL/DEAL-BREAKER + 14 HIGH applied). All Sub-A6 STOP-gates ✅ resolved. **Clean-slate amendment 2026-05-03:** User confirmed weight v1 НЕ в production → dual-running concerns N/A; decision matrix v1 maintenance moot; cutover plan N/A; t115 deprecated path; default template = simplified; estimate 5-6 → ~3-4 months. PR #16 awaiting explicit "мержить".
 5. Initiative Phase B-D (generate-vs-not-generate divider + synthetic t<200> reference + `--template` CLI flag)
 6. **Phase A-D gate close** (5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign)
-7. **`<weight-v2-build TASK>`** (only after Phase A-D gate closed; новый cross-repo TASK; NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`)
+7. **`<weight-build TASK>`** (only after Phase A-D gate closed; новый cross-repo TASK; NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`)
 8. Initiative Phase E-G (acceptance + documentation reconciliation + closure)
-9. Cutover prep basic в `<weight-v2-build TASK>` closure (full execution = separate later TASK)
+9. Cutover prep basic в `<weight-build TASK>` closure (full execution = separate later TASK)
 
 **Estimate:** 5-6 months calendar realistic, 6 hard ceiling.
 

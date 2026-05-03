@@ -126,7 +126,7 @@ TASK-021 реализует Discussion #10 13-point Decision — Initiative Phas
 - НЕ реализован simplified template код (Phase B scope)
 - НЕ создан synthetic t<200> reference project (Phase C scope)
 - НЕ реализован `--template` CLI flag (Phase D scope)
-- НЕ начат `<weight-v2-build TASK>` (Phase A-D gate not closed yet)
+- НЕ начат `<weight-build TASK>` (Phase A-D gate not closed yet)
 - НЕ pre-decided Phase B-D decisions (Riverpod variant / Drift conventions / manifest markers — Q7=e REJECT)
 - НЕ финализирован Phase A-D `closure-report.md` (Sub-A6 draft only — Phase A section; full document = end of Phase D)
 - НЕ открыт sync_core ADR-0006 fix-task (separate task в sync_core repo, complementary к Option C; weight v2 build trigger)
@@ -136,7 +136,7 @@ TASK-021 реализует Discussion #10 13-point Decision — Initiative Phas
 
 - **HIGH risk (backend event emission)** verification-pending — Phase A-D gate cannot close без либо verification done либо Option C mitigation in place.
 - **Decision matrix v1 maintenance approval** = separate User STOP-gate (Sub-A6); ADR text references conditional ("recommended Discussion #9, awaiting User counter-sign").
-- **`<weight-v2-build TASK>` ID allocation** — `new_task.py` allocates next available после Phase A-D gate close. Placeholder remains во всех живых docs до тех пор; Sub-A6 closure-report includes batch-update note.
+- **`<weight-build TASK>` ID allocation** — `new_task.py` allocates next available после Phase A-D gate close. Placeholder remains во всех живых docs до тех пор; Sub-A6 closure-report includes batch-update note.
 - **Sub-A5 каталог fixes** — 5 CRITICAL + 14 HIGH applied; 4 MEDIUM deferred (Section 5 inline trigger duplication / coalescer deviceId verification / ADR-0004 Pattern 7 / ADR numbering jump) с rationale в этом report.
 
 ## Открытые вопросы для User Sub-A6

@@ -19,7 +19,7 @@
 
 ## Цель
 
-Создать architectural foundation для Initiative Phase B-D + `<weight-v2-build TASK>`:
+Создать architectural foundation для Initiative Phase B-D + `<weight-build TASK>`:
 
 1. **ADR-0005 (Multi-template plurality + simplified architecture)** — canonical architectural contract, User counter-signed
 2. **sync-core-audit.md** — risk classification dual-running v1+v2 на same backend
@@ -35,7 +35,7 @@ User counter-signs: backend strategy + decision matrix v1 maintenance + ADR-0005
 - НЕ реализовывать simplified template код (Phase B scope)
 - НЕ создавать synthetic t<200> reference project (Phase C scope)
 - НЕ реализовывать `--template` CLI flag (Phase D scope)
-- НЕ начинать `<weight-v2-build TASK>` (только after Phase A-D gate closed)
+- НЕ начинать `<weight-build TASK>` (только after Phase A-D gate closed)
 - НЕ принимать Phase B-D decisions (Riverpod variant / Drift conventions) — emerge из B-D prototyping (Q7=e REJECT per Discussion #10)
 - НЕ менять existing t115 template (legacy/advanced, stays maintained)
 - НЕ менять source code в `src/` (генератор) — только ADR + audit reports + docs

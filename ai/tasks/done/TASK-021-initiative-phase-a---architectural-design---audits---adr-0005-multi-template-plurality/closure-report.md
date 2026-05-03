@@ -2,7 +2,7 @@
 
 **Status:** 🟡 Draft (Phase A section ✅ complete; Phase B / C / D placeholders pending)
 **Maintained:** Phase A executor (TeamLead Claude) — accumulator until end of Phase D
-**Final sign-off (end of Phase D):** TeamLead + User counter-sign — gates `<weight-v2-build TASK>` start
+**Final sign-off (end of Phase D):** TeamLead + User counter-sign — gates `<weight-build TASK>` start
 
 ---
 
@@ -30,23 +30,22 @@
 
 ### User counter-sign (Phase A — Sub-A6 STOP-gates ✅ resolved)
 
-- **Backend strategy (Option 1)** — ✅ confirmed 2026-05-03 ("ок делай" Sub-A1 acknowledgment, recorded в backend-strategy-rationale.md)
-- **ADR-0005 text counter-sign** — ✅ confirmed 2026-05-03 ("ok" implicit acknowledgment after Sub-A6 PR #16 review + CI PASS)
-- **Decision matrix v1 maintenance approval** — ✅ confirmed 2026-05-03 ("ok" implicit acknowledgment):
-  - Data loss / security / sync corruption → **fix v1 immediately**
-  - UI bugs / performance regression → **defer** (cosmetic для frozen app)
-  - New feature request → **reject** (v2 backlog)
+- **Backend strategy (Option 1)** — ✅ confirmed 2026-05-03 ("ок делай" Sub-A1 acknowledgment, recorded в backend-strategy-rationale.md). **Post clean-slate decision:** Option 1 trivially correct (nobody writing к backend, weight build = first user).
+- **ADR-0005 text counter-sign** — ✅ confirmed 2026-05-03 ("ok а" implicit acknowledgment after Sub-A6 PR #16 review + CI PASS + clean-slate amendments)
+- **Decision matrix v1 maintenance approval** — ⏭ **N/A под clean-slate decision 2026-05-03** (нет v1 в production → нет maintenance criteria для approve)
 
-**All Sub-A6 STOP-gates ✅ resolved.** Phase A section closed. Awaiting Phase B/C/D execution для full Phase A-D gate close (final TeamLead + User counter-sign at end of Phase D).
+**All Sub-A6 STOP-gates ✅ resolved.** Phase A section closed. Clean-slate decision (User 2026-05-03) удалила dual-running concerns + decision matrix requirement. Awaiting Phase B/C/D execution для full Phase A-D gate close (final TeamLead + User counter-sign at end of Phase D).
 
 ### Phase A Risks documented for Phase B-D
 
-1. **HIGH-pending-verification (sync-core-audit Risk #1):** Backend event emission contract gap для v1-source mutations. Verification cheap (~30 min spike — v1 staging mutation + v2 staging log observation). **Phase B-D mitigation:** Option C (dedicated v2 testing scope `customer = 'v2_staging_<userId>'`) до verification done; backend smoke test obligatory в weight v2 build.
-2. **MEDIUM (sync-core-audit Risk #2):** LWW timestamp skew между v1/v2 client clocks. **Mitigation:** server stamps `lastModified = serverNow()` on accept. **Phase B-D action:** weight v2 server endpoint contract codifies этот convention; v1 server reviewed для parity.
-3. **MEDIUM (sync-core-audit Risk #3):** Outbox-coalescing blindness к cross-protocol mutations. **Mitigation:** server endpoints support idempotent create with deterministic UUID v7 id. **Phase B-D action:** verified в weight v2 server.
-4. **MEDIUM (sync-core-audit Scenario 5 Sub-A5 addition):** Soft-delete tombstone propagation v1 → v2 — `LocalApplyAdapter` contract gap. **Mitigation:** ADR-0005 codifies "v2 LocalApplyAdapter treats `isDeleted=true` from server pull as DELETE on local row".
-5. **MEDIUM (test-inventory Open Q #3 Sub-A5 addition):** simplified template directory layout dependency — `app_database_generator.test.ts` 11 cases verdict universal conditional на Clean hierarchy preservation. **Phase B prototype resolves;** если flatten → 11 cases демотируются к `rewrite-for-template-abstraction`.
-6. **R1-R5 ADR risks** (over-constrains / under-constrains / test inventory stale / Option 1 assumed / category paralysis): mitigations applied (anti-examples generate-side + migration-side / living document / Option 2 triggers / Phase C amendment clause).
+**Post clean-slate decision (2026-05-03):** Sub-A3 dual-running risks (sync-core-audit #1-#5) NOT applicable для weight build — see [sync-core-audit.md](sync-core-audit.md) "Reference-only" status pinning. Useful single-app applicable findings retained:
+
+1. **MEDIUM (single-app sync_core best practice):** Server-stamps `lastModified = serverNow()` on accept = LWW correctness между multi-device users одного приложения (multiple weight clients одного customer на разных phones). **Phase B-D action:** weight server endpoint contract codifies этот convention.
+2. **MEDIUM (single-app sync_core best practice):** Server endpoints support idempotent create с deterministic UUID v7 id = network retry safety (mobile flaky connection, retried POST не дублирует record). **Phase B-D action:** verified в weight server endpoints.
+3. **MEDIUM (sync-core-audit Scenario 5 Sub-A5 addition, applicable single-app):** Soft-delete tombstone propagation — `LocalApplyAdapter` contract gap. sync_core ADR-0001/0002 silent на whether `localApply` should treat `isDeleted=true` от server pull как DELETE на local row либо UPDATE preserving the row. **Mitigation:** ADR-0005 codifies "v2 LocalApplyAdapter treats `isDeleted=true` from server pull as DELETE on local row" — applies к weight build (single-app sync_core consumer).
+4. **MEDIUM (test-inventory Open Q #3 Sub-A5 addition):** simplified template directory layout dependency — `app_database_generator.test.ts` 11 cases verdict universal conditional на Clean hierarchy preservation. **Phase B prototype resolves;** если flatten → 11 cases демотируются к `rewrite-for-template-abstraction`.
+5. **R1-R5 ADR risks** (over-constrains / under-constrains / test inventory stale / Option 1 assumed / category paralysis): mitigations applied (anti-examples generate-side + migration-side / living document / Option 2 triggers / Phase C amendment clause).
+6. **LOW (sync_core ADR-0006 amendment opportunity):** formalize backend event-emission contract surface + server-stamp convention в sync_core ADR — useful documentation regardless of clean slate. Separate task в sync_core repo, не TASK-021 scope.
 
 ### Phase B unblock backlog (handoff к Phase B executor)
 
@@ -55,8 +54,8 @@
 - **Open Question #3 (test-inventory + ADR Section 7.3):** simplified template directory layout (`data/datasources/local/tables/` preservation) — Phase B prototype resolves (affects app_database_generator + relation_generation + lib/core/sync paths)
 - **TBD placeholders (ADR Section 7.1 + 7.2):** Riverpod variant + Drift conventions — Phase B prototype первой simplified entity скажет
 - **CI 3-suite split (TASK-CI-001 future):** wired когда (a) ≥1 simplified suite файл exists AND (b) generation_service.test.ts refactored. Sub-A4 mapping готов для extension.
-- **`<weight-v2-build TASK>` ID resolution:** при `new_task.py` invocation присваивается next available; batch grep+replace `<weight-v2-build TASK>` placeholder во всех живых docs (status.md / roadmap.md / agent_memory.md / handoff.prompt.md / closure-report.md).
-- **sync_core ADR-0006 fix-task** (Option B complementary): formalize backend event-emission contract surface + server-stamp `lastModified` convention в `SyncRemoteEventAdapter` + `SyncPayloadCodec` adapter contract. Trigger когда weight v2 build начинается (или раньше при capacity).
+- **`<weight-build TASK>` ID resolution:** при `new_task.py` invocation присваивается next available; batch grep+replace `<weight-build TASK>` placeholder во всех живых docs (status.md / roadmap.md / agent_memory.md / handoff.prompt.md / closure-report.md). NB: post clean-slate decision placeholder dropped "v2" prefix — нет "v1" чтобы distinguish от.
+- **sync_core ADR-0006 fix-task** (sync_core repo, optional): formalize backend event-emission contract surface + server-stamp `lastModified` convention в `SyncRemoteEventAdapter` + `SyncPayloadCodec` adapter contract. Useful documentation regardless of clean slate. Trigger по capacity / interest, не blocking weight build.
 
 ### MEDIUM Sub-A5 deferrals для Phase G doc reconciliation
 
@@ -121,22 +120,26 @@
 
 ## Phase A-D gate verification (final, end of Phase D)
 
-**Mandatory before `<weight-v2-build TASK>` start:**
+**Mandatory before `<weight-build TASK>` start (post clean-slate decision):**
 
-- [ ] Phase A section ✅ closed (TeamLead + User counter-sign)
+- [x] Phase A section ✅ closed (TeamLead + User counter-sign 2026-05-03)
 - [ ] Phase B section ✅ closed
 - [ ] Phase C section ✅ closed (synthetic t<200> verify PASS errors=0)
-- [ ] Phase D section ✅ closed (CLI flag + 3-suite CI split wired)
+- [ ] Phase D section ✅ closed (CLI flag + manifest markers wired; default `--template simplified`)
 - [ ] Multi-agent review applied к каждой phase (catch rate ≥1 per review)
-- [ ] Backend strategy mitigation in place (Option C dedicated v2 testing scope OR HIGH risk verified resolved)
-- [ ] Documentation rulebook ("what generator generates / what agents write manually") finalized — references ADR-0005 + анти-examples
-- [ ] sync_core ADR-0006 fix-task status known (in-flight / scheduled / decided NOT-needed)
+- [ ] Documentation rulebook ("what generator generates / what agents write manually") finalized — references ADR-0005 + anti-examples
 
-**Sign-off:**
-- @TeamLead ✅ <date>
-- @User ✅ <date>
+**Removed under clean-slate (2026-05-03):**
+- ~~Backend strategy mitigation Option C dedicated v2 testing scope~~ — N/A (no v1 in production)
+- ~~HIGH risk verified resolved~~ — N/A (dual-running risks moot)
+- ~~Decision matrix v1 maintenance approval~~ — N/A
+- ~~sync_core ADR-0006 fix-task obligatory~~ — optional (useful documentation regardless, не blocking weight build)
 
-**Without artifact** → `<weight-v2-build TASK>` cannot start через `new_task.py` invocation per Discussion #10 Q15 (Phase A-D gate verification artifact requirement).
+**Sign-off (final, end of Phase D):**
+- @TeamLead ⏳ pending Phase D
+- @User ⏳ pending Phase D
+
+**Without artifact** → `<weight-build TASK>` cannot start через `new_task.py` invocation per Discussion #10 Q15 (Phase A-D gate verification artifact requirement).
 
 ---
 
@@ -147,3 +150,4 @@
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-05-03 | Initial draft (Phase A section completed; B/C/D placeholders) | TeamLead Claude (Sub-A6) |
+| 2026-05-03 | Clean-slate amendment: dual-running risks removed (Sub-A3 audit pinned reference-only); decision matrix v1 maintenance N/A; `<weight-v2-build TASK>` → `<weight-build TASK>` placeholder rename; Phase A-D gate checklist simplified (4 mandatory + 4 removed); estimate revised к ~3-4 months realistic (was 5-6) | TeamLead Claude (post User clean-slate decision) |

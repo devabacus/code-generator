@@ -1,10 +1,13 @@
 # Sync_core dual-running audit (TASK-021 / Sub-A3)
 
-**Status:** ✅ Complete
+**Status:** ⏭ **Reference-only post 2026-05-03 clean-slate decision** (User confirmed weight v1 НЕ в production → dual-running risks N/A для weight build; audit retained для historical reference + future projects requiring sync_core integration с pre-existing custom-protocol app).
+**Original status:** ✅ Complete (Sub-A3 deliverable)
 **Date:** 2026-05-03
 **Author:** Sub-A3 executor (read-only audit, no code changes)
 **Scope of review:** sync_core 0.3.0 master (path-dep `G:/Projects/Flutter/Packages/sync_core/`)
 **Audit type:** Theoretical analysis (read-only); no runtime spike (per Discussion #10 Q3=a default)
+
+**Clean-slate clarification (2026-05-03):** Audit assumed dual-protocol scenario (v1 custom + v2 sync_core на same backend). User confirmed clean slate — no v1 in production, no users. **5 dual-running risks (HIGH backend event emission gap + 2 MEDIUM + 2 LOW) NOT applicable** для weight build path. Useful findings retained: server-stamp `lastModified = serverNow()` convention (LWW correctness multi-device single-app), idempotent create с UUID v7 (network retry safety), soft-delete tombstone semantics clarification (sync_core ADR-0001/0002 silent — affects single-app weight тоже), sync_core ADR-0006 amendment idea (formalize backend contract surface — useful regardless of clean slate).
 
 ---
 

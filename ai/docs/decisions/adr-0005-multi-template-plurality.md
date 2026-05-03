@@ -46,7 +46,13 @@ Codegen tool принимает **multi-template architecture**. Coexisting temp
 
   Business layer (usecases, application services, validation, custom notifiers с business logic) — **manual write**.
 
-**Template selection** через CLI flag `--template <name>` (Phase D scope). **Default template TBD в Phase D**, selected по criteria: (a) which template applies to majority new projects post-Phase A-D? (b) which template имеет full Initiative validation (weight v2 build)? Strong indication = `simplified` based на Discussion #9 framing (weight v2 = first user, t115 = legacy maintenance only), но binding decision deferred Phase D until simplified prototype validated через synthetic t<200> + first weight v2 entities side-by-side.
+**Template selection** через CLI flag `--template <name>` (Phase D scope). **Default template = `simplified`** (clean-slate decision 2026-05-03 — User confirmed default = simplified, t115 = deprecated path explicitly).
+
+**t115 status (clean-slate amendment 2026-05-03):**
+- **Deprecated path** — frozen (no active maintenance, no new feature generation)
+- Recommendation для new projects = simplified
+- Removal планируется через 6-12 месяцев если нет active consumers
+- Existing usage (если есть) — fix-as-needed, не proactive evolution
 
 **Mixed-template boundary rule (Discussion #7 Q3=b):**
 - **Single template per feature** internally (внутри одного bounded context)
@@ -245,28 +251,19 @@ Per sync_core ADR-0004 Patterns 6-7 (consumer responsibility):
 - **FK ordering** при flush: consumer guarantees enqueue parent before child через atomic Repository transaction OR sequential UI actions. Sync_core flush'ит в `enqueued_at` order. Generator НЕ orchestrates topological sort.
 - **FK violation handling**: sync_core `RetryableSyncException` → backoff retry → `dead` если permanently unresolved. Consumer monitors `dead` queue через `SyncMetrics`. Generator НЕ emits custom FK violation handling.
 
-#### 4.3 Dual-running risk classification (per Sub-A3 audit, complete)
+#### 4.3 Dual-running risk — N/A under clean-slate decision (2026-05-03)
 
-Per [sync-core-audit.md](../../tasks/done/TASK-021-initiative-phase-a---architectural-design---audits---adr-0005-multi-template-plurality/sync-core-audit.md) (Sub-A3 ✅ complete 2026-05-03):
+**Status:** ⏭ **NOT APPLICABLE** post clean-slate User decision 2026-05-03. Weight v1 НЕ в production, реальных пользователей нет → нет coexistence v1+v2 → 5 dual-running рисков (HIGH backend event emission gap + 2 MEDIUM + 2 LOW) **not relevant** для weight build.
 
-**Reframing:** Per Sub-A0.5, weight v1 НЕ использует sync_core (custom `base_sync_repository.dart` + inline `syncStatus` column). Audit оценил **dual-protocol** (v1 custom + v2 sync_core) на same Serverpod backend, не two sync_core instances.
+**Sub-A3 audit retained as historical reference:** [sync-core-audit.md](../../tasks/done/TASK-021-initiative-phase-a---architectural-design---audits---adr-0005-multi-template-plurality/sync-core-audit.md) — содержит full theoretical analysis dual-protocol scenarios. Useful если future project требует sync_core integration с pre-existing custom-protocol app. Для weight build (clean slate) — risks moot.
 
-| Risk | Severity | Affects | Mitigation |
-|------|----------|---------|------------|
-| Backend event stream contract gap (v1 mutations invisible to v2's `SyncRemoteEventAdapter`) | **HIGH (verification-pending)** | Cross-device consistency v2 ↔ v1 | Server emits unified `SyncRemoteEvent` per entity mutation regardless of write source (v1 OR v2); OR Option C dedicated v2 testing scope until cutover |
-| LWW timestamp skew между v1 client clock и v2 client clock | **MEDIUM** | Last-write-wins correctness when v1 + v2 mutate same entity | Server stamps `lastModified = serverNow()` on accept; client `lastModified` becomes proposal only |
-| Outbox-coalescing per `(scope, entityType, entityId, deviceId)` не видит v1 mutations on same entity | **MEDIUM** | v2 client может coalesce stale local op while v1 already won server-side | Pull-on-event picks up server state; LWW resolves stale local override |
-| v2 scope subscription lifecycle on logout/login в mixed v1+v2 install (same device) | **LOW** | Edge case если user has both apps installed concurrently | `_scopeGen` race protection (R3.5) handles re-subscribe; install policy decision |
-| Resurrect attempt (delete + create) interleaved across v1 and v2 | **LOW** | Edge case requiring LWW + ConflictPolicy | Default `allowResurrect=false` throws `ResurrectAttemptException`; consumer handles via `enqueueResolved` |
+**What stays applicable от audit findings:**
+- ✅ Server-stamp `lastModified = serverNow()` convention — best practice независимо от dual-running, weight server endpoints должны это делать (LWW correctness между multi-device users одного приложения)
+- ✅ Idempotent create с deterministic UUID v7 — best practice для weight server endpoints (network retry safety)
+- ✅ Soft-delete tombstone semantics — `LocalApplyAdapter` contract clarification обязателен для weight build (sync_core ADR-0001/0002 silent на этот semantic — affects single-app weight тоже)
+- ✅ Sync_core ADR-0006 amendment в sync_core repo (formalize backend event-emission contract + server-stamp convention) — useful documentation regardless, separate task в sync_core repo если capacity allows
 
-**HIGH severity = verification-pending:** Audit conditional ("If Serverpod emits events only on sync_core's bundle endpoints"). Cheap verification (~30min spike: trigger v1 mutation + observe v2 event log) demotes к LOW immediately если backend Design B (DB-trigger emit). Verification scheduled before weight v2 production cutover (NOT в Phase A scope).
-
-**Recommendation: Option C** (Phase A proceeds с dedicated v2 testing scope as default mitigation):
-- Weight v2 staging + beta builds → dedicated `customer = 'v2_staging_<userId>'` scope (separate Serverpod customer entity provisioning required — backend data model work, see Sub-A3 audit Adversarial finding)
-- Production cutover blocked до либо: (a) backend event-emission contract verified end-to-end OR (b) dedicated scope strategy validated
-- Verification artifact: weight v2 build smoke test (trigger v1 mutation + observe v2 event log)
-
-**Option B (escalate sync_core repo fix-task) — partially applicable:** sync_core lib/ requires no code change, но **ADR amendment recommended в sync_core repo** (formalize backend event-emission contract surface + server-stamp `lastModified` convention as part of `SyncRemoteEventAdapter` + `SyncPayloadCodec` adapter contract). Complementary to Option C, не mutually exclusive. Separate task в sync_core repo, не TASK-021 scope.
+**Cutover plan complexity:** ⏭ N/A (нет users чтобы migrate). Weight build = installable app, deploy as new Flutter app, никаких "v1 → v2 transition" concerns.
 
 **Multi-entity FK guidance amendment for dual-protocol** (per Sub-A5 Sync reviewer): Pattern 6 (cross-entity FK ordering, sync_core ADR-0004) presupposes consumer = single mutator. Под dual-protocol, v2's UI/Repository guarantees parent-before-child within v2, но v1 может insert child-before-parent from v1 side. Pattern 6 amendment note: «in dual-protocol scenarios, child entity FK validation depends on backend ordering semantics, не consumer-side enqueue order».
 
@@ -285,12 +282,12 @@ Per [sync-core-audit.md](../../tasks/done/TASK-021-initiative-phase-a---architec
   - Trigger 4 (multi-tenancy / customer scope semantics changes) = ❌ NOT ACTIVE
 - **78% codegen test cases / 72% files universal** (Sub-A4 + Sub-A5 math correction): simplified template ≠ полный rewrite generator infrastructure shared (parsers + Drift table + sync orchestrator markers + replacement dictionary + verify CLI + services/utils). Усиливает Option 1 safer / cheaper. **Conditional caveat:** `app_database_generator.test.ts` (11 cases) verdict universal действителен только при сохранении t115 directory layout (см. test-inventory-audit Open Question #3 — Phase B prototype resolves)
 - **Zero data migration cost** под Option 1 (v1 production data immediately accessible to v2 client)
-- **Cutover = client switch** (install v2 app → point to existing Serverpod backend → all customer data live)
-- **v1 + v2 coexist на same backend** (parallel apps, decision matrix v1 maintenance per Discussion #9 recommendation — pending User Sub-A6 sign-off, см. task.md acceptance #82: critical-only fixes к v1 продолжают применяться при approval; иначе frozen полностью)
+- **Cutover = N/A** (clean-slate decision 2026-05-03 — нет users чтобы migrate; weight build = installable app, deploy as new Flutter app)
+- **v1 + v2 coexistence = N/A** (clean-slate decision — weight v1 НЕ в production, нет real users; decision matrix v1 maintenance moot)
 
 **Trigger 2/3/4 not active** (no schema redesign signal, no scope semantic changes). Option 2 (forked backend) defer evaluation **unless** ≥1 trigger активируется с concrete evidence. Option 3 (fresh backend) rejected — overkill для weight rebuild scope (out of scope этого Initiative; re-evaluate только if User explicitly решает migrate с Serverpod на another backend framework).
 
-**Sub-A3 sync_core dual-running audit pending** — может surface mitigation requirement (dedicated v2 testing scope), но **не invalidate** Option 1 selection (Sub-A1 STOP-gate ✅ resolved).
+**Clean-slate framing:** Option 1 trivially correct под clean-slate decision — nobody writing к backend ещё, weight build = first user. Sub-A0.5 trigger evaluation остаётся reference-only artifact (4 trigger framework useful если future dual-protocol scenarios, но не applicable для weight build path).
 
 ### 6. Phase C amendment clause
 
@@ -377,7 +374,7 @@ Phase B prototype simplified template scaffolding + RelationPatcher / Orchestrat
 
 | Date | Amendment | TeamLead | User | Section | Rationale |
 |------|-----------|----------|------|---------|-----------|
-| (none yet) | | | | | |
+| 2026-05-03 | **Clean-slate decision** — weight v1 НЕ в production, нет users; dual-running concerns N/A; t115 deprecated path; default template = simplified; weight TASK after Phase C synthetic | TeamLead Claude ✅ | User ✅ | 1, 4.3, 5 | User confirmed clean-slate path. Removes complexity: dual-protocol risks moot, decision matrix v1 maintenance moot, cutover plan N/A. Estimate revised 5-6 → 3-4 months realistic, hard ceiling 4 months. |
 
 ---
 

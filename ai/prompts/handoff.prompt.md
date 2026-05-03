@@ -82,7 +82,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 | Репо | Branch / version | Status |
 |---|---|---|
-| `devabacus/code-generator` (this) | master `841764e` (post TASK-020 CI gate) + TASK-021 in flight | 163 tests + CI workflow, Phase 1.5 closed, 10 discussions archived (Discussion #10 = Initiative Phase A organization), TASK-021 Sub-A6 finalize (ADR-0005 promoted + 3 audits + closure-report draft, awaiting User counter-sign на ADR text + decision matrix v1 maintenance) |
+| `devabacus/code-generator` (this) | master `841764e` (post TASK-020 CI gate) + TASK-021 PR #16 ready for merge | 163 tests + CI workflow, Phase 1.5 closed, 10 discussions archived (Discussion #10 = Initiative Phase A organization), TASK-021 ready: ADR-0005 ✅ accepted (clean-slate amendment 2026-05-03 — User confirmed weight v1 NOT in production, dual-running N/A, decision matrix N/A, t115 deprecated, default = simplified, estimate ~3-4 months) |
 | `devabacus/t115` (template) | master `148ddf1` | BUG-011/013 fixes pushed, 7 marker layers verified, **legacy/advanced template** |
 | `devabacus/sync_core` | 0.3.0 in master | validated multi-entity cross-device на Windows + Android. **Dual-running scope subscription audit obligatory в Initiative Phase A** |
 | `devabacus/weight v1` | master | **production baseline, critical-only maintenance** per Discussion #9 |
