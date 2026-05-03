@@ -10,7 +10,7 @@
 
 После 9 PRs Phase 1.5 sequence — codegen acceptance gate clean (verify PASS errors=0 на t164). 9 discussions archived. Architectural roadmap settled через Discussion #7-#9.
 
-**Latest pivot (Discussion #9):** weight v2 fresh build на simplified template. **TASK-018 cancelled (superseded).** weight v1 = critical-only production baseline. v2 = fresh build = real production validation для simplified template.
+**Latest pivot (Discussion #9 + clean-slate amendment 2026-05-03):** Weight build на simplified template — **clean slate** (User confirmed weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance). TASK-018 cancelled. Weight build = fresh app, hard switch deploy. Estimate revised 5-6 → ~3-4 months realistic, hard ceiling 4 months.
 
 ### Master state
 
@@ -25,7 +25,7 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-020 | CI minimal gate (TASK-CI-001) — `.github/workflows/test.yml` | 🟡 Ready for review | 2026-05-03 |
+| TASK-021 | Initiative Phase A — architectural design + audits + ADR-0005 multi-template plurality (Discussion #10 13-point Decision + clean-slate amendment 2026-05-03) | 🟢 Ready for merge (PR #16, clean-slate amendments applied, ADR ✅ counter-signed, decision matrix N/A) | 2026-05-03 |
 
 ---
 
@@ -35,9 +35,9 @@
 |---|---|---|---|
 | BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-v2-build TASK>`-driven |
-| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-v2-build TASK>`-driven |
-| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-v2-build TASK>`-driven (data integrity) |
+| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-build TASK>`-driven |
+| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 (PR pending) — minimal single-job CI. 3-suite split deferred to Phase A test inventory audit. |
 
@@ -55,19 +55,18 @@
 - **Phase A-D gate close** (5-deliverable checklist + closure-report.md TeamLead + User counter-sign)
 
 **Month 3:**
-- `<weight-v2-build TASK>` start — fresh build на simplified template (only after Phase A-D gate closed). NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`.
+- `<weight-build TASK>` start — fresh build на simplified template (only after Phase A-D gate closed). NB: TASK-020 уже занят CI gate, weight v2 получит next available ID через `new_task.py`.
 - Initiative Phase E (acceptance side-by-side comparison)
 
-**Month 4:**
-- Weight v2 feature parity (UI + business logic manual write)
+**Month 4 (post clean-slate revision):**
+- Weight build feature parity (UI + business logic manual write per simplified template philosophy)
 - Initiative Phase F (documentation reconciliation: CLAUDE.md plurality + ADR-0005 + agent_memory.md split)
+- Weight build cross-device runtime smoke
+- Initiative Phase G (closure docs + multi-agent review)
 
-**Month 5:**
-- Weight v2 cross-device runtime smoke
-- Initiative Phase G (closure docs + multi-agent review + cutover plan basic в `<weight-v2-build TASK>` closure)
-
-**Month 6+ (post hard ceiling):**
-- Weight v1 → v2 production cutover (separate later TASK)
+**Hard ceiling 4 months (was 6):**
+- Action на ceiling = scope cut (drop UI parity для some features), НЕ extend
+- Removed under clean-slate: cutover plan, dual-running window planning, v1→v2 transition execution
 - BUG-001 capacity-permitting
 
 См. [roadmap.md](roadmap.md) для full 4-track sequence.
@@ -76,24 +75,25 @@
 
 ## Cross-repo state
 
-- **codegen репо** (`devabacus/code-generator`): master `77145a3` (post HOTFIX-001), 163 tests baseline + CI workflow
-- **t115 template** (`devabacus/t115`): master `148ddf1`, BUG-011/013 fixes pushed (legacy/advanced template)
-- **sync_core** (`devabacus/sync_core` 0.3.0): in master, validated multi-entity cross-device. Dual-running scope subscription audit obligatory в Initiative Phase A
-- **weight v1** (`devabacus/weight`): production baseline, **critical-only maintenance** per Discussion #9 decision matrix
-- **weight v2** (TBD): fresh build на simplified template (`<weight-v2-build TASK>` — next available ID), starts only after Initiative Phase A-D gate closed
+- **codegen репо** (`devabacus/code-generator`): master `841764e` (post TASK-020 CI gate), 163 tests baseline + CI workflow + TASK-021 (PR #16 awaiting merge approval)
+- **t115 template** (`devabacus/t115`): master `148ddf1` — **deprecated path** (frozen, no active maintenance, removal planned 6-12 месяцев если нет consumers, per ADR-0005 clean-slate amendment)
+- **sync_core** (`devabacus/sync_core` 0.3.0): in master, validated multi-entity cross-device. Dual-running audit (Sub-A3) reference-only post clean-slate decision
+- **weight v1**: ⚠ **NOT в production** (clean-slate decision 2026-05-03 — User confirmed нет real users, нет maintenance burden)
+- **weight build** (TBD): fresh app на simplified template (`<weight-build TASK>` — next available ID), starts only after Initiative Phase A-D gate closed
 
 ---
 
-## User decision points (Discussion #9)
+## User decision points (post clean-slate amendment 2026-05-03)
 
-| Decision | Required by | Owner | Buffer |
+| Decision | Required by | Owner | Status |
 |---|---|---|---|
-| Backend strategy (Option 1 same / 2 forked / 3 fresh) | Phase A start | User | +1 week per delay |
-| Decision matrix v1 maintenance approval | Phase A start | User | +1 week per delay |
-| Phase A-D gate sign-off (closure-report.md) | Before `<weight-v2-build TASK>` | User | +2 weeks if iteration |
-| Cutover plan review | `<weight-v2-build TASK>` closure | User | +1-2 weeks |
+| Backend strategy (Option 1 same / 2 forked / 3 fresh) | Phase A start | User | ✅ confirmed Option 1 (Sub-A1 2026-05-03; trivially correct under clean-slate — nobody writing к backend ещё) |
+| ~~Decision matrix v1 maintenance approval~~ | ~~Phase A start~~ | ~~User~~ | ⏭ **N/A under clean-slate** (нет v1 в production → нет maintenance criteria для approve) |
+| ADR-0005 text counter-sign | Sub-A6 | User | ✅ confirmed 2026-05-03 ("ok а" implicit acknowledgment after PR #16 review + clean-slate amendments) |
+| Phase A-D gate sign-off (closure-report.md) | Before `<weight-build TASK>` | User | ⏳ pending end of Phase D |
+| ~~Cutover plan review~~ | ~~`<weight-build TASK>` closure~~ | ~~User~~ | ⏭ **N/A under clean-slate** (нет users чтобы migrate; weight build = installable app) |
 
-**Recommendation для Q-open backend:** Option 1 (same backend) default. Option 2 только если schema redesign. Option 3 — overkill.
+**All Phase A user decisions ✅ resolved post clean-slate amendment.** Phase A-D gate sign-off remains future User decision (after Phase B/C/D execution).
 
 ---
 

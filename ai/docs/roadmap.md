@@ -2,7 +2,7 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot + TASK-CI-001 closed via TASK-020)
+**Обновлено:** 2026-05-03 (clean-slate amendment — User confirmed weight v1 НЕ в production; dual-running concerns N/A; t115 deprecated path; default template = simplified; estimate 5-6 → ~3-4 months)
 
 ---
 
@@ -30,7 +30,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 - ✅ TASK-019 closure (Phase 1.5 final gate)
 - ✅ HOTFIX-001 (`new_task.py` scan active/ + done/ + blocked/)
 - ✅ TASK-CI-001 closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): `npm ci` + `npm run compile` + `npm run lint` + mocha 163 unit tests on PR/push to master. 3-suite split (universal + t115 regression + simplified) deferred to Initiative Phase A test inventory audit deliverable. Verify smoke deferred (heavy, requires real test project).
-- ⏭ Initiative Phase A: Architectural design (ADR + sync_core integration sanity check + backend strategy + test inventory audit + dual-running risk audit + User decision points)
+- 🟡 Initiative Phase A (TASK-021 Sub-A6 finalize per Discussion #10 13-point Decision): Architectural design — ADR-0005 multi-template plurality promoted в [ai/docs/decisions/](decisions/adr-0005-multi-template-plurality.md) + sync_core dual-running audit (Option C dedicated v2 testing scope recommended) + test inventory audit (78% universal cases) + backend strategy Option 1 confirmed + weight v1 schema audit (0.5/4 triggers active). Sub-A5 multi-agent review (4 reviewers) → 49 findings (5 CRITICAL/DEAL-BREAKER + 14 HIGH applied). **Pending User counter-sign:** ADR text + decision matrix v1 maintenance.
 
 ### Month 2 — Initiative Phase B-D + synthetic acceptance
 
@@ -38,62 +38,51 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 - Initiative Phase C: New t<200>-series reference template (с manifest markers, 5-7 entities synthetic)
 - Initiative Phase D: Codegen `--template <name>` selection mechanism
 
-**Phase A-D gate (mandatory before `<weight-v2-build TASK>` starts):**
+**Phase A-D gate (mandatory before `<weight-build TASK>` starts):**
 - [ ] ADR architectural decision document
 - [ ] Synthetic reference project t<200> minimal viable (5-7 entities, verify PASS errors=0)
 - [ ] Generator infrastructure (`--template` flag, manifest markers, junction regression PASS)
 - [ ] Multi-agent review pattern applied (Standard + Adversarial на 5 specific deliverables, catch rate ≥1)
 - [ ] Documentation rulebook ("what generator generates / what agents write manually")
 
-**Gate verification artifact:** `ai/tasks/initiative-phase-a-d/closure-report.md` TeamLead-signed + User counter-signed. Без артефакта → `<weight-v2-build TASK>` cannot start.
+**Gate verification artifact:** `ai/tasks/initiative-phase-a-d/closure-report.md` TeamLead-signed + User counter-signed. Без артефакта → `<weight-build TASK>` cannot start.
 
-### Month 3 — `<weight-v2-build TASK>` bootstrap + Initiative Phase E
+### Month 3 — `<weight-build TASK>` bootstrap + Initiative Phase E
 
 > NB: TASK-020 уже занят CI gate (TASK-CI-001). Weight v2 build получит next available ID через `new_task.py` (e.g. TASK-021 если ID не conflict'нет с другими).
 
-- `<weight-v2-build TASK>` created **only after Phase A-D gate closed**
+- `<weight-build TASK>` created **only after Phase A-D gate closed**
 - Weight v2 entity build (13 entities + sync infrastructure через generator)
 - Initiative Phase E: Acceptance — synthetic t<200> + first weight v2 entities side-by-side comparison
 
-### Month 4 — Weight v2 feature parity + Phase F
+### Month 4 (post clean-slate revision) — Weight build feature parity + Phase F+G closure
 
-- Weight v2 UI parity (depends на v1 complexity)
-- Weight v2 business logic / workflows manual write (per simplified template philosophy: business layer = manual)
-- Initiative Phase F: Documentation reconciliation
-  - CLAUDE.md plurality acknowledgment
-  - New ADR-0005 "Multi-template plurality decision"
-  - agent_memory.md split (Clean t115 patterns / Simplified t<200> patterns)
-
-### Month 5 — Closure + cutover prep
-
-- Weight v2 cross-device runtime smoke
+- Weight build UI parity (без v1 visual reference compatibility, simplified philosophy)
+- Weight build business logic / workflows manual write (per simplified template philosophy: business layer = manual)
+- Weight build cross-device runtime smoke
+- Initiative Phase F: Documentation reconciliation (CLAUDE.md plurality + ADR-0005 + agent_memory.md split)
 - Initiative Phase G: closure docs + multi-agent review (Standard + Adversarial fresh)
-- Basic cutover plan в `<weight-v2-build TASK>` closure (data source, migration strategy, rollback, transition, smoke, **dual-running window**)
 
-### Month 6+ (post hard ceiling)
+### Hard ceiling 4 months (was 6 pre clean-slate)
 
-- Weight v1 → v2 production cutover (separate later TASK)
+- Action на ceiling = scope cut (drop UI parity для some features), НЕ extend
+- **Removed under clean-slate (2026-05-03):**
+  - Cutover plan execution (нет users чтобы migrate)
+  - Dual-running window planning (нет coexistence)
+  - v1 → v2 production cutover separate later TASK (нет v1)
+  - Backend event emission verification spike (no v1-source mutations)
+  - Decision matrix v1 maintenance approval (нет v1)
 - BUG-001 fix capacity-permitting
-- Backlog items per severity ladder
 
 ---
 
 ## Tracks (parallel)
 
-### Track 1: weight v1 production baseline (critical-only maintenance)
+### Track 1: ⏭ N/A under clean-slate decision (2026-05-03)
 
-**Decision matrix (`<weight-v2-build TASK>` task.md):**
+**Removed:** weight v1 production baseline (critical-only maintenance) — User confirmed weight v1 НЕ в production, нет real users → нет maintenance burden.
 
-| Issue type | v1 action | v2 action |
-|---|---|---|
-| Data loss / corruption | Fix v1 immediately | Verify v2 doesn't have same |
-| Security (auth bypass, data leak) | Fix v1 immediately | Verify v2 doesn't have same |
-| Sync corruption (orphaned records) | Fix v1 immediately | Verify v2 doesn't have same |
-| UI bugs (crash, dead button) | Defer | Backlog v2 |
-| Performance regression | Defer | Backlog v2 |
-| New feature request | **Reject** | Add to v2 scope |
-
-**Owner pattern:** agent investigates + fix PR, User reviews + approves merge.
+Decision matrix v1 maintenance moot. Track 1 deleted. All ресурсы flow в Track 2 (Simplified Template Initiative) + future weight build.
 
 ### Track 2: Simplified Template Initiative
 
@@ -131,9 +120,9 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 |---|---|---|---|
 | BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative refactors |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-v2-build TASK>`-driven (если weight v2 имеет cross-feature junctions) |
-| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-v2-build TASK>`-driven |
-| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-v2-build TASK>`-driven (data integrity) |
+| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-build TASK>`-driven (если weight v2 имеет cross-feature junctions) |
+| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
 | ~~HOTFIX-001~~ | ~~Low~~ | ~~`new_task.py` сканирует только `active/`~~ | ✅ Closed (PR #14) |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Closed via TASK-020 — minimal single-job, [.github/workflows/test.yml](../../.github/workflows/test.yml). 3-suite split + verify smoke deferred to Phase A. |
@@ -142,7 +131,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 
 ## Deferred (post Months 1-6)
 
-- **Phase 2 (Microservices feature parity)** — defer until Initiative + `<weight-v2-build TASK>` done
+- **Phase 2 (Microservices feature parity)** — defer until Initiative + `<weight-build TASK>` done
 - **Phase 3 (UX/DevEx)** — cherry-pick urgent items only (CLI --help examples, plugin templates, cross-platform paths)
 - **Phase 4 (CI/CD + публикация)** — VS Code Marketplace publish, npm publish CLI. TASK-CI-001 partial coverage.
 
@@ -161,6 +150,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 | #7 | 2026-05-03 | Architectural pivot — Multi-template plurality |
 | #8 | 2026-05-03 | Roadmap approval (Phase 1.5 + TASK-018 на Clean + Initiative) — *superseded by #9* |
 | #9 | 2026-05-03 | **Weight v2 fresh build pivot** — TASK-018 cancelled, v1 critical-only, v2 fresh на simplified |
+| #10 | 2026-05-03 | **Initiative Phase A organization** — single TASK-021 с 7 sub-phases (Sub-A0..A6 + Sub-A0.5 weight schema audit), Sub-A1/A4 parallel, Q7=c ADR text sign-off MUST, Q7=e реджект (B-D decisions emerge in B-D), Q8 decomposed ceiling 3w calendar, Q10 двухслойная review structure (Layer 1 = #10 ✅ / Layer 2 = Sub-A5 3 thematic), ADR-0005 Phase C amendment clause |
 
 Полные тексты: `ai/discussions/archive/`.
 
@@ -174,8 +164,8 @@ Per Phase A architectural decisions требуют User input — explicit timel
 |---|---|---|---|
 | Backend strategy (Option 1/2/3) | Phase A start | User | +1 week per delay week |
 | Decision matrix v1 maintenance | Phase A start | User | +1 week per delay week |
-| Phase A-D gate sign-off | Before `<weight-v2-build TASK>` | User | +2 weeks if iteration needed |
-| Cutover plan review | `<weight-v2-build TASK>` closure | User | +1-2 weeks |
+| Phase A-D gate sign-off | Before `<weight-build TASK>` | User | +2 weeks if iteration needed |
+| Cutover plan review | `<weight-build TASK>` closure | User | +1-2 weeks |
 
 Total potential User-side latency: 4-8 weeks. Estimate уже implicitly budgets, но explicit tracking = best practice.
 
@@ -186,4 +176,4 @@ Total potential User-side latency: 4-8 weeks. Estimate уже implicitly budgets
 - Roadmap = живой документ
 - Architectural decisions через Discussion process (multi-agent review + Adversarial pass)
 - Маркеры задач: `[ ]` TODO, `[~]` in progress, `[x]` done, `[!]` blocked, `[~]` superseded
-- **Phase A-D gate enforcement:** TeamLead обязан verify checklist closed + User counter-sign closure-report.md до `new_task.py` invocation для `<weight-v2-build TASK>` (TASK-020 ID уже занят CI gate)
+- **Phase A-D gate enforcement:** TeamLead обязан verify checklist closed + User counter-sign closure-report.md до `new_task.py` invocation для `<weight-build TASK>` (TASK-020 ID уже занят CI gate)

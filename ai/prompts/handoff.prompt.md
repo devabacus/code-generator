@@ -58,7 +58,8 @@
 **Approved sequence (Discussion #9, 5-6 months realistic, 6 hard ceiling):**
 1. ✅ **HOTFIX-001** closed — `new_task.py` scan active/ + done/ + blocked/
 2. ✅ **TASK-CI-001** closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): compile + lint + 163 unit tests. 3-suite split (universal + t115 regression + simplified) deferred to Initiative Phase A test inventory audit.
-3. **Initiative Phase A-D** — ADR architectural decision + synthetic t<200> reference + `--template` CLI flag + multi-agent review
+3. 🟡 **Initiative Phase A** (TASK-021 Sub-A6 finalize per Discussion #10) — [ADR-0005 promoted](../docs/decisions/adr-0005-multi-template-plurality.md) + 3 audits done (weight v1 schema / sync_core dual-running / test inventory) + closure-report.md draft. Sub-A5 multi-agent review (4 reviewers, 49 findings, 5 CRITICAL/DEAL-BREAKER + 14 HIGH applied). Awaiting User counter-sign на ADR text + decision matrix v1 maintenance.
+3.5. **Initiative Phase B-D** — synthetic t<200> reference + `--template` CLI flag + multi-agent review per phase (after Phase A closed)
 4. **Phase A-D gate close** — 5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign artifact
 5. **Weight v2 build TASK** — only after gate closed (cross-repo TASK; ID = next через `new_task.py`, **NB:** TASK-020 уже занят CI gate, не reusing)
 6. **Initiative Phase E-G** parallel с late v2 work (acceptance + docs + closure)
@@ -81,7 +82,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 | Репо | Branch / version | Status |
 |---|---|---|
-| `devabacus/code-generator` (this) | master `77145a3` (post HOTFIX-001) | 163 tests + CI workflow, Phase 1.5 closed, 9 discussions archived, TASK-020 (CI gate) ready for review |
+| `devabacus/code-generator` (this) | master `841764e` (post TASK-020 CI gate) + TASK-021 PR #16 ready for merge | 163 tests + CI workflow, Phase 1.5 closed, 10 discussions archived (Discussion #10 = Initiative Phase A organization), TASK-021 ready: ADR-0005 ✅ accepted (clean-slate amendment 2026-05-03 — User confirmed weight v1 NOT in production, dual-running N/A, decision matrix N/A, t115 deprecated, default = simplified, estimate ~3-4 months) |
 | `devabacus/t115` (template) | master `148ddf1` | BUG-011/013 fixes pushed, 7 marker layers verified, **legacy/advanced template** |
 | `devabacus/sync_core` | 0.3.0 in master | validated multi-entity cross-device на Windows + Android. **Dual-running scope subscription audit obligatory в Initiative Phase A** |
 | `devabacus/weight v1` | master | **production baseline, critical-only maintenance** per Discussion #9 |
@@ -144,7 +145,7 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 
 - ✅ HOTFIX-001 — done.
 - ✅ TASK-CI-001 — done via TASK-020 (minimal single-job CI; 3-suite split deferred to Phase A).
-- Initiative Phase A — architectural design + ADR + sync_core integration audit + backend strategy + test inventory audit + dual-running risk audit
+- 🟡 Initiative Phase A (TASK-021) — Sub-A0..A5 done, Sub-A6 finalize pending User counter-sign на ADR-0005 text + decision matrix v1 maintenance.
 - Weight v2 build TASK — только after Phase A-D gate closed (fresh ID через `new_task.py`, TASK-020 уже занят)
 - BUG-001 не fixать (production-blocker для weight v1 UI, capacity-driven post-Initiative)
 
@@ -155,8 +156,9 @@ User-side latency budget: 4-8 weeks total (≥1 неделя per major decision)
 3. Жди User'а instructions
 
 User скорее всего скажет одно из:
-- **"стартуй Initiative Phase A"** — architectural design + ADR + design discussions для sync_core integration + backend strategy options для User
-- (TASK-CI-001 уже closed via TASK-020 — minimal single-job CI на месте, 3-suite split = Phase A test inventory audit deliverable)
+- **"подписать ADR-0005"** — read [ADR-0005](../docs/decisions/adr-0005-multi-template-plurality.md) + sign off на text + approve decision matrix v1 maintenance — закрывает TASK-021 Sub-A6 STOP-gates
+- **"стартуй Initiative Phase B"** — после Phase A closed, начать generate-vs-not-generate divider implementation + simplified template prototype
+- (TASK-CI-001 уже closed via TASK-020; Initiative Phase A в Sub-A6 finalize)
 
 Phase A architectural design **mandatory deliverable** = ADR + synthetic project + generator infrastructure + multi-agent review + docs rulebook. Без 5 deliverables Phase A-D gate not closed → TASK-020 not startable.
 
