@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import { OrchestratorPatcher } from '../../features/generation/generators/orchestrator_patcher';
 import { GenerationConfig } from '../../features/generation/config/generation_config';
+import { t115TemplateConfig } from '../../features/generation/config/template_config';
 import { ServerpodModel, ServerpodField } from '../../features/generation/parsers/formatters/types';
 import { MockFileSystem } from '../mocks/mock_file_system';
 
@@ -752,6 +753,102 @@ void wireUp() {
     });
 
     // ── BUG-012 (TASK-016) regression — multi-word lowerCamel parent ──────────
+
+    // ====================================================================================
+    // TASK-022 / Phase B1 — TemplateConfig injection tests
+    //
+    // Verifies что `OrchestratorPatcher` строит orchestrator path из
+    // `config.templateConfig.orchestrator.relativePath` вместо hardcoded
+    // `['lib', 'core', 'sync', 'sync_orchestrator_provider.dart']`.
+    // ====================================================================================
+
+    test('TASK-022 / TemplateConfig: t115 default produces hardcoded-equivalent orchestrator path (regression)', async () => {
+        // Verify default GenerationConfig (без explicit templateConfig) использует
+        // t115TemplateConfig() literals → orchestrator at lib/core/sync/sync_orchestrator_provider.dart.
+        const config = makeConfig();
+        assert.strictEqual(config.templateConfig.name, 't115');
+        assert.deepStrictEqual(
+            config.templateConfig.orchestrator.relativePath,
+            ['lib', 'core', 'sync', 'sync_orchestrator_provider.dart'],
+            't115 default: orchestrator relativePath = lib/core/sync/sync_orchestrator_provider.dart',
+        );
+
+        // Behavioral: orchestrator под default path читается, patcher работает идемпотентно.
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+        await patcher.patch(config, makeModel('Expense'));
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+        assert.ok(result.includes('register<ExpenseEntity>'),
+            't115 default config: register block produced под conventional path');
+    });
+
+    test('TASK-022 / TemplateConfig: alt config routes к alt target file', async () => {
+        // Alt path: orchestrator файл в alternate location. Patcher должен искать там,
+        // не в hardcoded `lib/core/sync/sync_orchestrator_provider.dart`.
+        const altOrchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/orchestrator/alt_orchestrator.dart`;
+        const altConfig = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'tasks',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: {
+                name: 't115',
+                relationPatcher: t115TemplateConfig().relationPatcher,
+                orchestrator: {
+                    relativePath: ['lib', 'core', 'orchestrator', 'alt_orchestrator.dart'],
+                },
+                database: t115TemplateConfig().database,
+            },
+        });
+
+        // Setup orchestrator at alt path.
+        mockFs.setFile(altOrchestratorPath, ORCHESTRATOR_BASELINE);
+
+        await patcher.patch(altConfig, makeModel('Expense'));
+
+        // Positive: alt path was patched (register block written there).
+        const altResult = await mockFs.readFile(altOrchestratorPath);
+        assert.ok(altResult.includes('register<ExpenseEntity>'),
+            'alt path: register block written в alternate orchestrator file');
+
+        // Negative: default ORCHESTRATOR_PATH should NOT exist (patcher не trying conventional path).
+        const defaultExists = await mockFs.exists(ORCHESTRATOR_PATH);
+        assert.strictEqual(defaultExists, false,
+            'alt path: default conventional path file НЕ должен быть создан/затронут');
+    });
+
+    test('TASK-022 / TemplateConfig: existing patching behavior unchanged под explicit t115 config (regression)', async () => {
+        // Equivalence test: explicit t115TemplateConfig() vs default = identical output.
+        const explicitConfig = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'tasks',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: t115TemplateConfig(),
+        });
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+        await patcher.patch(explicitConfig, makeModel('Expense'));
+        const explicitResult = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // Reset + default config.
+        const mockFs2 = new MockFileSystem();
+        const patcher2 = new OrchestratorPatcher(mockFs2);
+        mockFs2.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+        await patcher2.patch(makeConfig(), makeModel('Expense'));
+        const defaultResult = await mockFs2.readFile(ORCHESTRATOR_PATH);
+
+        assert.strictEqual(explicitResult, defaultResult,
+            'explicit t115TemplateConfig() = default config output (regression invariant)');
+    });
 
     test('BUG-012: junction с multi-word snake parent (terminalSet) → docstring/methods используют lowerCamel form', async () => {
         // Discussion #5 confirmed weight production landmine: customer_user.spy.yaml
