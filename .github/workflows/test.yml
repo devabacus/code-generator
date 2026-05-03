@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Compile + Lint + Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests (mocha workaround, excludes vscode-runtime extension.test.js)
+        # Explicit binary path вместо `npx mocha` — mocha = transitive dep через @vscode/test-cli,
+        # `npx` fallback'нул бы на latest из реестра при prune (Adversarial review DEAL-BREAKER #1).
+        # Соответствует prior-art TASK-013/016 reports.
+        run: node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
