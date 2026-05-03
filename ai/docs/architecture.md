@@ -1,6 +1,6 @@
 # Архитектура code-generator
 
-**Обновлено:** 2026-04-18
+**Обновлено:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; ADR-0005 multi-template plurality accepted; ⚠ CRITICAL stack-lock User decision; Phase B-D Initiative pending TASK-B1 creation)
 
 ## Высокоуровневая структура
 
@@ -198,13 +198,23 @@ G:/Templates/flutter/t115/
 
 После `create-project` проект **сразу компилируется** (verified на t143: errors=0, warnings=2, infos=75 + runtime HTTP 200).
 
+## Multi-template plurality (Discussion #7 → ADR-0005 accepted)
+
+**Per ADR-0005 + Discussion #11 stack-lock decision:** codegen поддерживает coexisting templates:
+
+- **`t115` (Clean / advanced)** — current existing template (`G:/Templates/flutter/t115/`). **Deprecated path** (frozen, no active maintenance, removal планируется 6-12 месяцев). Hardcode references на t115 (`create_new_project.ts`, `create_project.ts`) — будут refactored под `--template <name>` flag в Phase B-D Initiative.
+- **`simplified` (new)** — будет создан в Phase B-D в `G:/Templates/flutter/simplified/`. Default template post Phase D `--template <name>` flag implementation. Stripped-down — generates schema-derived infrastructure (Drift / DAO / Repository / sync_core 5 adapters / Riverpod data providers / mappings) **без** architecture ceremony (no usecases / business notifiers / validation / repository interfaces по умолчанию).
+
+**⚠ CRITICAL Stack-lock principle (User decision 2026-05-03):** стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout `lib/features/<feature>/data/datasources/local/tables/` + sync_core 0.3.0 + Serverpod) **НЕ меняется без явного User approval**. Версии всех packages update к latest stable (включая Serverpod). Simplified template **inherits ВСЕ patterns** от t115; меняется только architecture ceremony reduction.
+
+См. [decisions/adr-0005-multi-template-plurality.md](decisions/adr-0005-multi-template-plurality.md) — canonical contract; [ai/discussions/archive/11-initiative-phase-b-simplified-template-i/](../discussions/archive/11-initiative-phase-b-simplified-template-i/) — Phase B 12-point Decision + stack-lock User_2 override.
+
 ## Что намеренно упрощено
 
-- **Единственный шаблон `t115`** — хардкод в `create_new_project.ts:36` и `create_project.ts:44`. Плагинная архитектура (Фаза 3 roadmap) — в будущем.
-- **Активная ветка `feature--fix-codegen-regen-bugs`** — 14 коммитов с фиксами BUG-002/003/004/005/006 + verify CLI команда + autoGenerateTasksFeature. Решение о мерже в master — отдельный вопрос User.
-- **Тестов 163 passing** (mocha workaround `--ignore extension.test.js` per agent_memory.md; relation_patcher, entity_yaml_validator, replacement_util, app_database_generator, verify_analyzer_parser, sync_core integration tests, etc.). Та же команда в CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)). TASK-004 в roadmap — расширить покрытие (хотя за время Phase 1.5 покрытие выросло с 62 до 163).
-- **Windows-only path assumptions** — `G:/Templates`, `G:/Projects/Flutter/serverpod` хардкод в дефолтах CLI (можно переопределить флагами). Cross-platform не цель Фазы 1.
+- **Тестов 163 passing** (mocha workaround `--ignore extension.test.js` per agent_memory.md; relation_patcher, entity_yaml_validator, replacement_util, app_database_generator, verify_analyzer_parser, sync_core integration tests, etc.). Та же команда в CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)). TASK-004 в roadmap — расширить покрытие (за Phase 1.5 покрытие выросло с 62 до 163).
+- **Windows-only path assumptions** — `G:/Templates`, `G:/Projects/Flutter/serverpod` хардкод в дефолтах CLI (можно переопределить флагами). Cross-platform не цель.
 - **`python/services/workflow_modifier.ts` как фасад** — оставлен для back-compat. Постепенно `project_creator.ts` может мигрировать на прямое использование `core/services/workflow/*`.
+- **Multi-template support** — Phase B-D Initiative реализует `--template <name>` CLI flag и refactor hardcoded t115 references в codegen core. Sequenced TASK-B1 (core multi-template infra) → TASK-B2 (simplified template content) → TASK-B3 (tests + Open Q resolution). Estimate 5-7 weeks calendar (per Discussion #11 + ClaudeAdv evidence-based revision).
 
 ## Кто обновляет
 
