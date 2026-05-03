@@ -1,5 +1,6 @@
 import path from "path";
 import { manifestType as ManifestType } from "../generators/manifests";
+import { TemplateConfig, t115TemplateConfig } from "./template_config";
 
 export interface IGenerationConfig {
     templProject?: string;
@@ -30,6 +31,18 @@ export interface IGenerationConfig {
     sourceFeaturePath?: string;
     workspacesPath?: string;
     templatesPath?: string;
+    /**
+     * TASK-022 / Phase B1: template-specific configuration injected в generators
+     * (`RelationPatcher`, `OrchestratorPatcher`, `AppDatabaseGenerator`). Default
+     * через `t115TemplateConfig()` factory когда не указано — backwards compat
+     * для всех existing call-sites.
+     *
+     * Phase D `--template <name>` CLI flag будет переключать между t115 и simplified
+     * (TASK-B2 scope) через подмену этого field в config builder.
+     *
+     * См. [ADR-0005 amendment 2026-05-03 stack lock](../../docs/decisions/adr-0005-multi-template-plurality.md).
+     */
+    templateConfig?: TemplateConfig;
 }
 
 export class GenerationConfig {
@@ -54,6 +67,12 @@ export class GenerationConfig {
 
     public templatesPath: string;
 
+    /**
+     * TASK-022 / Phase B1: template-specific configuration. Default через
+     * `t115TemplateConfig()` factory если caller не передаёт — backwards compat.
+     */
+    public templateConfig: TemplateConfig;
+
 
     constructor(config: IGenerationConfig) {
         this.templProject = config.templProject || 't2';
@@ -76,6 +95,9 @@ export class GenerationConfig {
         this.templEntity2 = config.templEntity2 || 'tag';
         this.targetJunctionClassName = config.targetJunctionClassName || '';
         this.sourceFeaturePath = config.sourceFeaturePath || path.join(this.templatesPath, 'flutter', this.templProject, `${this.templProject}_flutter`, 'lib', 'features', this.templFeatureName);
+        // TASK-022 / Phase B1: default template config = t115 если не указано.
+        // Backwards compat для всех existing call-sites (create_project / generate_entity / tests).
+        this.templateConfig = config.templateConfig || t115TemplateConfig();
     }
 
 
