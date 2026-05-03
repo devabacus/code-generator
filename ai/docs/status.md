@@ -1,12 +1,14 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-03 (Discussion #9 — weight v2 fresh build pivot + TASK-CI-001 closed via TASK-020)
+**Обновлено:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; Discussion #11 archived; ready for Phase B execution)
 
 ---
 
 ## Текущая фаза
 
-**Phase 1.5 ✅ CLOSED** (2026-05-03).
+**Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03).
+
+**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. **Ready for TASK-B1 creation** (codegen core multi-template infrastructure refactor).
 
 После 9 PRs Phase 1.5 sequence — codegen acceptance gate clean (verify PASS errors=0 на t164). 9 discussions archived. Architectural roadmap settled через Discussion #7-#9.
 
@@ -16,10 +18,11 @@
 
 ### Master state
 
-- **Branch:** `master 77145a3` (post HOTFIX-001 + TASK-020 in flight)
-- **Tests:** 163 passing, 0 failing (mocha workaround `--ignore extension.test.js`)
+- **Branch:** `master 70650f7` (post stack-lock chore PR #17)
+- **Tests:** 163 passing, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
 - **Compile:** clean
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + 163 unit tests)
+- **Total PRs merged:** 17 (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + this docs refresh chore in flight)
 
 ---
 
@@ -27,7 +30,7 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-021 | Initiative Phase A — architectural design + audits + ADR-0005 multi-template plurality (Discussion #10 13-point Decision + clean-slate amendment 2026-05-03) | 🟢 Ready for merge (PR #16, clean-slate amendments applied, ADR ✅ counter-signed, decision matrix N/A) | 2026-05-03 |
+(Empty — Phase A merged PR #16 + stack-lock chore merged PR #17. **Ready for TASK-B1 creation per Discussion #11 12-point Decision.**)
 
 ---
 

@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-03 (Phase 1.5 closure + Discussion #8 finalization + TASK-CI-001 minimal CI gate)
+**Последнее обновление:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; Discussion #11 archived; ready for Phase B execution)
 
 ---
 
@@ -11,15 +11,19 @@
 
 **Что это.** VS Code расширение + CLI `codegen` для генерации Serverpod/Flutter монорепо из шаблона t115 + микросервисов (Python/Node/Go).
 
-**Стек проекта:**
+**Стек проекта (⚠ CRITICAL — locked per Discussion #11 User decision 2026-05-03):**
 - Codegen src/ — TypeScript, ~3000-4000 LOC, 163 unit tests
-- Шаблон t115 — отдельный git репо (`devabacus/t115`), не tracked codegen репо
+- Шаблон t115 — отдельный git репо (`devabacus/t115`), **deprecated path** (frozen, removal 6-12 месяцев)
 - sync_core 0.3.0 — отдельный pub package (`devabacus/sync_core`), outbox-first multi-entity sync
 - Сгенерированные test projects: `G:/Projects/Flutter/serverpod/t<N>/`
+- **Stack lock:** Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod = locked package set; package versions update к latest stable (включая Serverpod) — НЕ stack changes
 
-**Текущая фаза:** Phase 1.5 ✅ CLOSED (2026-05-03). См. [status.md](status.md) и [roadmap.md](roadmap.md).
+**Текущая фаза:** Phase 1.5 + Phase A ✅ CLOSED (2026-05-03); Phase B Discussion #11 ✅ archived; **ready for TASK-B1 creation**. См. [status.md](status.md) и [roadmap.md](roadmap.md).
 
-**Architectural pivot принят (Discussion #7):** Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative" — standalone parallel track.
+**Architectural pivots (consolidated 2026-05-03):**
+- **Discussion #7** Multi-template plurality (informal) → formalized в **ADR-0005**
+- **Discussion #9 + clean-slate amendment** — weight v1 НЕ в production, fresh build, no dual-running concerns, no cutover, t115 deprecated path, default template = simplified
+- **Discussion #11 + ⚠ CRITICAL stack-lock User decision** — стэк t115 baseline locked, package versions update к latest stable. Section 7.1/7.2/7.3 TBD placeholders RESOLVED via stack lock. Open Q #1/#2/#3 resolved as YES RelationPatcher / inherits t115 DI / preserve Clean directory layout.
 
 ---
 

@@ -9,16 +9,19 @@
 
 **Где живут вещи:**
 - Код: `src/` (TypeScript)
-- Шаблоны: `G:/Templates/flutter/t115/` — **вне репозитория**, путь конфигурируется
+- Шаблоны: `G:/Templates/flutter/t115/` — **вне репозитория**, **deprecated path** (frozen, removal 6-12 месяцев). Future simplified template = `G:/Templates/flutter/simplified/` (Phase B-D will create).
 - Сгенерированные проекты: `G:/Projects/Flutter/serverpod/<name>/`
 - Документация процесса: `ai/docs/`, задачи: `ai/tasks/`, баги: `ai/bug-reports/`
-- **Начинай с**: [ai/docs/INDEX.md](ai/docs/INDEX.md) → [ai/docs/agent_memory.md](ai/docs/agent_memory.md)
+- **Начинай с**: [ai/prompts/handoff.prompt.md](ai/prompts/handoff.prompt.md) → [ai/docs/INDEX.md](ai/docs/INDEX.md) → [ai/docs/agent_memory.md](ai/docs/agent_memory.md)
+
+**⚠ CRITICAL Stack-lock decision (User 2026-05-03 Discussion #11):** стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) **НЕ меняется без явного User approval**. Package versions update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation / repository interfaces по умолчанию / app services / mappers separate class / Either-Result / datasource interfaces).
 
 **Не пропусти:**
 - [AGENTS.md](AGENTS.md) — глобальные правила процесса (запреты, block-rules, PR/merge flow, коммиты)
 - [ai/docs/agent_memory.md](ai/docs/agent_memory.md) — обязателен к прочтению каждой сессии
-- [ai/bug-reports/](ai/bug-reports/) — статус известных багов (часть закрыта 2026-04-25/26)
-- [ai/prompts/{teamlead,executor,finalize}.prompt.md](ai/prompts/) — промпты для ролей (teamlead — оркестратор, executor — реализация, finalize — закрытие задачи)
+- [ai/docs/decisions/adr-0005-multi-template-plurality.md](ai/docs/decisions/adr-0005-multi-template-plurality.md) — canonical architectural contract
+- [ai/bug-reports/](ai/bug-reports/) — статус известных багов
+- [ai/prompts/{teamlead,executor,finalize}.prompt.md](ai/prompts/) — промпты для ролей
 - [ai/scripts/{new_task.py, task.py}](ai/scripts/) — task management CLI: создать TASK-XXX, feature branch → PR → merge
 
 ---
@@ -323,6 +326,11 @@ ai/tasks/active/               # текущие задачи
 
 ---
 
-**Последнее обновление:** 2026-05-03 (Phase 1.5 closure + handoff prep)
-**Активная ветка:** `master` (Phase 1.5 ✅ CLOSED — TASK-019 pending merge; next sequence per Discussion #8 — TASK-018 Phase 0 preflight + Simplified Template Initiative)
-**Architectural pivot принят (Discussion #7):** Multi-template plurality. Для handoff onboarding читай [INDEX.md](ai/docs/INDEX.md) → [agent_memory.md](ai/docs/agent_memory.md) → [roadmap.md](ai/docs/roadmap.md) → [status.md](ai/docs/status.md).
+**Последнее обновление:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; Discussion #11 archived; ready for Phase B execution)
+**Активная ветка:** `master 70650f7` (post stack-lock chore PR #17). 17 PRs merged. 163 tests baseline + CI workflow ([.github/workflows/test.yml](.github/workflows/test.yml)).
+**Architectural state:**
+- **Discussion #7** Multi-template plurality (informal) → formalized в **ADR-0005**
+- **Discussion #9 + clean-slate amendment 2026-05-03** — weight v1 НЕ в production, fresh build, no dual-running concerns
+- **Discussion #11 + ⚠ CRITICAL stack-lock 2026-05-03** — стэк t115 baseline locked; package versions update к latest stable; simplified философия = ТОЛЬКО architecture ceremony reduction
+
+Для handoff onboarding читай [handoff.prompt.md](ai/prompts/handoff.prompt.md) → [INDEX.md](ai/docs/INDEX.md) → [agent_memory.md](ai/docs/agent_memory.md) → [ADR-0005](ai/docs/decisions/adr-0005-multi-template-plurality.md) → [roadmap.md](ai/docs/roadmap.md) → [status.md](ai/docs/status.md).

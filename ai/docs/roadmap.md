@@ -8,14 +8,17 @@
 
 ## Текущий статус
 
-**Phase 1.5 ✅ CLOSED** (2026-05-03, TASK-019 acceptance — verify PASS errors=0 на t164).
+**Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03). master `70650f7`. 17 PRs merged. 163 tests baseline + CI workflow.
 
-Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-013 template markers + TASK-012 partial + TASK-016 parser FK alias + TASK-017 DAO substitution + TASK-019 re-acceptance). 163 unit tests baseline.
+**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. Ready for TASK-B1 creation.
 
 **Architectural pivot decisions:**
 - **Discussion #7** (archived 2026-05-03): Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative".
-- **Discussion #8** (archived 2026-05-03): Sequence approved (TASK-018 production migration на Clean) — *superseded by Discussion #9*.
-- **Discussion #9** (archived 2026-05-03): Weight v2 fresh build pivot. **TASK-018 cancelled (superseded).** weight v1 = critical-only production baseline. v2 = fresh build на simplified template.
+- **Discussion #8** (archived 2026-05-03): Sequence approved — *superseded by Discussion #9*.
+- **Discussion #9** (archived 2026-05-03): Weight v2 fresh build pivot. **TASK-018 cancelled.**
+  - **Clean-slate amendment 2026-05-03:** weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance. Estimate 5-6 → ~3-4 months realistic.
+- **Discussion #10** (archived 2026-05-03): Initiative Phase A organization (13-point Decision).
+- **Discussion #11** (archived 2026-05-03): Initiative Phase B implementation strategy (12-point Decision) + **⚠ CRITICAL Stack-lock User decision** (стэк t115 baseline locked, package versions update к latest stable, simplified философия = ТОЛЬКО architecture ceremony reduction).
 
 ---
 
