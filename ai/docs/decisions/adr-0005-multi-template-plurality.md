@@ -1,6 +1,6 @@
 # ADR-0005: Multi-template plurality + simplified architecture
 
-**Status:** Promoted (post-Sub-A5 review fixes applied) → awaiting User counter-sign
+**Status:** ✅ Accepted (User counter-signed 2026-05-03)
 **Date:** 2026-05-03
 **Authors:** Discussion #7 (informal multi-template plurality decision) + Discussion #10 (Phase A organization formalization) + TASK-021 Sub-A2 executor
 **Supersedes:** —

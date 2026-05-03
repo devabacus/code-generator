@@ -28,14 +28,16 @@
   - Adversarial overlay: 14 findings (3 DEAL-BREAKER + 4 HIGH + 4 MEDIUM + 3 LOW); recommendation Request changes — DEAL-BREAKERS + HIGH applied
 - **Catch rate threshold (≥1 finding per review):** ✅ substantially exceeded (49 findings total, 5 CRITICAL/DEAL-BREAKER, 14 HIGH applied)
 
-### User counter-sign (Phase A — pending Sub-A6 STOP-gates)
+### User counter-sign (Phase A — Sub-A6 STOP-gates ✅ resolved)
 
-- **Backend strategy (Option 1)** — ✅ confirmed 2026-05-03 ("ок делай" implicit acknowledgment, recorded в backend-strategy-rationale.md User decision section)
-- **ADR-0005 text counter-sign** — ⏳ pending User read + sign-off (1 week SLA per Discussion #10 Q8)
-- **Decision matrix v1 maintenance approval** — ⏳ pending User explicit confirmation:
-  - Data loss / security / sync corruption → fix v1 immediately
-  - UI bugs / performance regression → defer (cosmetic)
-  - New feature request → reject (v2 backlog)
+- **Backend strategy (Option 1)** — ✅ confirmed 2026-05-03 ("ок делай" Sub-A1 acknowledgment, recorded в backend-strategy-rationale.md)
+- **ADR-0005 text counter-sign** — ✅ confirmed 2026-05-03 ("ok" implicit acknowledgment after Sub-A6 PR #16 review + CI PASS)
+- **Decision matrix v1 maintenance approval** — ✅ confirmed 2026-05-03 ("ok" implicit acknowledgment):
+  - Data loss / security / sync corruption → **fix v1 immediately**
+  - UI bugs / performance regression → **defer** (cosmetic для frozen app)
+  - New feature request → **reject** (v2 backlog)
+
+**All Sub-A6 STOP-gates ✅ resolved.** Phase A section closed. Awaiting Phase B/C/D execution для full Phase A-D gate close (final TeamLead + User counter-sign at end of Phase D).
 
 ### Phase A Risks documented for Phase B-D
 
