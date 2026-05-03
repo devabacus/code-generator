@@ -1,6 +1,25 @@
 # BUG-012: server_yaml_parser игнорирует `relation(parent=X)` directive — FK alias resolution broken
 
-**Статус:** 🟡 Partially Resolved (parser + helper + path/class normalization closed via TASK-016 Path C, 2026-05-03; **method body substitution rewrite deferred to TASK-017** per Discussion #5 STOP-gate #2)
+**Статус:** ✅ **Resolved** (full FK alias support — parser + helper + path/class normalization closed via TASK-016 Path C 2026-05-03; method body substitution closed via TASK-017 Approach A order swap 2026-05-03)
+
+## Resolution evidence (TASK-017 Approach A, 2026-05-03)
+
+**Closed (TASK-017 PR):**
+- `relation_patcher.ts:71-94` substitution sequence reordered (Approach A): Step 2 NEW (field-Id preservation lowerCamel + PascalCase) BEFORE Step 3 (relatedEntity ENTITY rules)
+- `cap` import added (reuse existing helper from `text_util.ts`, no second helper)
+- 5 mandatory test groups + positive/negative assertions per Discussion #6
+- Verify evidence на t161 (production-shaped `assigneeId, parent=team_member`):
+  - `invoice_dao.dart:190` `t.assigneeId.equals(assigneeId)` ✅ (column ref preserved)
+  - `invoice_repository_impl.dart:193` `getInvoicesByAssigneeId(String assigneeId)` ✅ (method+param preserved)
+  - `invoice_local_data_source.dart:274` ✅
+  - `invoice_table.dart:6,12` import `team_member_table.dart` + `references(TeamMemberTable, ...)` ✅ (parent-derived for FK target)
+  - 7 marker layers all field-alias-preserved + 0 parent-derived leaks (verified Adversarial review)
+- 163 tests passing (158 baseline + 5 new TASK-017 groups)
+- Multi-agent code review: Standard ✅ MERGE с минорным cleanup, Adversarial ✅ MERGE 0 fixes required
+
+**Pre-implementation:** [Discussion #6](../discussions/archive/6-task-017-dao-substitution-rewrite-pre-im/) (3-agent consensus: Chatgpt_1 + Claude_1 + teamlead_claude_4) verified factual correction (7 markers consumers, не 5). Approach A delivered as designed in 65 minutes (vs 4-8h conservative band — legitimate Approach A simplicity, не cut corners).
+
+
 
 ## Resolution evidence (TASK-016 Path C, 2026-05-03)
 
