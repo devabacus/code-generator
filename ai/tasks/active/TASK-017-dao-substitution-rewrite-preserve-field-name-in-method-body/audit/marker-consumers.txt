@@ -1,0 +1,18 @@
+# Phase 1 Audit Deliverable — :oneToManyMethods marker consumers
+#
+# Command: rg -l ":oneToManyMethods" G:/Templates/flutter/t115 --type dart
+# Date: 2026-05-03
+# Expected (Discussion #6 verified): 7 files in t115_flutter/lib/features/tasks/
+# Result: 7 files — MATCH
+
+t115_flutter/lib/features/tasks/domain/repositories/task_repository.dart
+t115_flutter/lib/features/tasks/data/repositories/task_repository_impl.dart
+t115_flutter/lib/features/tasks/data/datasources/local/interfaces/task_local_datasource_service.dart
+t115_flutter/lib/features/tasks/data/datasources/local/datasources/task_local_data_source.dart
+t115_flutter/lib/features/tasks/data/datasources/local/daos/task/task_dao.dart
+t115_flutter/lib/features/tasks/domain/usecases/task_usecases.dart
+t115_flutter/lib/features/tasks/domain/providers/task/task_usecase_providers.dart
+
+# Conclusion: 7 marker consumers verified, no discrepancy. DAO + local_data_source
+# ARE marker consumers (not hardcoded inheritance per outdated description). Approach A
+# (order swap) works uniformly across all 7 layers — no special case needed.

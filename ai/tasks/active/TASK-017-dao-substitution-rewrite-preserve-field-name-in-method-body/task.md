@@ -260,4 +260,33 @@ Discussion #6 archived 2026-05-03. 3-agent consensus + verified factual correcti
 
 ## Журнал исполнения
 
-(Заполняется executor'ом по ходу работы.)
+- [Phase 1 / audit] `rg -l ":oneToManyMethods"` returned **7 files в `t115_flutter/lib/features/tasks/`** — exact match с Discussion #6 expected set. Output committed в `audit/marker-consumers.txt`. No discrepancy → proceed Phase 2 без re-evaluate.
+- [Phase 1 / audit] Verified `cap` exists в `text_util.ts:9-11` — single source of truth для PascalCase, no second helper нужен.
+- [Phase 1 / audit] Baseline `npm test` = **158 passing** (matches task.md baseline). Confirmed pre-change state.
+- [Phase 2 / impl] Added `cap` to import line `text_util.ts` import in `relation_patcher.ts`.
+- [Phase 2 / impl] Reordered substitution sequence в `relation_patcher.ts:71-94`. STEP 2 (field-Id preservation, lowerCamel + PascalCase) теперь идёт ПЕРЕД STEP 3 (relatedEntity ENTITY rules). Старые lines 90-91 (`targetIdName` substitution after Step 3) replaced inline в новый Step 2, и расширены PascalCase variant `${cap(templateRelatedEntity)}Id → targetIdNamePascal`.
+- [Phase 2 / impl] `npm run compile` → clean (no TS errors).
+- [Phase 2 / impl] `npx mocha --ui tdd out/test/**/*.test.js --ignore out/test/extension.test.js` → **158 passing** (no regression). Backwards compat для existing identity-case fixtures preserved.
+- [Phase 3 / tests] Добавил 5 mandatory test groups в `relation_patcher.test.ts`:
+  - Group 1 (simple FK alias `assigneeId, parent=member`): production-shaped DAO template + positive (method/param/column = `assigneeId`) + negative (no `MemberId`/`categoryId`/`teamMemberId` leaks).
+  - Group 2 (snake production-shaped `defaultTerminalSetId, parent=terminalSet`): positive multi-word preservation + negative snake leak `terminal_setId` guard.
+  - Group 3 (multiple FK aliases `assigneeId` + `cargoTypeId`): both methods preserved, no cross-contamination, idempotency check (1 occurrence each).
+  - Group 4 (backwards compat identity `categoryId, parent=category`): exact preservation + idempotent regen check.
+  - Group 5 (7 marker layers smoke): mini-fixtures для всех 7 layers (repository interface/impl, lds interface/concrete, dao, usecases, providers), per-layer positive (`getWeighingsByAssigneeId`) + negative (`!getWeighingsByMemberId`, `!categoryId`, `!CategoryId`).
+- [Phase 3 / tests] Initial test failure caught: existing `TASK_DAO_TEMPLATE` shared fixture был minimal (`_db.select(taskTable)`) без column refs. Per-test override `mockFs.setFile(TASK_DAO_PATH, TASK_DAO_PROD_TEMPLATE)` с production-shaped body (`t.categoryId.equals(categoryId)`) добавлен в Groups 1-4. Group 5 имеет свои custom multi-layer templates.
+- [Phase 3 / tests] `npx mocha --ui tdd out/test/**/*.test.js --ignore out/test/extension.test.js` → **163 passing** (158 baseline + 5 new TASK-017). Target 168+ был оптимистичен (Discussion #6 предполагал ~10 new); reality — 5 well-isolated groups покрывают все мандатные сценарии без duplication.
+- [Phase 4 / verify] Создал t161 через `create-project` (~3 min). Latest existing был t160, скипнул t150-t154 (отсутствуют), использовал t161.
+- [Phase 4 / verify] Создал TeamMember entity (parent для FK alias) + Invoice entity с `assigneeId, parent=team_member, onDelete=SetNull`. Production-shaped FK alias scenario per task.md acceptance #9.
+- [Phase 4 / verify] `generate-entity` для TeamMember + Invoice → SUCCESS. Invoice: 24 created + 9 modified (включая всех 7 marker consumers: dao, local_data_source, local_datasource_interface, repository_impl, usecase_providers, repository, usecases).
+- [Phase 4 / verify] **Generated artifacts verified:**
+  - `invoice_dao.dart:183-195` — `getInvoicesByAssigneeId(String assigneeId, ...)` + `t.assigneeId.equals(assigneeId)` ✅
+  - `invoice_repository_impl.dart:193` — `Future<List<InvoiceEntity>> getInvoicesByAssigneeId(String assigneeId) async` ✅
+  - `invoice_local_data_source.dart:274` — `Future<List<InvoiceModel>> getInvoicesByAssigneeId(...)` ✅
+  - `invoice_local_datasource_service.dart:25` — interface declaration ✅
+  - `invoice_repository.dart:17` — interface declaration `getInvoicesByAssigneeId(String assigneeId)` ✅
+  - `invoice_usecases.dart:74` — `_repository.getInvoicesByAssigneeId(assigneeId)` ✅
+  - `invoice_usecase_providers.dart:66` — `GetInvoicesByAssigneeIdUseCase? getInvoicesByAssigneeIdUseCase(Ref ref)` ✅
+  - `invoice_table.dart:6,12` — `import 'team_member_table.dart'` + `references(TeamMemberTable, #id, onDelete: KeyAction.setNull)` ✅
+- [Phase 4 / verify] Negative grep `teamMemberId|TeamMemberId|getInvoicesByTeamMemberId|getInvoicesByMemberId` в invoices feature → **No matches found**. Никакого leak parent-derived names.
+- [Phase 4 / verify] **DoD gate: `verify --name t161` PASS**. flutterAnalyze: errors=**0**, warnings=1, infos=44. pubGet/serverpodGenerate/buildRunner все clean. Total 43s.
+- [Phase 4 / verify] STOP-gate Phase 5 trigger: `⚠ STOP: ready for multi-agent review`. НЕ commit, НЕ subagent spawn, НЕ task.py pr — это zone teamlead'а.

@@ -7,7 +7,7 @@ import { getPathInfo } from '../config/path_handle';
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { JunctionDetector } from '../parsers/junction_detector';
 import { DictionaryPresets } from '../replacement/dictionary_presets';
-import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
+import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
 
 export class RelationPatcher {
     constructor(private fileSystem: IFileSystem) { }
@@ -75,20 +75,52 @@ export class RelationPatcher {
 
                     let body = innerBody;
 
+                    // STEP 1: ENTITY rules для mainEntity (Task → targetClass).
+                    // Меняет main entity literals: `Task`, `task`, `Tasks`, `tasks`, `task_*`.
                     const mainEntityConfig = new GenerationConfig({ ...config, templEntity: relationTemplateEntity, targetEntity: model.className });
                     const mainEntityRules = getDictionaryRules(DictionaryPresets.ENTITY, mainEntityConfig);
                     for (const rule of mainEntityRules) {
                         body = body.replace(new RegExp(rule.from, 'g'), rule.to);
                     }
 
+                    // STEP 2: field-Id preservation FIRST (TASK-017, BUG-012 closure).
+                    //
+                    // Должно идти ДО related entity ENTITY rules, иначе rule
+                    // `Category → TeamMember` уничтожает substring `CategoryId`
+                    // в method/parameter/column refs (превращает в `TeamMemberId`),
+                    // и subsequent field-Id substitution не находит `categoryId`
+                    // что заменять — silent no-op, broken DAO column refs.
+                    //
+                    // FK alias case (`assigneeId, parent=member`):
+                    //   field name = 'assigneeId', relatedModel = 'member'.
+                    //   targetIdName = 'assigneeId' (preserves field alias)
+                    //   targetIdNamePascal = 'AssigneeId' (preserves PascalCase part of method name)
+                    //
+                    // Identity case (`categoryId, parent=category`):
+                    //   field name = 'categoryId', relatedModel = 'category'.
+                    //   targetIdName = 'categoryId', targetIdNamePascal = 'CategoryId'
+                    //   → identity substitution (no-op), backwards compat preserved.
+                    //
+                    // PascalCase variant (`CategoryId → AssigneeId`) обязателен:
+                    // method literal `getTasksByCategoryId` содержит PascalCase
+                    // `CategoryId`, не lowerCamel `categoryId`. Без Pascal variant
+                    // method name стал бы `getInvoicesByTeamMemberId` после Step 3.
+                    const targetIdName = relationField.name.endsWith('Id') ? relationField.name : `${relationField.name}Id`;
+                    const targetIdNamePascal = cap(targetIdName);
+                    body = body.replace(new RegExp(`${templateRelatedEntity}Id`, 'g'), targetIdName);
+                    body = body.replace(new RegExp(`${cap(templateRelatedEntity)}Id`, 'g'), targetIdNamePascal);
+
+                    // STEP 3: ENTITY rules для relatedEntity (Category → relatedModel).
+                    // Замещает оставшиеся `Category`, `category`, `Categories`,
+                    // `categories`, `category_*` — это контексты table reference
+                    // (`CategoryTable`), import path (`category_table.dart`), etc.
+                    // На этом этапе method/parameter/column refs уже preserved
+                    // (Step 2), и rule `Category` matches только реальные class refs.
                     const relatedEntityConfig = new GenerationConfig({ ...config, templEntity: templateRelatedEntity, targetEntity: relationField.relatedModel });
                     const relatedEntityRules = getDictionaryRules(DictionaryPresets.ENTITY, relatedEntityConfig);
                     for (const rule of relatedEntityRules) {
                         body = body.replace(new RegExp(rule.from, 'g'), rule.to);
                     }
-
-                    const targetIdName = relationField.name.endsWith('Id') ? relationField.name : `${relationField.name}Id`;
-                    body = body.replace(new RegExp(`${templateRelatedEntity}Id`, 'g'), targetIdName);
 
                     processedBodies += '\n' + body.replace(/^\n+|\n+$/g, '') + '\n';
                 }
