@@ -190,19 +190,33 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 
 ---
 
-## Approved sequence (Discussion #8, 2026-05-03)
+## Approved sequence (Discussion #9, 2026-05-03 — supersedes #8)
 
-**Priority rule:** TASK-018 production blockers > Initiative > non-triggered backlog. STOP-gate protocol для concrete production blockers.
+**Pivot:** weight v2 fresh build на simplified template. **TASK-018 cancelled (superseded).** weight v1 = critical-only production baseline.
+
+**Priority rule:** Phase A-D gate blockers > Initiative Phase E-G > non-triggered backlog. STOP-gate protocol для concrete production blockers. Hard ceiling action = scope cut, не extend.
 
 **Next steps:**
-1. TASK-019 closure (Phase 1.5 final gate ceremonial close)
-2. HOTFIX-001 (`new_task.py` scan `active/` only — quick mini-chore)
-3. **TASK-018 Phase 0 preflight audit** (mandatory): junction inventory, FK alias inventory, onDelete audit, entity grouping, trigger matrix
-4. TASK-018 production migration (Clean t115 path)
-5. TASK-CI-001 (minimal automated gate) before Initiative Phase A
-6. Simplified Template Initiative — Phase A-G
+1. ✅ TASK-019 closure done (Phase 1.5 ceremony)
+2. HOTFIX-001 (`new_task.py` scan only `active/` — quick mini-chore Month 1)
+3. TASK-CI-001 (minimal automated gate, 3 test suites: universal + t115 regression + simplified) — **before Initiative Phase A start**
+4. **Initiative Phase A** (architectural design + ADR + sync_core integration audit + backend strategy decision + test inventory audit + dual-running risk audit)
+5. Initiative Phase B-D (generate-vs-not-generate divider + synthetic t<200> reference + `--template` CLI flag)
+6. **Phase A-D gate close** (5-deliverable checklist + `closure-report.md` TeamLead + User counter-sign)
+7. **TASK-020 weight v2 build** (only after Phase A-D gate closed; новый cross-repo TASK)
+8. Initiative Phase E-G (acceptance + documentation reconciliation + closure)
+9. Cutover prep basic в TASK-020 closure (full execution = separate later TASK)
 
-См. [Discussion #8 archive](../discussions/archive/8-roadmap-approval-sequence-phase-15-closu/) + [roadmap.md](roadmap.md).
+**Estimate:** 5-6 months calendar realistic, 6 hard ceiling.
+
+**Decision matrix v1 maintenance:**
+- Data loss/security/sync corruption → fix v1 immediately
+- UI bugs/performance regression → defer (cosmetic для frozen app)
+- New features → reject (v2 backlog)
+
+**Backend strategy (Phase A first decision):** Recommend Option 1 (same backend) default. Option 2 (forked) только если schema redesign. Option 3 (fresh) — overkill.
+
+См. [Discussion #9 archive](../discussions/archive/9-weight-v2-fresh-build-на-simplified-temp/) + [roadmap.md](roadmap.md).
 
 ---
 
