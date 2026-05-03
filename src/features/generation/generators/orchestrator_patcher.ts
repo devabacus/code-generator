@@ -295,12 +295,19 @@ export class OrchestratorPatcher {
     /**
      * TASK-014: extracts entity name из FK field (e.g. `roleId` → `role`).
      * Mirrors logic из `server_yaml_parser.ts:extractEntityNameFromField`.
+     *
+     * BUG-012 (TASK-016): возвращает lowerCamel form. Previous `.toLowerCase()`
+     * ломало multi-word entity names (`'terminalSet'` → `'terminalset'`,
+     * `cap()` потом давал `'Terminalset'` вместо `'TerminalSet'`). После parser
+     * fix `relatedModel` уже lowerCamel — substitution downstream работает
+     * корректно через `cap()`/`unCap()`/`toSnakeCase()` calls.
      */
     private _extractEntityNameFromField(field: ServerpodField): string {
         if (field.relatedModel) {
-            return field.relatedModel.toLowerCase();
+            return field.relatedModel;
         }
-        return field.name.replace(/Id$/, '').toLowerCase();
+        // Fallback: strip-Id from name (already lowerCamel via Serverpod convention).
+        return field.name.endsWith('Id') ? field.name.slice(0, -2) : field.name;
     }
 
     /**

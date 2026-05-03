@@ -52,6 +52,35 @@ export function snakeToPascalCase(snakeCaseString: string): string {
     ).join('');
 }
 
+/**
+ * Converts snake_case to lowerCamelCase (e.g. `terminal_set` → `terminalSet`).
+ *
+ * Throws на ill-formed input. Validation regex
+ * `/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/` отвергает:
+ *   - leading underscore (`_bad`)
+ *   - trailing underscore (`bad_`)
+ *   - double underscore (`double__bad`)
+ *   - empty string
+ *   - non-lowercase first char
+ *
+ * Используется для конверсии Serverpod YAML `relation(parent=X)` directives
+ * (where X is snake_case identifier) в lowerCamelCase `relatedModel` token,
+ * который затем потребляется consumer layers (path/class/method contexts).
+ *
+ * **Fail-fast** rationale: parser не валидирует upstream YAML, и silent
+ * tolerance к malformed input приведёт к junk generated code. Лучше throw
+ * с descriptive error и attach context на parser side.
+ *
+ * @throws Error если input не соответствует strict snake_case pattern
+ */
+export function snakeToLowerCamelCase(snake: string): string {
+    const validRegex = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+    if (!validRegex.test(snake)) {
+        throw new Error(`Invalid snake_case identifier: '${snake}'`);
+    }
+    return snake.replace(/_([a-z0-9])/g, (_, ch) => ch.toUpperCase());
+}
+
 export const textGroupReplacer = (content: string, regex: RegExp, newTableName: string) =>
     content.replace(regex, (match, p1) => {
         const trimmedCont = p1.trim();

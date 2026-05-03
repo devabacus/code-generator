@@ -16,7 +16,11 @@ export function generateDriftTableImports(model: ServerpodModel, config: Generat
     const featuresDir = config.featuresPath;
 
     const imports = relationFields.map(field => {
-        const tableFileName = `${field.relatedModel!}_table.dart`;
+        // BUG-012 (TASK-016): table file paths должны быть snake_case даже когда
+        // `relatedModel` хранится в lowerCamel. После parser fix `parent=terminal_set`
+        // → `relatedModel='terminalSet'` (Discussion #5 Q2=A). Без `toSnakeCase()`
+        // получим broken `terminalSet_table.dart` вместо `terminal_set_table.dart`.
+        const tableFileName = `${toSnakeCase(field.relatedModel!)}_table.dart`;
 
         // Check if table exists in current feature's tables dir
         const localPath = path.join(currentTablesDir, tableFileName);

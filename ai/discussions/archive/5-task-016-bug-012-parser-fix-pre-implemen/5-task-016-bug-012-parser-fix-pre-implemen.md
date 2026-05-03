@@ -669,3 +669,19 @@ Chatgpt_2 предложил junction snake-snake делать **unit-level** (p
 4. Archive Discussion #5
 
 Никаких дополнительных concerns с моей стороны не остаётся. Plan technically robust, scope защищён stop-gates, estimate conservative, audit gate concrete.
+
+## Patch Record (2026-05-03, post-TASK-016 Phase 5)
+
+**TASK-016 Phase 5 verify triggered Decision STOP-gate #2.** Reduced Decision items 1-3 (parser + helper + path/class normalization) закрывают **filename + class refs**, но **DAO method body substitution** в `relation_patcher.ts:78-91` ENTITY substitution dictionary заменяет field name indiscriminately — это substitution semantics shift (STOP-gate #2 explicit).
+
+**User-authorized Path C (2026-05-03):** TASK-016 closes на текущем scope, новая [TASK-017](../../../tasks/active/TASK-017-dao-substitution-rewrite-preserve-field-name-in-method-body/) для DAO substitution rewrite с **pre-implementation Discussion #6 mandatory**.
+
+**Decision items status post-Path-C:**
+- Items 1-5 ✅ closed via TASK-016
+- Item 6 (consumer context normalization) ⚠ partial — path/class layers ✅, method body layer deferred TASK-017
+- Item 7 (5+ layer regression) ⚠ partial — orchestrator + relation_generation extended, relation_patcher method-body coverage deferred
+- Items 8-12 ✅ closed
+
+**Phase 6 multi-agent review** (Standard + Adversarial fresh subagents) caught **DEAL-BREAKER**: parens-inside-string-default landmine (`notes: String, default='See relation(parent=foo) docs'` was silently miscategorizing String fields as FK). Resolved в TASK-016 PR через quote-stripping ДО `\brelation\(` matching + 2 negative tests (case 5c single-quote, 5d double-quote).
+
+**Это Path C deviation от literal Decision text** (требовался full method-body fix), но **в духе Decision STOP-gate #2** (substitution semantics shift = scope expansion, escalate via separate TASK). См. TASK-017 для full closure roadmap.

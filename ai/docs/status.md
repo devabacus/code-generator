@@ -94,3 +94,4 @@ Sequence per Discussion #4 Decision (re-sequenced — BUG-013 first):
 - **ADR-0001** — перенести `docs-code-generator/decisions/adr-0001-logger-in-templates.md`, обновить статус Proposed→Accepted
 | TASK-012 | todo real app generation cross-device smoke (Phase 1.5 final gate) | 🟡 In Progress | 2026-05-02 |
 | TASK-011 | fix BUG-012 server_yaml_parser relation parent directive | 🟡 In Progress | 2026-05-03 |
+| TASK-017 | DAO substitution rewrite preserve field name in method body | 🟡 In Progress | 2026-05-03 |
