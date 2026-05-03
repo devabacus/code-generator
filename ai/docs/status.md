@@ -12,6 +12,8 @@
 
 **Latest pivot (Discussion #9 + clean-slate amendment 2026-05-03):** Weight build на simplified template — **clean slate** (User confirmed weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance). TASK-018 cancelled. Weight build = fresh app, hard switch deploy. Estimate revised 5-6 → ~3-4 months realistic, hard ceiling 4 months.
 
+**⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115. Phase B-D + weight build inherit this constraint. ADR-0005 Section 7.1/7.2/7.3 TBD RESOLVED via stack lock. test-inventory Open Q #1/#2/#3 resolved as YES RelationPatcher / inherits t115 DI / preserve Clean directory layout.
+
 ### Master state
 
 - **Branch:** `master 77145a3` (post HOTFIX-001 + TASK-020 in flight)

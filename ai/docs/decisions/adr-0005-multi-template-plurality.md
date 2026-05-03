@@ -297,40 +297,43 @@ Per sync_core ADR-0004 Patterns 6-7 (consumer responsibility):
 
 > «Phase C may extend categories list with additional findings via amendment лог section в этом ADR. Amendment requires TeamLead + User counter-sign, не full ADR rewrite. ADR principle (generate-vs-not-generate divider) remains valid; only category coverage expands.»
 
-### 7. TBD placeholders (Phase B-D will resolve)
+### 7. TBD placeholders — RESOLVED 2026-05-03 via stack-lock User decision
 
-Q7=e Discussion #10 explicit **REJECT** pre-deciding Phase B-D decisions в Phase A. Эти решения emerge из B-D prototyping; pre-deciding в Phase A без prototype data = artificial constraint, likely revisited в Phase B → wasted user decision cycle.
+**⚠ CRITICAL OVERRIDE (2026-05-03 User decision, recorded в Discussion #11 User_2 + Amendment log entry):**
 
-#### 7.1 Riverpod variant TBD в Phase B prototype
+Section 7.1/7.2/7.3 TBD placeholders **resolved via stack-lock principle:** простой template inherits **same package set** as t115 (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod). Стэк выбора пакетов **НЕ меняется** без явного User approval — supersedes Discussion #10 Q7=e REJECT which assumed Phase B-D would resolve via prototyping. User explicit decision overrides "decide via prototype" approach.
 
-Open question: какие именно Riverpod patterns используются в simplified template?
+**What changes vs t115 (single permitted change category):** simplified template отличается только в **architecture ceremony reduction** (NO usecases / NO business notifiers / NO validation / NO repository interfaces по умолчанию / NO application services / NO mappers separate class / NO Either-Result wrappers / NO datasource interfaces). Всё остальное inherited from t115 baseline.
 
-- **Generated state providers vs Notifiers vs raw families** — TBD
-- **`@riverpod` codegen annotations vs manual `Provider`** — TBD
-- **AsyncValue handling pattern** (manual `.when` switch vs helper extension) — TBD
-- **Provider naming convention** (`xxxProvider` suffix vs `xxxBinding` vs annotation-derived) — TBD
+**What MUST update (НЕ stack change, version refresh):** все package versions обновляются к latest stable (включая Serverpod) — `flutter_riverpod` + `riverpod_annotation` + `riverpod_generator` + `drift` + `drift_dev` + `drift_flutter` + `sync_core` + `serverpod` + `serverpod_client` + `serverpod_flutter` + `serverpod_test_tools` + `freezed` + `json_serializable` + `build_runner` + `uuid` + others. Verify через Dart MCP перед commit.
 
-**Note (Sub-A5 fix):** Section 3.4.4 example был ранее использован `@riverpod XxxDao xxxDao(XxxDaoRef ref)` annotation syntax — Sub-A5 Architecture + Adversarial reviewers указали contradiction с Q7=e REJECT. Section 3.4.4 example переписан как illustrative pseudocode (no annotation pre-decision); Section 2 mention "Notifier" — generic Riverpod primitive name, не commitment к specific Notifier API style (Notifier vs StateNotifier vs AsyncNotifier — Phase B-D resolves).
+#### 7.1 Riverpod variant — RESOLVED 2026-05-03 via stack lock
 
-Phase B prototype simplified template + side-by-side с generated stub usage → данные для решения. ADR amendment когда зафиксировано.
+**Decision:** `@riverpod` annotations (codegen-based, requires `riverpod_generator` + `build_runner`) + Notifier hierarchy as in t115 baseline. Provider naming = annotation-derived (e.g. `xxxDaoProvider` from `XxxDao xxxDao(...)`).
 
-#### 7.2 Drift conventions TBD в Phase B prototype
+**Rationale:** stack lock User decision 2026-05-03 — same package set as t115, same patterns. Phase B template emit'ит готовые provider definitions с `@riverpod` annotations.
 
-Open question: table layout patterns + DAO method naming в simplified template?
+**Section 3.4.4 example update:** illustrative pseudocode стало binding (`@riverpod XxxDao xxxDao(XxxDaoRef ref) => XxxDao(ref.read(databaseProvider));` — final form). Sub-A5 fix moot under stack lock.
 
-- **Table per entity vs single shared table** — TBD (default = table per entity, как в t115)
-- **DAO method naming convention** (`getXById` vs `findXById` vs `xByIdOrNull`) — TBD
-- **Relation accessor pattern** (`watchXWithRelations` vs separate `watchXChildren`) — TBD
+#### 7.2 Drift conventions — RESOLVED 2026-05-03 via stack lock
 
-Phase B prototype simplified Drift schema + iterate. ADR amendment когда зафиксировано.
+**Decision:** Same as t115 baseline:
+- Table per entity (separate `<entity>_table.dart` files в `lib/features/<feature>/data/datasources/local/tables/`)
+- DAO method naming `getXById` / `insertX` / `updateX` / `deleteX` / `watchX`
+- FK references inline в Drift columns
+- Relation accessors через separate `watchXChildren` queries (per t115 convention, не `watchXWithRelations`)
 
-#### 7.3 Manifest markers для simplified template TBD
+**Rationale:** stack lock User decision 2026-05-03 — Drift conventions inherited from t115 baseline.
 
-Open question: какой набор markers использует simplified template?
+#### 7.3 Manifest markers — RESOLVED 2026-05-03 via stack lock
 
-- **t115 использует 7-marker pattern** (`:base / :oneToManyMethods / :methods / etc.`) — RelationPatcher dependency
-- **Simplified возможно смягчён set markers** (если нет multi-layer wire-up patcher need)
-- **OrchestratorPatcher reuse vs simplified-specific patcher** — TBD (см. test-inventory-audit.md open question #2)
+**Decision:** Same marker scheme as t115 baseline. ClaudeAdv evidence-based correction (Discussion #11): t115 actually has **13 unique markers** (`base, driftTableColumns, driftTableImports, entityToServerpodParams, freezedConstructor, oneToManyMethods, serverpodToModelParams, simpleFields, syncEntityTypes, syncImports, syncRegistrations, valueWrappedFields, valueWrappedFieldsModel`), не 7 как изначально документировано. Simplified template inherits **all 13 markers** under stack lock. RelationPatcher + OrchestratorPatcher applicable к simplified.
+
+**Rationale:** stack lock User decision 2026-05-03 — marker scheme inherited from t115 baseline без modifications.
+
+**Test-inventory Open Q #1 (RelationPatcher applicability в simplified):** ✅ **RESOLVED YES** under stack lock — markers preserved, RelationPatcher applicable.
+**Test-inventory Open Q #2 (OrchestratorPatcher DI style adaptation):** ✅ **RESOLVED — inherits t115 DI pattern** under stack lock (no different DI style; `ConfigurationLocalApply(ConfigurationDao(dbService))` chain inherited).
+**Test-inventory Open Q #3 (directory layout):** ✅ **RESOLVED — preserve Clean directory layout** under stack lock.
 
 Phase B prototype simplified template scaffolding + RelationPatcher / OrchestratorPatcher applicability assessment → данные для решения. ADR amendment когда зафиксировано.
 
@@ -375,6 +378,7 @@ Phase B prototype simplified template scaffolding + RelationPatcher / Orchestrat
 | Date | Amendment | TeamLead | User | Section | Rationale |
 |------|-----------|----------|------|---------|-----------|
 | 2026-05-03 | **Clean-slate decision** — weight v1 НЕ в production, нет users; dual-running concerns N/A; t115 deprecated path; default template = simplified; weight TASK after Phase C synthetic | TeamLead Claude ✅ | User ✅ | 1, 4.3, 5 | User confirmed clean-slate path. Removes complexity: dual-protocol risks moot, decision matrix v1 maintenance moot, cutover plan N/A. Estimate revised 5-6 → 3-4 months realistic, hard ceiling 4 months. |
+| 2026-05-03 | **⚠ CRITICAL Stack-lock decision** — стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Все package versions update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony (no usecases / business notifiers / validation / repository interfaces / app services / mappers separate class / Either-Result / datasource interfaces). Section 7.1/7.2/7.3 TBD placeholders RESOLVED via stack lock. | TeamLead Claude ✅ | User ✅ | 1, 7.1, 7.2, 7.3 | User explicit decision 2026-05-03 ("мы стэк не меняем какой был riverpod через аннотации" + "это касается всех пакетов, единственное их нужно все обновить, включая serverpod"). Discussion #11 reviewer recommendations (Q4=b prototype side-by-side, Q6=b/d reduced markers, Q9=a different DI) overruled. test-inventory Open Q #1/#2/#3 resolved as YES (RelationPatcher applicable) / inherits t115 DI / preserve Clean directory layout. ClaudeAdv evidence-based correction accepted: t115 has 13 markers, не 7. Future agents — treat stack lock как hard architectural invariant. |
 
 ---
 

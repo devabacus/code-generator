@@ -2,7 +2,7 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-03 (clean-slate amendment — User confirmed weight v1 НЕ в production; dual-running concerns N/A; t115 deprecated path; default template = simplified; estimate 5-6 → ~3-4 months)
+**Обновлено:** 2026-05-03 (clean-slate amendment + ⚠ CRITICAL stack-lock decision — стэк t115 baseline (Riverpod annotations + Drift + Clean directory + sync_core + Serverpod) НЕ меняется без User approval; package versions update к latest stable (включая Serverpod); simplified = ТОЛЬКО architecture ceremony reduction)
 
 ---
 
