@@ -30,7 +30,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 - ✅ TASK-019 closure (Phase 1.5 final gate)
 - ✅ HOTFIX-001 (`new_task.py` scan active/ + done/ + blocked/)
 - ✅ TASK-CI-001 closed via TASK-020 — minimal single-job CI ([.github/workflows/test.yml](../../.github/workflows/test.yml)): `npm ci` + `npm run compile` + `npm run lint` + mocha 163 unit tests on PR/push to master. 3-suite split (universal + t115 regression + simplified) deferred to Initiative Phase A test inventory audit deliverable. Verify smoke deferred (heavy, requires real test project).
-- ⏭ Initiative Phase A: Architectural design (ADR + sync_core integration sanity check + backend strategy + test inventory audit + dual-running risk audit + User decision points)
+- 🟡 Initiative Phase A (TASK-021 Sub-A6 finalize per Discussion #10 13-point Decision): Architectural design — ADR-0005 multi-template plurality promoted в [ai/docs/decisions/](decisions/adr-0005-multi-template-plurality.md) + sync_core dual-running audit (Option C dedicated v2 testing scope recommended) + test inventory audit (78% universal cases) + backend strategy Option 1 confirmed + weight v1 schema audit (0.5/4 triggers active). Sub-A5 multi-agent review (4 reviewers) → 49 findings (5 CRITICAL/DEAL-BREAKER + 14 HIGH applied). **Pending User counter-sign:** ADR text + decision matrix v1 maintenance.
 
 ### Month 2 — Initiative Phase B-D + synthetic acceptance
 
@@ -161,6 +161,7 @@ Phase 1.5 sequence: 9 PRs merged (TASK-011/013/014 sync_core integration + BUG-0
 | #7 | 2026-05-03 | Architectural pivot — Multi-template plurality |
 | #8 | 2026-05-03 | Roadmap approval (Phase 1.5 + TASK-018 на Clean + Initiative) — *superseded by #9* |
 | #9 | 2026-05-03 | **Weight v2 fresh build pivot** — TASK-018 cancelled, v1 critical-only, v2 fresh на simplified |
+| #10 | 2026-05-03 | **Initiative Phase A organization** — single TASK-021 с 7 sub-phases (Sub-A0..A6 + Sub-A0.5 weight schema audit), Sub-A1/A4 parallel, Q7=c ADR text sign-off MUST, Q7=e реджект (B-D decisions emerge in B-D), Q8 decomposed ceiling 3w calendar, Q10 двухслойная review structure (Layer 1 = #10 ✅ / Layer 2 = Sub-A5 3 thematic), ADR-0005 Phase C amendment clause |
 
 Полные тексты: `ai/discussions/archive/`.
 

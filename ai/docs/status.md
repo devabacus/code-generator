@@ -25,7 +25,7 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-020 | CI minimal gate (TASK-CI-001) — `.github/workflows/test.yml` | 🟡 Ready for review | 2026-05-03 |
+| TASK-021 | Initiative Phase A — architectural design + audits + ADR-0005 multi-template plurality (Discussion #10 13-point Decision) | 🟡 Sub-A6 finalize (ADR promoted, awaiting User counter-sign на ADR text + decision matrix v1 maintenance) | 2026-05-03 |
 
 ---
 
@@ -95,6 +95,8 @@
 
 **Recommendation для Q-open backend:** Option 1 (same backend) default. Option 2 только если schema redesign. Option 3 — overkill.
 
+**Sub-A1 sign-off (TASK-021 2026-05-03):** ✅ User confirmed Option 1 (recorded в [backend-strategy-rationale.md](../tasks/active/TASK-021-initiative-phase-a---architectural-design---audits---adr-0005-multi-template-plurality/backend-strategy-rationale.md)). ADR text counter-sign + decision matrix approval pending Sub-A6 STOP-gates.
+
 ---
 
 ## Architectural pivot context
@@ -123,3 +125,4 @@ Sequence per Discussion #4 → #6:
 **Closed BUGs Phase 1.5:** BUG-002/003/004/005/006/008/009/011/012/013.
 
 См. [TASK-019 report](../tasks/done/TASK-019-re-acceptance-full-fk-alias-scenario-verify-phase-1-5-final-gate/report.md) для full closure evidence.
+| TASK-021 | Initiative Phase A — architectural design + audits + ADR-0005 multi-template plurality | 🟡 In Progress | 2026-05-03 |
