@@ -1,22 +1,9 @@
 # BUG-013: t115 template markers gap на repository_impl + usecases — каждый fresh project с FK relations broken
 
-**Статус:** ✅ Resolved (2026-05-03, PR 2 chore/bug-013-template-markers-fill, Approach A applied)
+**Статус:** Open (High, blocking weight TASK-018, extension BUG-007)
 **Обнаружено:** 2026-05-03 (TASK-012 executor шаг 8 + Adversarial review)
 **Источник:** Multi-agent review TASK-012 findings
 **Критичность:** High (systemic template gap — affects ВСЕ fresh projects с FK relations)
-
-## Resolution evidence (2026-05-03)
-
-PR 2 Approach A applied — marker block seed в **4 layers** (audit revealed 4 layers, не 2 как initial estimate):
-
-1. `task_repository_impl.dart` — marker block `:oneToManyMethods` внутри class с concrete impl `getTasksByCategoryId` delegating to `_localDataSource`
-2. `task_usecases.dart` — marker block top-level (EOF, ПОСЛЕ `WatchTasksUseCase`) с class `GetTasksByCategoryIdUseCase` (Gemini_1 critical requirement: top-level placement satisfied)
-3. `task_usecase_providers.dart` — marker block top-level с `@riverpod GetTasksByCategoryIdUseCase? getTasksByCategoryIdUseCase(Ref)` factory (null-safe pattern)
-4. `task_local_datasource_service.dart` (interface — **scope expansion**, audit revealed как direct dependency repository_impl fix) — marker block с declaration `Future<List<TaskModel>> getTasksByCategoryId(...)`
-
-**Verify evidence:** t158 fresh project + `generate-entity` для Task FK entity → `verify --name t158` PASS errors=0, warnings=1 (unrelated unused local), infos=44. success: true. Total: 42063ms. Time spent на fix: ~30 минут (под 90-min ceiling).
-
-**MANY_TO_MANY substitution автоматически распространит fix** на other entities (Member.projectId, TodoItem.projectId, etc.) при `generate-entity` — никакие changes в `src/features/generation/` не нужны.
 
 ## Симптом
 

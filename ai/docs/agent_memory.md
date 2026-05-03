@@ -3,7 +3,29 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-02
+**Последнее обновление:** 2026-05-03 (Discussion #3 finalization)
+
+## Phase 1.5 status — НЕ closed (2026-05-03)
+
+TASK-012 acceptance gate hits 2 systemic regressions:
+- **BUG-012** — `server_yaml_parser.ts:106` игнорирует `relation(parent=X)` directive (FK alias broken). Production landmine: weight `customer_user.spy.yaml defaultTerminalSetId, parent=terminal_set` (strip-Id ≠ parent).
+- **BUG-013** — template `task_repository_impl.dart` + `task_usecases.dart` имеют 0 markers + 0 hardcoded relation methods. Каждый fresh project с FK relations broken.
+
+Per [Discussion #3 Decision](../discussions/archive/3-phase-15-scope-reconsideration-acceptanc.md) + [Discussion #4 re-sequence](../discussions/archive/4-pr-1-bug-013-blocks-reduced-scope-verify.md):
+- TASK-012 closes **partial** (drop `assigneeId`, ≥1 FK + 1 junction). Closure PR в `feature/TASK-012-...`
+- Phase 1.5 stays open
+- Weight TASK-018 blocked до BUG-012 + BUG-013 + new re-acceptance TASK closed
+- FK alias workaround (`assigneeId → memberId`) НЕ использовать как acceptance evidence
+- Manual patch на target проект НЕ использовать (DoD violation)
+
+**Sequence (re-sequenced 2026-05-03 per Discussion #4):**
+1. Setup commit codegen uncommitted state на TASK-012 ветке
+2. PR 2 (BUG-013 markers fill — Approach A): chore branch от master, 5-min audit gate, 90-min ceiling, marker block seed (top-level EOF в usecases). **First** потому что reduced scope ≥1 FK не может PASS verify до BUG-013 fix
+3. PR 1 (TASK-012 partial close): после PR 2 merge → TASK-012 ветка rebase → re-verify must PASS errors=0 → close partial
+4. PR 3 (BUG-012 parser fix): independent feature branch, after PR 1
+5. PR 4 (re-acceptance new TASK): after PR 2 + PR 3 merged
+
+**Critical PR 2 technical (Gemini_1):** marker block (НЕ hardcoded body), top-level EOF placement в usecases (иначе syntax garbage от `isBlockInClass` heuristic), provider plumbing в `task_usecase_providers.dart` если audit need. Scope expansion guard: build infra/version mismatch = новый BUG-014.
 
 ---
 
@@ -139,12 +161,18 @@ Orchestrator wire-up (`sync_orchestrator_provider.dart`) патчится авт
 - `serverpodToModelParams` — Serverpod→Model (enum `.name`, relation `.toString()`)
 - `entityToServerpodParams` — Entity→Serverpod (enum `.values.byName()`, relation `UuidValue.fromString()`)
 
-### relation_patcher (после TASK-008, 2026-04-25)
+### relation_patcher — **реальный coverage** (corrected 2026-05-03 после TASK-012 audit)
 
-- Один marker-блок `:oneToManyMethods` на файл — все relation-методы внутри.
-- Patcher идемпотентный: повторный gen с тем же YAML → identical content; добавление relation в YAML → новый метод во всех 8 слоях (endpoint, remote_data_source, usecases, local_datasource_service, local_data_source, dao, repository, repository_impl).
-- Replace через `replace(blockRegexAll, callback)` — первое вхождение заменяется на свежий fullBlock, остальные удаляются (recovery от legacy-дубликатов).
-- НЕ трогает `:base` секции — это отдельная архитектурная проблема (BUG-003 part 2, в backlog).
+⚠ **Предыдущая версия заявляла "8 слоях patching" — было неверно.** Audit 2026-05-03 (BUG-013):
+
+- **Layer 1 (interface `<entity>_repository.dart`):** через markers `:oneToManyMethods` — patcher работает. Идемпотентный, recovery от legacy-дубликатов через `replace(blockRegexAll, callback)`.
+- **Layers 2-4 (dao, local_data_source, remote_data_source):** **hardcoded inheritance** в t115 template + MANY_TO_MANY substitution. Markers отсутствуют. Regen работает через template substitution (Task→TodoItem, Category→Project automatically).
+- **Layers 5-6 (repository_impl, usecases):** ❌ **полностью broken**. Нет ни markers, ни hardcoded methods в t115 template. Fresh project с FK relations получит compile errors. См. [BUG-013](../bug-reports/013-template-markers-gap-repository-impl-usecases.md).
+- **Layer 7-8 (endpoint, local_datasource_service):** hardcoded inheritance (предположительно).
+
+**Дополнительный gap:** parser server_yaml_parser.ts:106 derives `relatedModel` через strip-Id field name, **игнорирует `relation(parent=X)` directive**. FK alias case (`assigneeId, parent=member`) broken. См. [BUG-012](../bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
+
+- НЕ трогает `:base` секции — отдельная архитектурная проблема (BUG-003 part 2, в backlog).
 
 ### entity_yaml_validator (после TASK-009, 2026-04-25)
 

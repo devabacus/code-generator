@@ -111,12 +111,23 @@ G:/Projects/Flutter/serverpod/<name>/
 
 ## Главные инварианты генератора
 
-### 1. relation_patcher (TASK-008/BUG-003)
+### 1. relation_patcher (TASK-008/BUG-003) — **реальный coverage** (corrected 2026-05-03)
+
+⚠ **Предыдущая версия этого блока заявляла "8 слоях patching" — это было неверно.** Audit 2026-05-03 (TASK-012 + BUG-013) показал реальный coverage:
+
+- **Layer 1 — interface (`<entity>_repository.dart`):** patcher через markers `:oneToManyMethods` ✅
+- **Layers 2-4 — dao, local_data_source, remote_data_source:** через **hardcoded inheritance** в template + MANY_TO_MANY substitution (Task→TodoItem, Category→Project automatically). Markers отсутствуют, regen работает через template substitution.
+- **Layers 5-6 — repository_impl, usecases:** ❌ **полностью broken** в t115 template. Нет ни markers, ни hardcoded methods. Каждый fresh project с FK relations получит `non_abstract_class_inherits_abstract_member` + `undefined_identifier` errors. См. [BUG-013](ai/bug-reports/013-template-markers-gap-repository-impl-usecases.md).
+- **Layer 7-8 — endpoint, local_datasource_service:** через hardcoded inheritance (предположительно).
+
+**Markers properties (где работают, layer 1):**
 
 - **Один marker-блок `:oneToManyMethods` на файл.** Внутри — все relation-методы.
-- **Идемпотентный.** Повторный gen с тем же YAML → identical content.
-- **Additive.** Новый `relation(parent=X)` в YAML → новый метод во всех 8 слоях (endpoint, remote_data_source, usecases, local_datasource_service, local_data_source, dao, repository, repository_impl).
-- **Recovery от legacy-дубликатов.** Если в файле ОЙ-сколько-то marker-пар (после старого patcher'а до 2026-04-25) → схлопываются в одну.
+- **Идемпотентный** на interface layer.
+- **Recovery от legacy-дубликатов.** Если в файле несколько marker-пар → схлопываются в одну.
+
+**Дополнительно:** parser игнорирует `relation(parent=X)` directive — derives `relatedModel` через `name.replace(/(.*)Id/, '$1')`, что ломает FK alias case (`assigneeId, parent=member` → broken). См. [BUG-012](ai/bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
+
 - НЕ ТРОГАЕТ `:base` секции — это отдельная проблема (см. BUG-005 в backlog).
 
 ### 2. Файловые имена — snake_case (TASK / BUG-002)
@@ -312,5 +323,5 @@ ai/tasks/active/               # текущие задачи
 
 ---
 
-**Последнее обновление:** 2026-04-26
-**Активная ветка:** `feature--fix-codegen-regen-bugs`
+**Последнее обновление:** 2026-05-02
+**Активная ветка:** `master` (Phase 1.5 active — sync_core 0.3.0 templates integration)
