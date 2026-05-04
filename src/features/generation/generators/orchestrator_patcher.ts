@@ -39,12 +39,12 @@ export class OrchestratorPatcher {
     constructor(private fileSystem: IFileSystem) {}
 
     public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
+        // TASK-022 / Phase B1: orchestrator path components читаются из config.templateConfig.orchestrator.relativePath
+        // (default = t115TemplateConfig() через GenerationConfig constructor).
+        // Pre-TASK-022 hardcoded values: ['lib', 'core', 'sync', 'sync_orchestrator_provider.dart'].
         const orchestratorPath = path.join(
             config.targetFlutterProjectPath,
-            'lib',
-            'core',
-            'sync',
-            'sync_orchestrator_provider.dart'
+            ...config.templateConfig.orchestrator.relativePath,
         );
 
         if (!(await this.fileSystem.exists(orchestratorPath))) {
