@@ -3,6 +3,7 @@ import { OrchestratorPatcher } from '../../features/generation/generators/orches
 import { GenerationConfig } from '../../features/generation/config/generation_config';
 import { t115TemplateConfig, simplifiedTemplateConfig } from '../../features/generation/config/template_config';
 import { ServerpodModel, ServerpodField } from '../../features/generation/parsers/formatters/types';
+import { JunctionDetector } from '../../features/generation/parsers/junction_detector';
 import { MockFileSystem } from '../mocks/mock_file_system';
 
 const TEMPLATES_PATH = '/test/templates';
@@ -1089,10 +1090,21 @@ import 'package:custom/altmarker/category_alt.dart';`,
         );
     });
 
-    test('TASK-023 / BUG-019: alt junction config с custom FK fallbacks применяется когда model FK extraction returns < 2', async () => {
-        // Bomb-style positive: defensive FK fallbacks читаются из config.junctionFkFallbacks.
-        // Test: junction model с 0 FK fields → patcher fallbacks к config-defined `parentA`/`parentB`,
-        // не hardcoded `task`/`tag`.
+    test('TASK-023 / BUG-019: junction with <2 FKs falls back to junctionFkFallbacks config (Round 2 H-2 restructured)', async () => {
+        // Round 2 H-2 fix: previous test mislabeled — it provided 2 FK fields, so FK extraction
+        // succeeded и junctionFkFallbacks branch (`fkFields.length < 2`) НЕ срабатывал. Это
+        // оставляло `junctionFkFallbacks` config field полностью без test coverage.
+        //
+        // Restructured test: monkey-patch `JunctionDetector.isJunctionEntity` чтобы вернуть `true`
+        // для модели с 1 FK field (структурно junction detection требует ≥2 FK через public API,
+        // explicit `junction:true` flag throws JunctionValidationError при FK<2). Patch позволяет
+        // exercise dead-defensive branch в `_buildRegisterSnippet:289-293`:
+        //   ```
+        //   const fk1Name = fkFields.length >= 1 ? extract(fkFields[0]) : fk1Fallback;
+        //   const fk2Name = fkFields.length >= 2 ? extract(fkFields[1]) : fk2Fallback;
+        //   ```
+        // С 1 FK field: `fk1Name = extract(soloId) = 'solo'`, `fk2Name = fk2Fallback = 'parentB'`
+        // (config-driven для simplifiedTemplateConfig).
         const altConfig = new GenerationConfig({
             templProject: 'simplified',
             templEntity: 'configuration',
@@ -1121,27 +1133,136 @@ void wireUp() {
         const orchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/sync/sync_orchestrator_provider.dart`;
         mockFs.setFile(orchestratorPath, orchestratorBaseline);
 
-        // Junction model с 2 FK (NB: < 2 не triggered junction detection — нужно ≥ 2 FK для junction).
-        // Используем 2 FK для positive path с ConcreteParent fallbacks.
-        const junctionWithTwoFk = makeJunctionModel('UserRoleMap', [
-            fkField('userId', 'user'),
-            fkField('roleId', 'role'),
+        // Junction model с 1 FK field. `JunctionDetector.isJunctionEntity()` через public API
+        // НЕ classify это как junction (FK<2). Monkey-patch чтобы заставить patcher войти в
+        // junction branch и exercise FK fallback.
+        const junctionWithOneFk = makeJunctionModel('IncompleteJunction', [
+            fkField('soloId', 'solo'),
         ]);
 
-        await patcher.patch(altConfig, junctionWithTwoFk);
+        const originalIsJunction = JunctionDetector.isJunctionEntity;
+        JunctionDetector.isJunctionEntity = () => true;
+        try {
+            await patcher.patch(altConfig, junctionWithOneFk);
+        } finally {
+            JunctionDetector.isJunctionEntity = originalIsJunction;
+        }
 
         const result = await mockFs.readFile(orchestratorPath);
 
-        // POSITIVE: FK fallback `parentA`/`parentB` НЕ используются (model FK extraction вернула user/role).
+        // POSITIVE: fk2 fallback из simplifiedTemplateConfig().junctionFkFallbacks (= `parentB`).
+        // Доказывает что fallback config-driven, не hardcoded.
         assert.ok(
-            result.includes('junction FK→user+role'),
-            'simplified junction with 2 FK: docstring uses FKs from model (user+role), не fallback',
+            result.includes('junction FK→solo+parentB'),
+            'junction <2 FK: fk2 fallback `parentB` берётся из simplifiedTemplateConfig().junctionFkFallbacks (proof config-driven)',
         );
 
-        // NEGATIVE: t115 hardcoded `task+tag` literals НЕ leak (proof что fallback тоже config-driven).
+        // NEGATIVE: t115 hardcoded `tag` fallback НЕ leak (доказывает что fallback config-specific).
+        assert.ok(
+            !result.includes('junction FK→solo+tag'),
+            'junction <2 FK: t115 hardcoded `tag` fallback НЕ leak (proof simplified config governs fallback)',
+        );
+
+        // NEGATIVE: t115 hardcoded `task+tag` literal pair НЕ leak.
         assert.ok(
             !result.includes('junction FK→task+tag'),
-            'simplified junction: t115 hardcoded fallback `task+tag` НЕ leak (proof config-driven)',
+            'junction <2 FK: t115 hardcoded `task+tag` pair НЕ leak (proof config-driven)',
+        );
+    });
+
+    test('TASK-023 / BUG-019 / Round 2 H-1: --templ-feature CLI flag override consumed для feature substitution (regression)', async () => {
+        // H-1 fix: pre-TASK-023 master `orchestrator_patcher.ts` использовал `config.templFeatureName`
+        // (CLI `--templ-feature` flag value, default `'tasks'`) для feature segment anchor substitution.
+        // Round 1 refactor сменил на `templateConfig.orchestrator.templateFeatureSegment` (hardcoded
+        // в factory) → user-overridden `--templ-feature foo` против t115 templateConfig silently broken
+        // (snippet substitution искал `features/foo/` anchor который в t115 template = `features/tasks/`,
+        // не matched, no-op output retained literal `features/tasks/` import paths).
+        //
+        // Round 2: restored CLI flag primary с config fallback —
+        // `config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment`.
+        //
+        // Этот test exercises non-default CLI flag (templFeatureName='customFoo') против t115
+        // templateConfig (templateFeatureSegment='tasks'). Output должен иметь `features/expense/`
+        // (target feature, properly substituted из anchor), НЕ literal `features/tasks/` (silent
+        // breakage от Round 1 regression).
+        const altOrchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/sync/sync_orchestrator_provider.dart`;
+        const orchestratorBaseline = `// manifest: startProject
+// === generated_start:syncImports ===
+// === generated_end:syncImports ===
+const List<String> syncEntityTypes = <String>[
+  // === generated_start:syncEntityTypes ===
+  // === generated_end:syncEntityTypes ===
+];
+void wireUp() {
+  // === generated_start:syncRegistrations ===
+  // === generated_end:syncRegistrations ===
+}
+`;
+
+        // Custom template config где snippet содержит anchor `features/custom_foo/` —
+        // эмулирует custom template's snippet literal. CLI flag value `customFoo` через
+        // toSnakeCase → `custom_foo` → matches anchor.
+        //
+        // КЛЮЧЕВАЯ деталь H-1 fix verification: `templateFeatureSegment` (config field) остаётся
+        // default `'tasks'` (из t115TemplateConfig spread). Pre-Round-2 patcher выбрал бы
+        // `'tasks'` → toSnakeCase('tasks')='tasks' → искал `features/tasks/` anchor в snippet —
+        // не нашёл (snippet содержит `features/custom_foo/`) → no-op → output retains literal
+        // `features/custom_foo/` (НЕ substituted на target).
+        //
+        // Round 2 patcher выбирает CLI flag value (primary) → toSnakeCase('customFoo')='custom_foo'
+        // → matches anchor `features/custom_foo/` → substitutes на target `features/expense/`.
+        const customTemplateConfig = {
+            ...t115TemplateConfig(),
+            orchestrator: {
+                ...t115TemplateConfig().orchestrator,
+                // Snippet с anchor `features/custom_foo/` — substitution требует snake_case anchor
+                // (per `_substitutePlaceholders` step 1: `features/${tplFeatureSnake}/`).
+                entityImportsTemplate: `import '../../features/custom_foo/data/adapters/category/category_remote_adapter.dart';`,
+                // templateFeatureSegment остаётся 'tasks' (default из t115TemplateConfig spread).
+                // CLI flag (`templFeatureName: 'customFoo'`) должен win primary.
+            },
+        };
+
+        const config = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            // CLI flag override — non-default. Pre-Round-2 silently ignored.
+            templFeatureName: 'customFoo',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: customTemplateConfig,
+        });
+
+        mockFs.setFile(altOrchestratorPath, orchestratorBaseline);
+
+        await patcher.patch(config, makeModel('Expense'));
+
+        const result = await mockFs.readFile(altOrchestratorPath);
+
+        // POSITIVE: CLI flag value `customFoo` (snake `custom_foo`) → matched anchor →
+        // substituted на target `features/expense/`.
+        assert.ok(
+            result.includes('features/expense/'),
+            'H-1 Round 2: CLI flag `templFeatureName: customFoo` (snake `custom_foo`) matches snippet anchor → substituted на target features/expense/',
+        );
+
+        // NEGATIVE: literal `features/custom_foo/` НЕ leak в output (substitution произошёл).
+        assert.ok(
+            !result.includes('features/custom_foo/'),
+            'H-1 Round 2: substitution успешно произошёл; literal features/custom_foo/ НЕ leak',
+        );
+
+        // NEGATIVE: `features/tasks/` НЕ должен появиться в output. Если patcher mistakenly
+        // использовал templateFeatureSegment='tasks' (Round 1 regression), anchor поиск
+        // `features/tasks/` не matches snippet `features/custom_foo/` → no-op → output retains
+        // literal `features/custom_foo/`. Тоже covered позитивным assertion выше через `expense`.
+        assert.ok(
+            !result.includes('features/tasks/'),
+            'H-1 Round 2: t115 templateFeatureSegment default `tasks` НЕ leak (CLI flag won, не config fallback)',
         );
     });
 
