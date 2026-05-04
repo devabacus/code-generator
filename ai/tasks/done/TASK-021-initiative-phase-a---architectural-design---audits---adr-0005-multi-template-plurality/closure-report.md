@@ -136,6 +136,43 @@
 
 ---
 
+## Phase B — TASK-024 deliverable (simplified template directory bootstrap)
+
+**Status:** 🟡 In progress (pending review apply + merge approval) — Sessions A-E3d2 complete, ready for multi-agent review (4 reviewers)
+**Branch:** `feature/TASK-024-b2-simplified-template-directory-bootstrap`
+**Commits:** см. `git log --oneline master..HEAD` post-Session-E3d2 commits
+
+**Deliverables:**
+- Simplified template directory bootstrap (`G:/Templates/flutter/simplified/`) — Configuration baseline (singleton entity per ADR-0005 §3.1) + 4 fixture entities в `features/tasks/` (Category/Tag/Task/TaskTagMap) для substitution flow
+- Architecture ceremony stripped (per ADR-0005 §3.5): no usecases / no abstract repository interfaces / no business notifiers / no validation gen / no application services / no separate mappers / no Either-Result / no datasource interfaces в flutter app
+- pubspec safe bumps к latest stable (Riverpod / Drift / sync_core / Serverpod packages — stack package SET locked per Discussion #11, только versions update)
+- Generator default switched к simplified (DEFAULT_TEMPLATE = 'simplified' in `template_profile.ts`); legacy path preserved через `--template t115` opt-in flag
+- Bootstrapper dynamic depth-delta для path-deps к Packages (Approach 2 patcher для Templates/Packages/ + out-of-monorepo Projects/Packages/ paths)
+- Defensive empty-targetEntity guard в `generation_service._getDestinationPath`
+- Simplified template orchestrator file fixed (Configuration-only baseline; previously had Tasks fixture registrations baked в pre-E3d2 → не bootstrappable)
+
+**Verification (cited evidence):**
+- Mocha 181/181 passing post Session E3d2 fix (см. tail evidence в Session E3d2 step 3)
+- Compile clean (`npm run compile`)
+- Default flow smoke `t176`: `verify --name t176` PASS errors=0, warnings=0, infos=30
+  - Shape verify: 0 usecases в `t176_flutter/`, 0 abstract repository interfaces, features dir = baseline (auth/bluetooth/configuration/developer_tools/home/settings_definitions/) — без Tasks fixture leak
+- Legacy flow smoke `t177`: `verify --name t177 --template t115` PASS errors=0, warnings=1, infos=44 — regression preserved
+- Strip checklist (per ADR-0005 §3.5): all-zero usecases / interfaces в `t176_flutter`
+- Stack lock preserved (Riverpod + Drift + sync_core + Serverpod package SET unchanged)
+
+**BUG-019 closure:** end-to-end validated через default flow t176 + legacy flow t177 (both errors=0). Закрыт 2026-05-04. Marker scheme + config-driven snippets (TemplateConfig.orchestrator) work as designed; previous E3d default switch errantly set `templFeatureName='configuration'` для simplified flow → E3d2 corrected к 'tasks' (matching t115 — Configuration baseline копируется как-есть startProject manifest, substitution-источник = `features/tasks/` Category fixture в обоих templates). Также cleaned simplified template's `sync_orchestrator_provider.dart` — Configuration-only baseline (Tasks fixture registrations добавляются через `generate-entity` pipeline post-bootstrap).
+
+**Sign-offs:**
+- @TeamLead ⏳ pending review apply
+- @User ⏳ pending merge approval
+
+**Pending для Phase B closure:**
+- Multi-agent review (4 reviewers) apply
+- PR created + reviewed + merged
+- Phase B section status updates → ✅ closed
+
+---
+
 ## Phase C — synthetic reference project t<200> (placeholder, filled end of C)
 
 **Scope per ADR-0005 Section 6 (Phase C amendment clause):**

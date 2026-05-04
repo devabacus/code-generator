@@ -127,7 +127,7 @@ Decision matrix v1 maintenance moot. Track 1 deleted. All ресурсы flow в
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| BUG-019 | Medium | Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`) — TASK-B2 landmine | TASK-B2 Session 1 ✅ closes orchestrator-side; junction-substitution-side → BUG-020 |
+| ~~BUG-019~~ | ~~Medium~~ | ~~Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`)~~ | ✅ Closed 2026-05-04 (TASK-024 Session E3d2) — default flow t176 + legacy flow t177 verify PASS errors=0; junction-substitution-side → BUG-020 |
 | BUG-020 | Medium | Junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`) — Session 2 landmine для simplified junction generate-entity flow | TASK-023 Session 2 либо follow-up TASK после Session 2 closure |
 | ~~HOTFIX-001~~ | ~~Low~~ | ~~`new_task.py` сканирует только `active/`~~ | ✅ Closed (PR #14) |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Closed via TASK-020 — minimal single-job, [.github/workflows/test.yml](../../.github/workflows/test.yml). 3-suite split + verify smoke deferred to Phase A. |
