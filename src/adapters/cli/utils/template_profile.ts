@@ -16,8 +16,15 @@
  *    consolidated tasks/Category fixture used as substitution anchor)
  * 4. `templateConfig` factory (`t115TemplateConfig()` или `simplifiedTemplateConfig()`)
  *
- * Default = `simplified` (per ADR-0005 + Discussion #11). Legacy `t115` остаётся
- * available через `--template t115` flag для regression testing / opt-in.
+ * Default = `t115` (post-pivot Discussion #12 — 2026-05-04). T115 остаётся
+ * supported template для existing codebases / weight continuity. Simplified
+ * = opt-in для new CRUD projects via `--template simplified`. Both templates
+ * долго-сохраняемые: t115 для existing projects lineage, simplified для
+ * new opt-in projects.
+ *
+ * Validation: commander `--template` flag uses `.choices(['t115', 'simplified'])`
+ * to validate input при invocation. `resolveTemplateProfile()` performs
+ * defensive runtime check как secondary guard для programmatic callers.
  */
 import {
     TemplateConfig,
@@ -27,7 +34,7 @@ import {
 
 export type TemplateName = 't115' | 'simplified';
 
-export const DEFAULT_TEMPLATE: TemplateName = 'simplified';
+export const DEFAULT_TEMPLATE: TemplateName = 't115';
 
 export interface TemplateProfile {
     name: TemplateName;
@@ -65,10 +72,16 @@ const PROFILES: Record<TemplateName, TemplateProfile> = {
 };
 
 /**
- * Returns the profile для указанного template name. Throws если name не в
- * `TemplateName` union (defensive — commander validates через `choices()`).
+ * Returns the profile для указанного template name.
  *
- * Если `name` undefined → возвращает default profile (`simplified`).
+ * @param name — template name. Undefined → default profile (post-pivot = `t115`).
+ *   Commander `.choices()` enforces valid values на CLI parse step. Эта функция
+ *   performs defensive runtime check для programmatic callers, которые могут
+ *   bypass commander layer (e.g. VS Code adapter direct invocation).
+ *
+ * @throws Error если `name` provided но не в `TemplateName` union.
+ *
+ * @returns Profile для resolved template (`t115` | `simplified`).
  */
 export function resolveTemplateProfile(name?: string): TemplateProfile {
     const resolved = (name ?? DEFAULT_TEMPLATE) as TemplateName;
