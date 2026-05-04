@@ -120,6 +120,13 @@
 - [ ] **Per-TASK closure-report Phase B section update** (incremental): добавить sub-section "Phase B — TASK-B2 deliverable" в [closure-report.md](../../done/TASK-021-initiative-phase-a---architectural-design---audits---adr-0005-multi-template-plurality/closure-report.md)
 - [ ] BUG-019 status updated к Closed в `ai/bug-reports/019-orchestrator-snippet-hardcoded-literals.md` + status.md backlog table
 
+### Session 2 deferred (acceptance criteria added Round 2 H-3 fix per Adversarial review)
+
+- [ ] **BUG-020 acceptance** — junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`) в `replacement_util.ts:60-61` + `generation_service.ts:240-242` + `relation_patcher.ts:103`. См. [ai/bug-reports/020-junction-substitution-template-coupling.md](../../bug-reports/020-junction-substitution-template-coupling.md). Session 2 must либо:
+  - (a) **Resolve в Session 2 scope:** extend `TemplateConfig.relationPatcher` (либо аналогичные) с `templEntity1`/`templEntity2` fields; refactor 4 call-sites через CLI flag primary + config fallback (same pattern как H-1 fix `config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment`); zero-diff t115 invariant preserved; tests prove simplified junction emits правильные literals.
+  - (b) **Defer к follow-up TASK после Session 2 closure:** explicit acknowledgment в Session 2 closure-report что junction substitution still coupled к `task`/`tag` defaults; simplified bootstrap пока что не emit'ит junction (Configuration baseline = singleton); BUG-020 остаётся Open до Phase C synthetic либо отдельного follow-up TASK.
+- Decision (a) vs (b) — Session 2 executor's call в зависимости от того, ландит ли Session 2 concrete junction fixture в simplified bootstrap. Если да — (a) обязательно; если Configuration-only baseline без junction — (b) acceptable.
+
 ## Заметки по реализации
 
 ### Bootstrap strategy для simplified/
@@ -441,4 +448,121 @@ Session 1 deliverables ✅ done. Не bootstrap'аем `G:/Templates/flutter/sim
 - Tests proving substitution flow correct (5 BUG-019 tests + 173 baseline)
 - Detailed commit history showing BUG-019 fix shape
 - Этот журнал с complete state.
+
+### [2026-05-04 / Session 1 Round 2] Adversarial review fixes (5 HIGH applied)
+
+**Context:** 4 reviewers (architecture / generator-core / test / adversarial) ревьюили Round 1.
+Architecture / Generator-core / Test = APPROVE по существу (0 CRITICAL / 0 HIGH each).
+Adversarial = Approve with fixes — caught 5 HIGH cross-axis findings (cross-axis = findings spanning multiple
+review axes which thematic reviewers individually missed). Fixes applied в priority order.
+
+**Round 2 fixes applied:**
+
+#### Round 2 fix H-1 — silent `--templ-feature` CLI flag breakage (real silent regression)
+
+**Issue evidence:** Pre-TASK-023 master `orchestrator_patcher.ts:67` использовал `config.templFeatureName`
+(CLI flag value, default `'tasks'`) для feature segment substitution anchor. Round 1 refactor сменил на
+`config.templateConfig.orchestrator.templateFeatureSegment` (hardcoded `'tasks'` в `t115TemplateConfig()`
+factory). Callers passing `--templ-feature foo` (non-default) silently broken — substitution игнорирует
+user CLI value, generates `features/tasks/` imports вместо `features/foo/` → cascade `uri_does_not_exist`
+errors в target project. Adv H-1.
+
+**Fix:** Option A (Adv recommended; minimal change semantics-clear):
+`orchestrator_patcher.ts:85-87` — `config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment`.
+Это restore'ит CLI flag consumption AS PRIMARY с template config fallback. Backwards compat preserved.
+Updated docstring lines 79-84 (Architecture M2 acknowledgment + Round 2 explanation).
+
+**Regression test:** new test `TASK-023 / BUG-019 / Round 2 H-1: --templ-feature CLI flag override consumed
+для feature substitution`. Setup: customTemplateConfig с snippet anchor `features/custom_foo/` + templateFeatureSegment
+default `'tasks'` + CLI flag `templFeatureName='customFoo'`. Pre-Round-2 patcher выбрал бы 'tasks' →
+toSnakeCase='tasks' → искал `features/tasks/` anchor → не matched → no-op → output literal
+`features/custom_foo/` retained. Post-Round-2 patcher выбирает CLI flag 'customFoo' (primary) →
+toSnakeCase='custom_foo' → matches snippet anchor → substitutes на `features/expense/` (target).
+
+**Commits:**
+- `856d315 fix(orchestrator-patcher): restore --templ-feature CLI flag consumption (H-1 silent regression fix)`
+- `499d4b9 test(orchestrator-patcher): restructure FK fallback test + H-1 regression test (Round 2 H-1, H-2)`
+
+#### Round 2 fix H-2 — junction FK fallback test mislabeled (dead test coverage)
+
+**Issue evidence:** Test `TASK-023 / BUG-019: alt junction config с custom FK fallbacks применяется когда
+model FK extraction returns < 2` (line 1092-1146 в orchestrator_patcher.test.ts) provided 2 FK fields,
+поэтому `_buildRegisterSnippet:289-293` FK extraction succeeded и `junctionFkFallbacks` fallback branch
+(`fkFields.length < 2`) НЕ exercised. Test проverял только positive proof что extraction работает (already
+covered TASK-014 tests at L658), оставляя `junctionFkFallbacks` config field полностью без test coverage.
+Test M1 / Adv H-2 unanimous.
+
+**Fix:** Restructured test 'TASK-023 / BUG-019: junction with <2 FKs falls back to junctionFkFallbacks
+config (Round 2 H-2 restructured)':
+- Junction model с 1 FK field (через public API `JunctionDetector.isJunctionEntity()` структурно требует
+  ≥2 FK; explicit `junction:true` flag throws `JunctionValidationError` при FK<2 — нет другого пути
+  enter junction branch с FK<2)
+- Monkey-patch `JunctionDetector.isJunctionEntity = () => true` (try/finally restoration) — заставляет
+  patcher войти в junction branch с `fkFields.length=1` → exercise dead-defensive fallback branch
+- Asserts: `junction FK→solo+parentB` (positive proof fk2 fallback `parentB` берётся из
+  `simplifiedTemplateConfig().junctionFkFallbacks.fk2`) + negative `junction FK→solo+tag` (t115 fallback
+  не leak) + negative `junction FK→task+tag` (t115 pair не leak)
+
+**Commit:** `499d4b9 test(orchestrator-patcher): restructure FK fallback test + H-1 regression test (Round 2 H-1, H-2)`
+
+#### Round 2 fix H-3 (Option B) — simplified junction forward coupling (Session 2 landmine)
+
+**Issue evidence:** `templEntity1`/`templEntity2` defaults `'task'`/`'tag'` в `generation_config.ts:94-95`
+consumed `replacement_util.ts:60-61` для junction substitution. Когда Session 2 / Phase C synthetic
+generates concrete junction fixture в simplified template (e.g. `configuration_map_*.dart` либо
+`parent_child_map_*.dart`) — substitution rule `task_tag_map → role_permission` НЕ match'ит on-disk
+literal → file content un-substituted. Adv H-3.
+
+**Fix:** Option B (Adv recommended; preserves Session 1 atomic codegen TS chunk scope; defers Session 2 work):
+- Created `ai/bug-reports/020-junction-substitution-template-coupling.md` — full evidence + 4 call-sites
+  enumeration + acceptance criteria
+- Updated `ai/docs/status.md` backlog table — BUG-020 row added
+- Updated `ai/docs/roadmap.md` Track 4 backlog table — BUG-020 row added
+- Updated этот task.md "Session 2 deferred" sub-section в "Критерии приёмки" — explicit acceptance
+  criterion с (a) resolve в Session 2 если concrete junction fixture лансится либо (b) defer к
+  follow-up TASK с explicit acknowledgment в closure-report
+
+Session 2 executor's call (a) vs (b) — зависит от того, ландит ли Session 2 junction fixture.
+Configuration-only baseline без junction → (b) acceptable. Concrete junction fixture (либо
+Phase C synthetic adds one) → (a) обязательно.
+
+#### Round 2 fix H-4 — LOC numbers off-by-half (clarification)
+
+**Issue evidence:** Round 1 journal claim `-66 LOC orchestrator_patcher.ts` → actual `git diff --numstat`
+= 74 ins / 108 del = **net -34 LOC**. Round 1 mis-claim verified Adv H-4 fact-check.
+
+**Fix:** Cited correctly в Round 2 `report.md` (next entry below): `+74 / -108 (net -34 LOC)` для
+orchestrator_patcher.ts; `369 ins / 6 del (net +363 LOC)` для template_config.ts. Не нужно amend
+Round 1 commits — clarification документирован в final report.
+
+#### Round 2 fix H-5 — `report.md` filled (acceptance criterion task.md:118)
+
+**Issue evidence:** `report.md` 23-line empty stub после Round 1 — acceptance criterion task.md:118
+explicitly violated. 4 reviewers had to manually re-derive каждое claim из git diff + journal.
+Adv H-5 / Test review explicit recommendation.
+
+**Fix:** `report.md` populated с filled version per Adv H-5 recommendation:
+- Session 1 deliverable summary (codegen-TS subset)
+- Cited mocha (179 passing post-Round-2; was 178 Round 1, was 173 baseline) + lint (0/18) + compile clean
+- Cited LOC deltas accurate (per H-4)
+- Files modified table с verified line counts
+- Multi-agent review summary (4 reviewers verdicts + Round 2 fixes status)
+- Honest "Session 2 outstanding" sub-section listing acceptance criteria deferred (template directory
+  bootstrap, package versions update, simplified positive smoke, BUG-019 status flip, BUG-020 closure либо defer,
+  closure-report Phase B sub-section)
+
+**Commits Round 2 (cumulative master..HEAD):**
+1. `6537088 feat(template-config): extend TemplateConfig.orchestrator с snippet content fields + simplifiedTemplateConfig factory` (Round 1)
+2. `994bf1b refactor(orchestrator-patcher): snippet content + fallbacks из templateConfig (BUG-019 fix)` (Round 1)
+3. `832ba6a test(orchestrator-patcher): +5 cases для BUG-019 fix` (Round 1)
+4. `71e3a67 docs(task-023): TASK setup + status.md (TASK-023 active, TASK-022 ✅ done) + журнал Session 1` (Round 1)
+5. `856d315 fix(orchestrator-patcher): restore --templ-feature CLI flag consumption (H-1 silent regression fix)` (Round 2)
+6. `499d4b9 test(orchestrator-patcher): restructure FK fallback test + H-1 regression test (Round 2 H-1, H-2)` (Round 2)
+7. (next) `docs(bug-reports + backlog): BUG-020 simplified junction substitution coupling (Session 2 landmine documentation)` (Round 2 H-3)
+8. (next) `docs(report): TASK-023 Session 1 final report.md с cited evidence + 4 review summary (H-5)` (Round 2 H-5)
+
+**Verify:** mocha 179 passing (49ms) ✓ post-Round-2; compile clean ✓; lint 0 errors / 18 pre-existing
+warnings ✓.
+
+**Ready для:** push + PR creation by teamlead (`task.py pr`).
 
