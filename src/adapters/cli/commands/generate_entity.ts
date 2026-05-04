@@ -10,6 +10,7 @@ import { TrackingFileSystem } from '../utils/cli_file_system';
 import { CliLogger } from '../utils/cli_logger';
 import { readStdin } from '../utils/stdin_reader';
 import { manifestType } from '../../../features/generation/generators/manifests';
+import { resolveTemplateProfile } from '../utils/template_profile';
 
 function snakeToCamelCase(str: string): string {
     return str.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
@@ -22,9 +23,11 @@ interface GenerateEntityOptions {
     workspace: string;
     projectsPath?: string;
     templatesPath: string;
-    templProject: string;
-    templEntity: string;
-    templFeature: string;
+    /** TASK-024 Session E3d: --template <name> (default 'simplified'). */
+    template?: string;
+    templProject?: string;
+    templEntity?: string;
+    templFeature?: string;
     json: boolean;
     human?: boolean;
     skipValidation?: boolean;
@@ -40,9 +43,13 @@ export function registerGenerateEntity(program: Command): void {
         .requiredOption('--workspace <path>', 'Workspace root path')
         .option('--projects-path <path>', 'Base path for projects (overrides default G:/Projects/Flutter/serverpod, used for E2E template re-population)')
         .option('--templates-path <path>', 'Path to templates', 'G:/Templates')
-        .option('--templ-project <id>', 'Template project ID', 't115')
-        .option('--templ-entity <name>', 'Template entity placeholder', 'category')
-        .option('--templ-feature <name>', 'Template feature name', 'tasks')
+        // TASK-024 Session E3d: --template flag — single source of truth.
+        // Defaults для --templ-project/--templ-entity/--templ-feature derive
+        // от template profile (override only when caller explicitly passes flag).
+        .option('--template <name>', 'Template variant: simplified (default) or t115 (legacy)', 'simplified')
+        .option('--templ-project <id>', 'Override template project directory id (default derived from --template)')
+        .option('--templ-entity <name>', 'Override template entity placeholder (default derived from --template)')
+        .option('--templ-feature <name>', 'Override template feature name (default derived from --template)')
         .option('--json', 'Output as JSON (default)', true)
         .option('--human', 'Output as human-readable text')
         .option('--skip-validation', 'Skip pre-flight validation of YAML (6-field pattern, sync-event)', false)
@@ -87,11 +94,17 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             }
         }
 
+        // TASK-024 Session E3d: resolve template profile (default 'simplified').
+        // Каждый --templ-* flag overrides соответствующее поле profile при
+        // explicit передаче; иначе используется profile default.
+        const templateProfile = resolveTemplateProfile(opts.template);
         const config = new GenerationConfig({
-            templProject: opts.templProject,
+            templProject: opts.templProject || templateProfile.templProject,
+            templEntity: opts.templEntity || templateProfile.templEntity,
+            templFeatureName: opts.templFeature || templateProfile.templFeatureName,
+            templateConfig: templateProfile.templateConfig,
             workspacesPath: opts.workspace,
             projectsPath: opts.projectsPath,
-            templFeatureName: opts.templFeature,
             targetFeaturePath: opts.featurePath,
             targetEntity: snakeToCamelCase(model.tableName),
             targetEntity1: model.entity1,

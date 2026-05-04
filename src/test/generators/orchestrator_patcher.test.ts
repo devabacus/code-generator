@@ -880,30 +880,27 @@ void wireUp() {
         assert.ok(config.orchestrator.junctionRegisterTemplate.length > 0,
             'simplified junctionRegisterTemplate should be non-empty');
 
-        // Fallbacks
-        assert.strictEqual(config.orchestrator.regularEntityFallback, 'configuration',
-            'simplified regularEntityFallback должен быть `configuration` (Configuration baseline)');
-        assert.strictEqual(config.orchestrator.junctionEntityFallback, 'configurationMap',
-            'simplified junctionEntityFallback (placeholder для junction substitution)');
-        assert.deepStrictEqual(config.orchestrator.junctionFkFallbacks, { fk1: 'parentA', fk2: 'parentB' },
-            'simplified junctionFkFallbacks (generic placeholders since simplified bootstrap не содержит concrete junction)');
-        assert.strictEqual(config.orchestrator.templateFeatureSegment, 'configuration',
-            'simplified templateFeatureSegment = `configuration` (Configuration feature location)');
+        // Fallbacks (Session E3d2: aligned с t115 — Configuration = startProject baseline,
+        // не template fixture; simplified inherits `features/tasks/` Category fixture).
+        assert.strictEqual(config.orchestrator.regularEntityFallback, 'category',
+            'simplified regularEntityFallback = `category` (E3d2: aligned с t115 — Configuration baseline копируется как-есть, не substitution source)');
+        assert.strictEqual(config.orchestrator.junctionEntityFallback, 'taskTagMap',
+            'simplified junctionEntityFallback = `taskTagMap` (E3d2: aligned с t115 consolidated fixture)');
+        assert.deepStrictEqual(config.orchestrator.junctionFkFallbacks, { fk1: 'task', fk2: 'tag' },
+            'simplified junctionFkFallbacks = `task`/`tag` (E3d2: aligned с t115 TaskTagMap junction)');
+        assert.strictEqual(config.orchestrator.templateFeatureSegment, 'tasks',
+            'simplified templateFeatureSegment = `tasks` (E3d2: aligned с t115 Category fixture location)');
 
-        // Simplified snippet содержит Configuration / configuration literals (не Category / category t115 markers).
-        assert.ok(config.orchestrator.entityImportsTemplate.includes('configuration_remote_adapter.dart'),
-            'simplified entityImportsTemplate содержит configuration adapter file path');
-        assert.ok(!config.orchestrator.entityImportsTemplate.includes('category_remote_adapter.dart'),
-            'simplified entityImportsTemplate НЕ содержит t115 category literal (BUG-019 isolation)');
-        assert.ok(config.orchestrator.entityImportsTemplate.includes('features/configuration/'),
-            'simplified entityImportsTemplate содержит features/configuration/ feature segment');
-        assert.ok(!config.orchestrator.entityImportsTemplate.includes('features/tasks/'),
-            'simplified entityImportsTemplate НЕ содержит t115 features/tasks/ feature segment');
+        // Simplified snippet содержит Category / category literals (E3d2: aligned с t115).
+        // Configuration baseline (per ADR-0005 §3.1) копируется как-есть startProject manifest,
+        // не входит в substitution flow.
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('category_remote_adapter.dart'),
+            'simplified entityImportsTemplate содержит category adapter file path (E3d2: shared с t115)');
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('features/tasks/'),
+            'simplified entityImportsTemplate содержит features/tasks/ feature segment (E3d2)');
 
-        assert.ok(config.orchestrator.entityRegisterTemplate.includes('register<ConfigurationEntity>'),
-            'simplified entityRegisterTemplate содержит ConfigurationEntity register');
-        assert.ok(!config.orchestrator.entityRegisterTemplate.includes('register<CategoryEntity>'),
-            'simplified entityRegisterTemplate НЕ содержит t115 CategoryEntity literal');
+        assert.ok(config.orchestrator.entityRegisterTemplate.includes('register<CategoryEntity>'),
+            'simplified entityRegisterTemplate содержит CategoryEntity register (E3d2: shared с t115)');
     });
 
     test('TASK-023 / BUG-019: t115TemplateConfig() factory snippet content matches pre-TASK-023 hardcoded constants', async () => {
@@ -937,16 +934,15 @@ void wireUp() {
         assert.strictEqual(config.orchestrator.templateFeatureSegment, 'tasks');
     });
 
-    test('TASK-023 / BUG-019: simplified config produces simplified snippet output (positive proof)', async () => {
-        // Positive proof: patcher с simplified config produces output, содержащий simplified
-        // template literals (configuration / Configuration / features/configuration/), не t115
-        // literals (category / Category / features/tasks/).
-        // NB: simplified config substitution заменит `configuration` → target entity name.
-        // Поэтому test использует target entity 'Expense' и проверяет что:
-        // (a) `Expense` имена правильно substituted (не литералы template)
-        // (b) substitution произошёл из simplified template (anchor segment был
-        //     `features/configuration/`, не `features/tasks/` — verifies что patcher
-        //     ЧИТАЕТ simplified config, не fallback к t115 hardcoded)
+    test('TASK-023 / BUG-019 + Session E3d2: simplified config substitution flow (positive proof)', async () => {
+        // Session E3d2 update: simplified config теперь использует те же substitution
+        // literals что t115 (Category fixture в `features/tasks/`). Configuration baseline
+        // (per ADR-0005 §3.1) копируется как-есть startProject manifest, не входит в
+        // substitution flow → не вызывает Configuration table duplication.
+        //
+        // Positive proof: patcher с simplified config produces output, где Category fixture
+        // properly substituted к target entity. Substitution shape unified с t115 — это
+        // правильно since simplified inherits Clean directory layout + same fixture location.
         const orchestratorBaseline = `// manifest: startProject
 import 'package:sync_core/sync_core.dart';
 
@@ -967,14 +963,14 @@ void wireUp() {
 
         const simplifiedConfig = new GenerationConfig({
             templProject: 'simplified',
-            templEntity: 'configuration',
+            templEntity: 'category',
             targetEntity: '',
             templatesPath: TEMPLATES_PATH,
             projectsPath: PROJECTS_PATH,
             targetProject: TARGET_PROJECT,
-            // NB: targetFeaturePath = lib/features/expense — substitution from simplified
-            // template's `features/configuration/` anchor → `features/expense/` target.
-            templFeatureName: 'configuration',
+            // E3d2: targetFeaturePath = lib/features/expense — substitution from simplified
+            // template's `features/tasks/` anchor → `features/expense/` target.
+            templFeatureName: 'tasks',
             targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
             workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
             templateConfig: simplifiedTemplateConfig(),
@@ -996,25 +992,18 @@ void wireUp() {
             'simplified config + target=Expense: register<ExpenseEntity> emitted',
         );
 
-        // NEGATIVE: t115 template literals НЕ leak.
+        // NEGATIVE: template literals (`features/tasks/` anchor + `category` entity) НЕ leak (substituted на target).
         assert.ok(
             !result.includes('features/tasks/'),
-            'simplified config: t115 template feature segment `features/tasks/` НЕ leak в output',
+            'simplified config: template feature segment `features/tasks/` substituted на `features/expense/`',
         );
         assert.ok(
             !result.includes('category_remote_adapter.dart'),
-            'simplified config: t115 template entity literal `category_remote_adapter.dart` НЕ leak в output',
+            'simplified config: template entity literal `category_remote_adapter.dart` substituted на target',
         );
         assert.ok(
             !result.includes('register<CategoryEntity>'),
-            'simplified config: t115 template entity literal `register<CategoryEntity>` НЕ leak в output',
-        );
-
-        // NEGATIVE: simplified template literal `configuration_remote_adapter.dart` тоже substituted
-        // (Expense target — `configuration` → `expense`).
-        assert.ok(
-            !result.includes('configuration_remote_adapter.dart'),
-            'simplified config: template literal `configuration_remote_adapter.dart` substituted на target',
+            'simplified config: template entity literal `register<CategoryEntity>` substituted на `register<ExpenseEntity>`',
         );
     });
 
@@ -1103,19 +1092,29 @@ import 'package:custom/altmarker/category_alt.dart';`,
         //   const fk1Name = fkFields.length >= 1 ? extract(fkFields[0]) : fk1Fallback;
         //   const fk2Name = fkFields.length >= 2 ? extract(fkFields[1]) : fk2Fallback;
         //   ```
-        // С 1 FK field: `fk1Name = extract(soloId) = 'solo'`, `fk2Name = fk2Fallback = 'parentB'`
-        // (config-driven для simplifiedTemplateConfig).
+        // С 1 FK field: `fk1Name = extract(soloId) = 'solo'`, `fk2Name = fk2Fallback = 'sentinelFk2'`
+        // (config-driven proof). Session E3d2: simplified и t115 теперь оба используют `task`/`tag`
+        // FK fallbacks → нужен custom config с sentinel literal чтобы доказать config-driven dispatch
+        // не hardcoded constant.
         const altConfig = new GenerationConfig({
             templProject: 'simplified',
-            templEntity: 'configuration',
+            templEntity: 'category',
             targetEntity: '',
             templatesPath: TEMPLATES_PATH,
             projectsPath: PROJECTS_PATH,
             targetProject: TARGET_PROJECT,
-            templFeatureName: 'configuration',
+            templFeatureName: 'tasks',
             targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/configuration`,
             workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
-            templateConfig: simplifiedTemplateConfig(),
+            // Custom config: derived from simplifiedTemplateConfig() с overridden junctionFkFallbacks.
+            // Sentinel literals доказывают config-driven dispatch (не hardcoded).
+            templateConfig: {
+                ...simplifiedTemplateConfig(),
+                orchestrator: {
+                    ...simplifiedTemplateConfig().orchestrator,
+                    junctionFkFallbacks: { fk1: 'sentinelFk1', fk2: 'sentinelFk2' },
+                },
+            },
         });
 
         const orchestratorBaseline = `// manifest: startProject
@@ -1150,23 +1149,24 @@ void wireUp() {
 
         const result = await mockFs.readFile(orchestratorPath);
 
-        // POSITIVE: fk2 fallback из simplifiedTemplateConfig().junctionFkFallbacks (= `parentB`).
+        // POSITIVE: fk2 fallback из custom config junctionFkFallbacks (= `sentinelFk2`).
         // Доказывает что fallback config-driven, не hardcoded.
         assert.ok(
-            result.includes('junction FK→solo+parentB'),
-            'junction <2 FK: fk2 fallback `parentB` берётся из simplifiedTemplateConfig().junctionFkFallbacks (proof config-driven)',
+            result.includes('junction FK→solo+sentinelFk2'),
+            'junction <2 FK: fk2 fallback `sentinelFk2` берётся из custom templateConfig.junctionFkFallbacks (proof config-driven)',
         );
 
-        // NEGATIVE: t115 hardcoded `tag` fallback НЕ leak (доказывает что fallback config-specific).
+        // NEGATIVE: default `tag` fallback (из simplifiedTemplateConfig defaults) НЕ leak,
+        // потому что custom config override'ит fallback.
         assert.ok(
             !result.includes('junction FK→solo+tag'),
-            'junction <2 FK: t115 hardcoded `tag` fallback НЕ leak (proof simplified config governs fallback)',
+            'junction <2 FK: default `tag` fallback НЕ leak (proof custom config override governs)',
         );
 
-        // NEGATIVE: t115 hardcoded `task+tag` literal pair НЕ leak.
+        // NEGATIVE: hardcoded `task+tag` literal pair НЕ leak (proof что patcher не использует hardcoded constant).
         assert.ok(
             !result.includes('junction FK→task+tag'),
-            'junction <2 FK: t115 hardcoded `task+tag` pair НЕ leak (proof config-driven)',
+            'junction <2 FK: hardcoded `task+tag` pair НЕ leak (proof config-driven)',
         );
     });
 

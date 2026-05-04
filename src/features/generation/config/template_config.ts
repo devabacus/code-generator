@@ -316,77 +316,68 @@ export function t115TemplateConfig(): TemplateConfig {
     };
 }
 
-// ── simplified snippet templates (TASK-023 — Configuration baseline) ──
+// ── simplified snippet templates (TASK-023 — TASKS fixture, Configuration = baseline) ──
 
 /**
  * Imports snippet для regular entity в simplified template.
  *
- * **Стратегия (per ADR-0005 §7 stack lock):** simplified template inherits
- * t115's directory layout + sync_core 0.3.0 wire-up shape — снапшот snippet'а
- * MIRROR'ится с одним отличием: template feature = `configuration` (Configuration
- * baseline singleton entity, ADR-0005 §3.1 generate categories), template entity
- * = `configuration` (regular entity).
+ * **Стратегия (per ADR-0005 §7 stack lock + Session E3d2 fix):** simplified
+ * template inherits t115's directory layout + sync_core 0.3.0 wire-up shape +
+ * `features/tasks/` Category/Tag/Task/TaskTagMap fixture. Configuration baseline
+ * (per ADR-0005 §3.1) копируется как-есть из startProject manifest и НЕ
+ * участвует в template substitution — это singleton baseline entity. Template
+ * substitution-источник = `features/tasks/` Category fixture (identical с t115).
  *
- * Substitution flow в orchestrator_patcher преобразует `configuration` → target
- * entity name + `features/configuration/` → `features/<target_feature>/` (BUG-009).
- *
- * **NB:** simplified template содержит SAME structure (5 adapters + 1 dao +
- * 1 entity) per ADR-0005 §3.1 generate categories — это generate scope
- * не меняется между templates, только ceremony layer (usecases / interfaces /
- * separate mappers / etc) удаляется. Sync_core 0.3.0 contract = invariant.
+ * Pre-Session-E3d2 simplified template substitution использовал
+ * `features/configuration/` literal + `configuration` template entity →
+ * Configuration table determinated twice (один раз через startProject baseline
+ * copy, другой через substitution copy в `features/<targetFeaturePath>/`),
+ * 312 errors smoke. Session E3d2 fix унифицирует simplified ↔ t115 substitution
+ * literals при сохранении ceremony reduction в template content.
  */
-const SIMPLIFIED_ENTITY_IMPORTS_TEMPLATE = `import '../../features/configuration/data/adapters/configuration/configuration_event_adapter.dart';
-import '../../features/configuration/data/adapters/configuration/configuration_local_apply.dart';
-import '../../features/configuration/data/adapters/configuration/configuration_payload_codec.dart';
-import '../../features/configuration/data/adapters/configuration/configuration_pull_adapter.dart';
-import '../../features/configuration/data/adapters/configuration/configuration_remote_adapter.dart';
-import '../../features/configuration/data/datasources/local/daos/configuration/configuration_dao.dart';
-import '../../features/configuration/domain/entities/configuration/configuration_entity.dart';`;
+const SIMPLIFIED_ENTITY_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/category/category_event_adapter.dart';
+import '../../features/tasks/data/adapters/category/category_local_apply.dart';
+import '../../features/tasks/data/adapters/category/category_payload_codec.dart';
+import '../../features/tasks/data/adapters/category/category_pull_adapter.dart';
+import '../../features/tasks/data/adapters/category/category_remote_adapter.dart';
+import '../../features/tasks/data/datasources/local/daos/category/category_dao.dart';
+import '../../features/tasks/domain/entities/category/category_entity.dart';`;
 
 /**
  * Register block snippet для regular entity в simplified template.
  *
- * Identical в shape к t115 (sync_core 0.3.0 wire-up = invariant), отличие
- * только в template entity name (`configuration` instead of `category`).
+ * Identical в shape к t115 (sync_core 0.3.0 wire-up = invariant) + Session E3d2:
+ * template entity = `category` (consolidated tasks fixture, не Configuration baseline).
  */
-const SIMPLIFIED_ENTITY_REGISTER_TEMPLATE = `  // ── Adapter bundle: Configuration ──────────────────────────────────────
-  orchestrator.register<ConfigurationEntity>(
-    'configuration',
-    AdapterBundle<ConfigurationEntity>(
-      writeAdapter: ConfigurationRemoteAdapter(client),
-      codec: const ConfigurationPayloadCodec(),
-      localApply: ConfigurationLocalApply(ConfigurationDao(dbService)),
-      pullAdapter: ConfigurationPullAdapter(client),
-      eventAdapter: ConfigurationEventAdapter(client),
+const SIMPLIFIED_ENTITY_REGISTER_TEMPLATE = `  // ── Adapter bundle: Category ────────────────────────────────────────────
+  orchestrator.register<CategoryEntity>(
+    'category',
+    AdapterBundle<CategoryEntity>(
+      writeAdapter: CategoryRemoteAdapter(client),
+      codec: const CategoryPayloadCodec(),
+      localApply: CategoryLocalApply(CategoryDao(dbService)),
+      pullAdapter: CategoryPullAdapter(client),
+      eventAdapter: CategoryEventAdapter(client),
     ),
   );`;
 
 /**
  * Imports snippet для junction entity в simplified template.
  *
- * **NB на TASK-023 scope:** Configuration baseline singleton (no junction
- * present в bootstrap content). Junction entities генерируются через
- * `generate-entity` post-bootstrap. Snippet shape inherits t115 contract
- * (5 adapters + 1 dao + 1 entity), template feature = `configuration`,
- * template junction = `configuration_map` (placeholder pattern). Когда
- * Phase C synthetic создаёт concrete junction reference fixture — этот
- * placeholder может потребовать update; для TASK-B2 baseline — generic
- * shape работает (`generate-entity` для real junction substitute'ит target
- * names через `_substitutePlaceholders` flow).
- *
- * **Honest limitation note:** Symmetric с t115 в shape (substitution flow
- * mechanical), но конкретные literal values (`configuration_map`) — это
- * placeholder; t115 has `task_tag_map` от concrete TaskTagMap fixture.
- * Simplified bootstrap не содержит concrete junction → placeholder
- * `configuration_map` приемлем, substitution заменит на target.
+ * Session E3d2 fix: junction fixture = `features/tasks/` TaskTagMap (concrete
+ * fixture inherited from t115's tasks feature, simplified bootstrap содержит
+ * `task_tag_map/` directories per consolidated layout). Substitution flow в
+ * orchestrator_patcher подменяет `task_tag_map`/`taskTagMap`/`TaskTagMap` →
+ * target junction entity, `features/tasks/` → `features/<target_feature>/`,
+ * `__FK1__`/`__FK2__` → actual FK names из model.
  */
-const SIMPLIFIED_JUNCTION_IMPORTS_TEMPLATE = `import '../../features/configuration/data/adapters/configuration_map/configuration_map_event_adapter.dart';
-import '../../features/configuration/data/adapters/configuration_map/configuration_map_local_apply.dart';
-import '../../features/configuration/data/adapters/configuration_map/configuration_map_payload_codec.dart';
-import '../../features/configuration/data/adapters/configuration_map/configuration_map_pull_adapter.dart';
-import '../../features/configuration/data/adapters/configuration_map/configuration_map_remote_adapter.dart';
-import '../../features/configuration/data/datasources/local/daos/configuration_map/configuration_map_dao.dart';
-import '../../features/configuration/domain/entities/configuration_map/configuration_map_entity.dart';`;
+const SIMPLIFIED_JUNCTION_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_event_adapter.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_local_apply.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_payload_codec.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_pull_adapter.dart';
+import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_remote_adapter.dart';
+import '../../features/tasks/data/datasources/local/daos/task_tag_map/task_tag_map_dao.dart';
+import '../../features/tasks/domain/entities/task_tag_map/task_tag_map_entity.dart';`;
 
 /**
  * Register block snippet для junction entity в simplified template.
@@ -396,25 +387,24 @@ import '../../features/configuration/domain/entities/configuration_map/configura
  * Substitution placeholders identical с t115 (`__FK1__` / `__FK2__` /
  * `__FK1Pascal__` / `__FK2Pascal__`).
  *
- * Placeholder fallback FK pair = `parentA` + `parentB` (generic) — для
- * simplified bootstrap нет concrete junction fixture, generate-entity
- * substitute'ит actual FK names из target model.
+ * Session E3d2 fix: junction fixture = `taskTagMap` + FK pair `task`+`tag`
+ * (consolidated tasks fixture, identical с t115).
  */
-const SIMPLIFIED_JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: ConfigurationMap (junction FK→__FK1__+__FK2__) ────────
-  // Junction-specific: server has no \`updateConfigurationMap\` RPC, only
-  // \`createConfigurationMap\` (idempotent create + resurrect) and
-  // \`deleteConfigurationMapBy__FK1Pascal__And__FK2Pascal__\` (soft-delete via business key).
-  // \`update()\` adapter routes через \`createConfigurationMap\`; \`delete()\` is
+const SIMPLIFIED_JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: TaskTagMap (junction FK→__FK1__+__FK2__) ───────────────────
+  // Junction-specific: server has no \`updateTaskTagMap\` RPC, only
+  // \`createTaskTagMap\` (idempotent create + resurrect) and
+  // \`deleteTaskTagMapBy__FK1Pascal__And__FK2Pascal__\` (soft-delete via business key).
+  // \`update()\` adapter routes через \`createTaskTagMap\`; \`delete()\` is
   // a noop (Repository должен решать delete-flow — см.
-  // configuration_map_remote_adapter.dart docstring).
-  orchestrator.register<ConfigurationMapEntity>(
-    'configuration_map',
-    AdapterBundle<ConfigurationMapEntity>(
-      writeAdapter: ConfigurationMapRemoteAdapter(client),
-      codec: const ConfigurationMapPayloadCodec(),
-      localApply: ConfigurationMapLocalApply(ConfigurationMapDao(dbService)),
-      pullAdapter: ConfigurationMapPullAdapter(client),
-      eventAdapter: ConfigurationMapEventAdapter(client),
+  // task_tag_map_remote_adapter.dart docstring).
+  orchestrator.register<TaskTagMapEntity>(
+    'task_tag_map',
+    AdapterBundle<TaskTagMapEntity>(
+      writeAdapter: TaskTagMapRemoteAdapter(client),
+      codec: const TaskTagMapPayloadCodec(),
+      localApply: TaskTagMapLocalApply(TaskTagMapDao(dbService)),
+      pullAdapter: TaskTagMapPullAdapter(client),
+      eventAdapter: TaskTagMapEventAdapter(client),
     ),
   );`;
 
@@ -433,36 +423,25 @@ const SIMPLIFIED_JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: Confi
  *   NO datasource interfaces
  *
  * **Snippet content differences from t115:**
- * - Template entity = `configuration` (single Configuration baseline per
- *   ADR-0005 §3.1, не `category` как в t115's tasks feature reference)
- * - Template feature = `configuration` (per Configuration entity location в
- *   `lib/features/configuration/`)
- * - Junction placeholder = `configuration_map` (no concrete junction в
- *   simplified bootstrap; placeholder for `generate-entity` substitution flow)
- * - Junction FK fallbacks = `parentA`/`parentB` (generic) since no concrete
- *   junction reference fixture в bootstrap
+ * Session E3d2 fix: Configuration baseline (per ADR-0005 §3.1) = startProject
+ * baseline (copies as-is, не template fixture). Substitution literals для
+ * simplified template UNIFIED с t115 — same `features/tasks/` Category fixture,
+ * same `category`/`taskTagMap` template entities, same `task`/`tag` FK fallbacks.
  *
- * **NB на template content scope (per task.md "Не-цели"):** этот factory =
- * codegen core extension; actual `G:/Templates/flutter/simplified/` template
- * directory bootstrap (Configuration baseline files + sync_core wire-up files
- * + scaffold) — separate Session 2 deliverable, не входит в сессию 1
- * implementation которая closes BUG-019.
+ * **Difference from t115 — ceremony only** (per ADR-0005 §3.5 architecture
+ * ceremony reduction). Snippet wire-up shape (sync_core 0.3.0 contract) +
+ * substitution literals (template fixture entities) — invariant across templates.
  */
 export function simplifiedTemplateConfig(): TemplateConfig {
     return {
         name: 'simplified',
         relationPatcher: {
-            // Simplified template = Configuration baseline (singleton, no relation).
-            // RelationPatcher applicability per ADR-0005 §7.3 = YES under stack lock
-            // (markers preserved, patcher executes when target entity has FK).
-            // Template "main" = `configuration` (single entity baseline; не `task` как в t115
-            // потому что simplified bootstrap не содержит multi-entity FK fixture).
-            // ⚠ Когда Phase C synthetic добавляет concrete FK fixture (e.g. Project + Task),
-            // эти literals потребуется обновить. Пока baseline — simplified RelationPatcher
-            // активируется только при `generate-entity` с FK relation, использует
-            // `configuration` template как substitution anchor.
-            templateMainEntity: 'configuration',
-            templateRelatedEntity: 'configuration',
+            // Simplified template inherits t115's Category/Task FK fixture в
+            // `features/tasks/`. Per ADR-0005 §7.3 stack lock: marker scheme +
+            // Clean directory layout preserved. RelationPatcher executes when target
+            // entity has FK; substitution anchors identical с t115.
+            templateMainEntity: 'task',
+            templateRelatedEntity: 'category',
             markerName: 'oneToManyMethods',
             scanDirectories: ['feature/', 'server/'],
         },
@@ -473,13 +452,13 @@ export function simplifiedTemplateConfig(): TemplateConfig {
             entityRegisterTemplate: SIMPLIFIED_ENTITY_REGISTER_TEMPLATE,
             junctionImportsTemplate: SIMPLIFIED_JUNCTION_IMPORTS_TEMPLATE,
             junctionRegisterTemplate: SIMPLIFIED_JUNCTION_REGISTER_TEMPLATE,
-            // Substitution sentinels matching simplified snippet templates.
-            regularEntityFallback: 'configuration',
-            junctionEntityFallback: 'configurationMap',
-            // Generic FK fallbacks since simplified bootstrap не содержит concrete junction.
-            junctionFkFallbacks: { fk1: 'parentA', fk2: 'parentB' },
-            // Template feature segment matching simplified bootstrap.
-            templateFeatureSegment: 'configuration',
+            // Substitution sentinels matching simplified snippet templates (E3d2: aligned с t115).
+            regularEntityFallback: 'category',
+            junctionEntityFallback: 'taskTagMap',
+            // FK fallbacks aligned с t115 (TaskTagMap junction = task+tag).
+            junctionFkFallbacks: { fk1: 'task', fk2: 'tag' },
+            // Template feature segment = 'tasks' (E3d2: aligned с t115's Category fixture location).
+            templateFeatureSegment: 'tasks',
         },
         database: {
             // Same path as t115 (Drift conventions preserved per ADR-0005 §7.2).
