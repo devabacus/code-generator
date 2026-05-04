@@ -44,6 +44,7 @@
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
+| BUG-019 | Medium | Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`) — TASK-B2 landmine | TASK-B2 acceptance addresses |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 (PR pending) — minimal single-job CI. 3-suite split deferred to Phase A test inventory audit. |
 
 ---
