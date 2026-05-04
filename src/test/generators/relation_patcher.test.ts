@@ -648,6 +648,93 @@ class WeighingDao {
         assert.strictEqual(result, dest, 'alt config: dest file unchanged когда template missing');
     });
 
+    test('TASK-022 / TemplateConfig: alt config positive-path — patcher reads templateMainEntity & markerName from config (H4 review fix)', async () => {
+        // Positive proof что patcher РЕАЛЬНО использует alt `templateMainEntity` и
+        // alt `markerName` из config (а не early-return'ит). Создаём fixture files
+        // под alt entity names + alt marker block; alt config указывает на них.
+        // Если patcher hardcoded'ит 'task'/'oneToManyMethods' — он не найдёт alt
+        // template и не запишет dest. Если patcher reads из config — alt marker block
+        // запишется в dest.
+        //
+        // Фикстуры под alt schema (project как main, todo как related):
+        //   - todo_dao.dart (related entity, существует чтобы pass filter line 51)
+        //   - project_dao.dart (main entity, содержит alt marker block)
+        const ALT_TODO_DAO_PATH = `${SRC_BASE}/data/datasources/local/daos/todo/todo_dao.dart`;
+        const ALT_PROJECT_DAO_PATH = `${SRC_BASE}/data/datasources/local/daos/project/project_dao.dart`;
+        const altMarkerName = 'altRelations';
+        const altMainEntity = 'project';
+        const altRelatedEntity = 'todo';
+
+        const ALT_PROJECT_DAO_TEMPLATE = `// manifest: entity
+// === generated_start:base ===
+class ProjectDao {
+  Future<void> placeholder() => Future.value();
+  // === generated_end:base ===
+
+  // === generated_start:${altMarkerName} ===
+  Future<List<ProjectTableData>> getProjectsByTodoId(String todoId) =>
+      _db.select(projectTable);
+  // === generated_end:${altMarkerName} ===
+}
+`;
+        const ALT_TODO_DAO_TEMPLATE = `// manifest: entity
+// === generated_start:base ===
+class TodoDao {}
+// === generated_end:base ===
+`;
+
+        // Свежий mockFs (НЕ ставим default category/task fixtures чтобы доказать
+        // что patcher НЕ обращается к hardcoded 'task'/'category').
+        const altMockFs = new MockFileSystem();
+        const altPatcher = new RelationPatcher(altMockFs);
+        altMockFs.setFile(ALT_TODO_DAO_PATH, ALT_TODO_DAO_TEMPLATE);
+        altMockFs.setFile(ALT_PROJECT_DAO_PATH, ALT_PROJECT_DAO_TEMPLATE);
+
+        const altConfig = new GenerationConfig({
+            templProject: 't115',
+            templEntity: altRelatedEntity, // 'todo' — filter sentinel line 51
+            targetEntity: 'weighing',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: 'weight',
+            templFeatureName: 'tasks',
+            targetFeaturePath: DEST_BASE,
+            workspacesPath: `${PROJECTS_PATH}/weight`,
+            templateConfig: {
+                name: 't115',
+                relationPatcher: {
+                    templateMainEntity: altMainEntity,        // 'project' — read by patcher line 21
+                    templateRelatedEntity: altRelatedEntity,  // 'todo' — read by patcher line 22
+                    markerName: altMarkerName,                // 'altRelations' — read by patcher line 23
+                    scanDirectories: ['feature/', 'server/'],
+                },
+                orchestrator: t115TemplateConfig().orchestrator,
+                database: t115TemplateConfig().database,
+            },
+        });
+
+        const dest = `// === generated_start:base ===
+class WeighingDao {
+  Future<void> placeholder() => Future.value();
+  // === generated_end:base ===
+}
+`;
+        altMockFs.setFile(DEST_DAO_PATH, dest);
+
+        await altPatcher.patch(altConfig, makeModel([relationField('contractorId', 'contractor')]));
+
+        const result = await altMockFs.readFile(DEST_DAO_PATH);
+        // Positive: alt marker name действительно использован (config-driven)
+        assert.ok(result.includes(`// === generated_start:${altMarkerName} ===`),
+            'alt config: marker block с altMarkerName записан → patcher reads markerName from config');
+        // Positive: hardcoded oneToManyMethods marker НЕ должен присутствовать
+        assert.ok(!result.includes('generated_start:oneToManyMethods'),
+            'alt config: hardcoded oneToManyMethods marker отсутствует → markerName действительно config-driven');
+        // Positive: dest изменён vs original (proof что patcher не early-return'нул)
+        assert.notStrictEqual(result, dest,
+            'alt config: dest content modified → patcher выполнил substitution через alt config');
+    });
+
     test('TASK-022 / TemplateConfig: existing relation patching behavior unchanged под explicit t115 config (regression)', async () => {
         // Same as default makeConfig() but with EXPLICIT templateConfig: t115TemplateConfig()
         // — verify equivalence (zero-diff invariant с pre-TASK-022 hardcoded behavior).
