@@ -1,7 +1,8 @@
 # BUG-019: Orchestrator patcher snippet templates содержат hardcoded entity literals
 
-**Статус:** Open (TASK-B2 scope)
+**Статус:** Closed (validated end-to-end через default flow + legacy flow smokes 2026-05-04)
 **Обнаружено:** 2026-05-04 (TASK-022 / Phase B1 — Generator-core review HIGH H2 + Adversarial review HIGH H-3)
+**Закрыто:** 2026-05-04 (TASK-024 Session E3d2 — default flow t176 PASS errors=0 + legacy flow t177 PASS errors=0)
 **Источник:** Multi-agent code review TASK-022 round 1
 **Критичность:** Medium (TASK-B2 landmine — не блокирует TASK-B1 closure; блокирует simplified template emission в TASK-B2)
 
@@ -78,3 +79,15 @@ Refactor `_buildImportsSnippet` / `_buildEntityTypeSnippet` / `_buildRegisterSni
 ## Priority
 
 **Medium** — TASK-B2 acceptance gate. Без этого fix simplified template emission не будет работать корректно. Schedule: TASK-B2 scope.
+
+## Closure note (2026-05-04, TASK-024 Session E3d2)
+
+Closed end-to-end через TASK-023 (config-shape extension) + TASK-024 Sessions A-E3d2 (simplified template directory bootstrap + Phase D CLI flag + Session E3d2 default-switch fix).
+
+**Verification evidence:**
+- `t176` default flow (`create-project --name t176`) → `verify --name t176` PASS errors=0, warnings=0, infos=30. Simplified ceremony reduction confirmed (0 usecases в `t176_flutter/`, 0 abstract repository interfaces).
+- `t177` legacy flow (`create-project --name t177 --template t115`) → `verify --name t177` PASS errors=0, warnings=1, infos=44. Regression preserved.
+- Mocha 181/181 passing post-fix (зерo regressions в orchestrator_patcher.test.ts включая `simplifiedTemplateConfig() factory exposes snippet content fields`, `simplified config produces simplified snippet output (positive proof)`, `junction with <2 FKs falls back to junctionFkFallbacks config (Round 2 H-2 restructured)`).
+- BUG-019 marker сoverage: orchestrator_patcher consumes config-driven snippets через `templateConfig.orchestrator.{entityImportsTemplate, entityRegisterTemplate, junctionImportsTemplate, junctionRegisterTemplate, regularEntityFallback, junctionEntityFallback, junctionFkFallbacks, templateFeatureSegment}` — нет hardcoded constants.
+
+**Session E3d2 scope:** unified simplified template substitution literals с t115 (Configuration baseline = startProject baseline копируется как-есть, не template fixture; substitution-источник = `features/tasks/` Category fixture в обоих templates). Resolution: previous E3d default switch errantly set `templFeatureName='configuration'` для simplified flow — E3d2 corrected к 'tasks' (matching t115). Также subsystem fix simplified template's `sync_orchestrator_provider.dart` (had Tasks fixture registrations baked in pre-E3d2 — Configuration baseline должен только содержать Configuration registration, additional entities добавляются через `generate-entity` pipeline).

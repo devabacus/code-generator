@@ -10,7 +10,7 @@
 
 **Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03). master `70650f7`. 17 PRs merged. 163 tests baseline + CI workflow.
 
-**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. Ready for TASK-B1 creation.
+**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. TASK-022 / TASK-023 / TASK-024 implemented.
 
 **Architectural pivot decisions:**
 - **Discussion #7** (archived 2026-05-03): Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative".
@@ -19,6 +19,7 @@
   - **Clean-slate amendment 2026-05-03:** weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance. Estimate 5-6 → ~3-4 months realistic.
 - **Discussion #10** (archived 2026-05-03): Initiative Phase A organization (13-point Decision).
 - **Discussion #11** (archived 2026-05-03): Initiative Phase B implementation strategy (12-point Decision) + **⚠ CRITICAL Stack-lock User decision** (стэк t115 baseline locked, package versions update к latest stable, simplified философия = ТОЛЬКО architecture ceremony reduction).
+- **Discussion #12** (archived 2026-05-04): **⚠ Pivot — t115 как default; simplified = opt-in.** Post-TASK-024 multi-agent review re-evaluation: simplified ≡ t115 минус 3 abstract layers (~30% file reduction marginal benefit); migration cost для weight (13 entities) > rebuild benefit. **DEFAULT_TEMPLATE reverts simplified → t115.** Weight TASK-018 ре-activated на t115 + sync_core wire-up (proven, no migration cost). Simplified = opt-in для new CRUD projects via `--template simplified`. Both templates долго-сохраняемые. Stack lock + 13 markers + Clean directory layout invariants preserved.
 
 ---
 
@@ -127,7 +128,7 @@ Decision matrix v1 maintenance moot. Track 1 deleted. All ресурсы flow в
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| BUG-019 | Medium | Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`) — TASK-B2 landmine | TASK-B2 Session 1 ✅ closes orchestrator-side; junction-substitution-side → BUG-020 |
+| ~~BUG-019~~ | ~~Medium~~ | ~~Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`)~~ | ✅ Closed 2026-05-04 (TASK-024 Session E3d2) — default flow t176 + legacy flow t177 verify PASS errors=0; junction-substitution-side → BUG-020 |
 | BUG-020 | Medium | Junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`) — Session 2 landmine для simplified junction generate-entity flow | TASK-023 Session 2 либо follow-up TASK после Session 2 closure |
 | ~~HOTFIX-001~~ | ~~Low~~ | ~~`new_task.py` сканирует только `active/`~~ | ✅ Closed (PR #14) |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Closed via TASK-020 — minimal single-job, [.github/workflows/test.yml](../../.github/workflows/test.yml). 3-suite split + verify smoke deferred to Phase A. |

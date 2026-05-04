@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { GenerationConfig } from '../../../features/generation/config/generation_config';
@@ -15,6 +15,7 @@ import {
     patchPubspecPackagePaths as bootstrapPatchPubspec,
     copyAgentInfrastructure as bootstrapCopyAgentInfra,
 } from '../../../core/services/project_bootstrapper';
+import { resolveTemplateProfile, DEFAULT_TEMPLATE, type TemplateName } from '../utils/template_profile';
 
 const SERVERPOD_GENERATE = 'serverpod generate --experimental-features=all';
 const SERVERPOD_CREATE_MIGRATION = 'serverpod create-migration --experimental-features=all --force';
@@ -33,7 +34,9 @@ interface CreateProjectOptions {
     name: string;
     templatesPath: string;
     projectsPath: string;
-    templProject: string;
+    templProject?: string;
+    /** TASK-024 Session E3d / Round 2: --template <name> (default 't115' post-pivot). */
+    template?: string;
     skipPubGet?: boolean;
     skipServerpodGenerate?: boolean;
     skipGitInit?: boolean;
@@ -48,7 +51,20 @@ export function registerCreateProject(program: Command): void {
         .requiredOption('--name <name>', 'Project name')
         .option('--templates-path <path>', 'Path to templates', 'G:/Templates')
         .option('--projects-path <path>', 'Base path for projects', 'G:/Projects/Flutter/serverpod')
-        .option('--templ-project <id>', 'Template project ID', 't115')
+        // TASK-024 Session E3d / Round 2: --template flag — single source of truth
+        // для template variant. Default = t115 (post-pivot Discussion #12 — 2026-05-04;
+        // existing codebases / weight continuity). Simplified = opt-in для new CRUD
+        // projects via `--template simplified`. .choices() validates value на parse step
+        // (defensive — runtime check в resolveTemplateProfile() остаётся как secondary
+        // guard для programmatic callers).
+        // --templ-project оставлен для backward compat (overrides only template
+        // directory id, не trogает templateConfig factory / feature defaults).
+        .addOption(
+            new Option('--template <name>', 'Template variant: t115 (default) or simplified (opt-in)')
+                .choices(['t115', 'simplified'])
+                .default(DEFAULT_TEMPLATE),
+        )
+        .option('--templ-project <id>', 'Override template project directory id (default derived from --template)')
         .option('--skip-pub-get', 'Skip flutter pub get')
         .option('--skip-serverpod-generate', 'Skip serverpod generate and migrations')
         .option('--skip-git-init', 'Skip git init and GitHub setup')
@@ -70,8 +86,16 @@ async function handleCreateProject(opts: CreateProjectOptions): Promise<void> {
         const inner = new DefaultFileSystem();
         const fileSystem = new TrackingFileSystem(inner, logger);
 
+        // TASK-024 Session E3d: resolve template profile (default 'simplified').
+        // --templ-project, если передан явно, overrides только директорию template;
+        // factory / feature / entity defaults остаются из profile (consistent
+        // отношение между templateConfig и feature/entity name).
+        const templateProfile = resolveTemplateProfile(opts.template);
         const config = new GenerationConfig({
-            templProject: opts.templProject,
+            templProject: opts.templProject || templateProfile.templProject,
+            templFeatureName: templateProfile.templFeatureName,
+            templEntity: templateProfile.templEntity,
+            templateConfig: templateProfile.templateConfig,
             targetProject: targetProject,
             manifest: ['startProject'],
             templatesPath: opts.templatesPath,

@@ -468,3 +468,19 @@ Simplified template отличается от t115 **только в architectur
 ## Approved
 
 ✅ User approved 2026-05-03 (User_2 stack-lock override section + ok а acknowledgment).
+
+---
+
+## Post-pivot amendment (2026-05-04)
+
+Discussion #12 (archived 2026-05-04) ре-evaluation после TASK-024 multi-agent review:
+
+- **"Default = simplified" decision superseded** → "default = t115; simplified = opt-in via `--template simplified`"
+- **Stack lock package set preserved** (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod + Freezed + json_serializable + build_runner + uuid + остальные latest stable)
+- **13 markers preserved** (`base, driftTableColumns, driftTableImports, entityToServerpodParams, freezedConstructor, oneToManyMethods, serverpodToModelParams, simpleFields, syncEntityTypes, syncImports, syncRegistrations, valueWrappedFields, valueWrappedFieldsModel`)
+- **Clean directory layout preserved** (Discussion #11 12-point Decision invariant)
+- Все остальные Discussion #11 12-point Decisions remain valid
+
+**Rationale post-pivot:** TASK-024 multi-agent review revealed simplified ≡ t115 минус 3 abstract layers (~30% file reduction marginal benefit); migration cost для weight (13 entities) > rebuild benefit; weight TASK-018 stays на t115 + sync_core wire-up. Simplified template остаётся available для new CRUD projects через `--template simplified` opt-in.
+
+См. [Discussion #12 archive](../12-упрощение-шаблона-по-best-practices-с-со/) для full context + [ADR-0005 amendment log entry 2026-05-04](../../../docs/decisions/adr-0005-multi-template-plurality.md#amendment-log).

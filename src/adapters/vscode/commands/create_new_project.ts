@@ -36,6 +36,11 @@ export async function createNewProject(): Promise<void> {
 
     const templatesPath = ServiceLocator.getInstance().getTemplatesPath();
 
+    // VS Code adapter uses t115 default — consistent с CLI default post-pivot
+    // (Discussion #12 — 2026-05-04: t115 = supported template для existing
+    // codebases / weight continuity; simplified = opt-in via CLI flag).
+    // VS Code doesn't expose template variant picker yet; users wanting
+    // simplified template should use CLI: `codegen create-project --template simplified`.
     const config = new GenerationConfig({
         templProject: 't115',
         targetProject: targetProject,

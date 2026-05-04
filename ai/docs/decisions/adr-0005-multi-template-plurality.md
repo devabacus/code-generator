@@ -46,13 +46,14 @@ Codegen tool принимает **multi-template architecture**. Coexisting temp
 
   Business layer (usecases, application services, validation, custom notifiers с business logic) — **manual write**.
 
-**Template selection** через CLI flag `--template <name>` (Phase D scope). **Default template = `simplified`** (clean-slate decision 2026-05-03 — User confirmed default = simplified, t115 = deprecated path explicitly).
+**Template selection** через CLI flag `--template <name>` (Phase D scope). **Default template = `t115`** (post-pivot Discussion #12 — 2026-05-04: existing codebases / weight continuity); **simplified = opt-in** для new CRUD projects via `--template simplified`. См. [Amendment log](#amendment-log) entry 2026-05-04.
 
-**t115 status (clean-slate amendment 2026-05-03):**
-- **Deprecated path** — frozen (no active maintenance, no new feature generation)
-- Recommendation для new projects = simplified
-- Removal планируется через 6-12 месяцев если нет active consumers
-- Existing usage (если есть) — fix-as-needed, не proactive evolution
+**t115 status (post-pivot Discussion #12 amendment 2026-05-04):**
+- **Supported template** для existing codebases (weight TASK-018 stays на t115 + sync_core wire-up — proven, no migration cost)
+- **Minimal version maintenance** (Serverpod CLI lockstep + bug-fix-as-needed, без proactive feature generation evolution)
+- Long-term coexistence с simplified — оба templates долго-сохраняемые (t115 для existing projects lineage, simplified для new opt-in projects)
+
+**Pre-pivot context (superseded 2026-05-04):** clean-slate decision 2026-05-03 originally установил default = simplified + t115 = deprecated frozen. Discussion #12 re-evaluation после TASK-024 multi-agent review: simplified ≡ t115 минус 3 abstract layers (~30% file reduction marginal benefit); migration cost для weight (13 entities) > rebuild benefit; default reverts. Discussion #11 stack lock package set decisions remain valid post-pivot.
 
 **Mixed-template boundary rule (Discussion #7 Q3=b):**
 - **Single template per feature** internally (внутри одного bounded context)
@@ -379,6 +380,8 @@ Phase B prototype simplified template scaffolding + RelationPatcher / Orchestrat
 |------|-----------|----------|------|---------|-----------|
 | 2026-05-03 | **Clean-slate decision** — weight v1 НЕ в production, нет users; dual-running concerns N/A; t115 deprecated path; default template = simplified; weight TASK after Phase C synthetic | TeamLead Claude ✅ | User ✅ | 1, 4.3, 5 | User confirmed clean-slate path. Removes complexity: dual-protocol risks moot, decision matrix v1 maintenance moot, cutover plan N/A. Estimate revised 5-6 → 3-4 months realistic, hard ceiling 4 months. |
 | 2026-05-03 | **⚠ CRITICAL Stack-lock decision** — стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Все package versions update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony (no usecases / business notifiers / validation / repository interfaces / app services / mappers separate class / Either-Result / datasource interfaces). Section 7.1/7.2/7.3 TBD placeholders RESOLVED via stack lock. | TeamLead Claude ✅ | User ✅ | 1, 7.1, 7.2, 7.3 | User explicit decision 2026-05-03 ("мы стэк не меняем какой был riverpod через аннотации" + "это касается всех пакетов, единственное их нужно все обновить, включая serverpod"). Discussion #11 reviewer recommendations (Q4=b prototype side-by-side, Q6=b/d reduced markers, Q9=a different DI) overruled. test-inventory Open Q #1/#2/#3 resolved as YES (RelationPatcher applicable) / inherits t115 DI / preserve Clean directory layout. ClaudeAdv evidence-based correction accepted: t115 has 13 markers, не 7. Future agents — treat stack lock как hard architectural invariant. |
+| 2026-05-04 | **Pivot — t115 как default; simplified = opt-in** — Discussion #12 Decision: weight TASK-018 stays на t115 + sync_core wire-up (proven, no migration cost); simplified template = opt-in для new CRUD projects via `--template simplified`. T115 status reverts с "deprecated path" к "supported template для existing codebases / weight continuity". Both templates долго-сохраняемые: t115 для existing projects lineage, simplified для new opt-in. ADR §1 default switch reverts. | TeamLead Claude ✅ | User ✅ | 1 | TASK-024 multi-agent review revealed simplified ≡ t115 минус 3 abstract layers (~30% file reduction, marginal benefit); migration cost для weight (13 entities) > rebuild benefit; modern Flutter community drift (flat structure) = trend, не universal applicable; multi-template plurality finally имеет real meaning через divergent use cases. |
+| 2026-05-04 | **§3.5 strip retain decisions documented** — Configuration UI ceremony (dialogs / setting_tiles / settings_definitions / IConfigurationService / settings_mapper / IConfigurationDependencies) retained per "Configuration baseline test fixture integrity"; `dependencies/` directories retained как legitimate DI seam pattern; separate `*_model.dart` Model layer retained per Drift/Serverpod conversion conventions. Strip applied на ~25-30% of §3.5 anti-examples (3/7 applicable categories). Justifications: (a) Configuration UI removal cascades в home_page rendering breakage; (b) DI seam = consumer override pattern, не ceremony; (c) Model layer needed для server↔local conversion semantics. Future Phase 2 cleanup (capacity-driven optional TASK) может revisit if simplified consumer feedback warrants. | TeamLead Claude ✅ | User ✅ | 3.5 | TASK-024 multi-agent review revealed strip carve-outs were unrecorded; this amendment records retain decisions formally per Architecture H-4 finding. |
 
 ---
 
