@@ -218,6 +218,76 @@ suite('GenerationService — _getDestinationPath (TASK-014)', () => {
         );
     });
 
+    test('TASK-024 Round 2 (H7): empty targetEntity → no entity rewrite (path preserved verbatim)', () => {
+        // startProject flow без entity scope (e.g. simplified Configuration baseline).
+        // Раньше `replaceAll(templEntity, '')` рендерил `configuration_dao.dart` →
+        // `_dao.dart` (silent corruption). Defensive guard в _getDestinationPath:
+        // если targetEntity = '' → entity rewrite skipped, file copied as-is.
+        const config = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: '/test/templates',
+            projectsPath: '/test/projects',
+            targetProject: 'weight',
+            templFeatureName: 'configuration',
+            targetFeaturePath: '/test/projects/weight/weight_flutter/lib/features/configuration',
+            workspacesPath: '/test/projects/weight',
+        });
+
+        // Template path содержит `category` — без guard превратилось бы в `_table.dart`.
+        const result = getDestPath(
+            service,
+            'feature/data/datasources/local/tables/category_table.dart',
+            config,
+            // model=undefined emulates startProject flow (no model parsed)
+        );
+
+        // С guard: targetEntity '' → entity rewrite skipped, path preserved
+        // (только templProject 't115' → 'weight' substitution применяется).
+        assert.strictEqual(
+            result,
+            'feature/data/datasources/local/tables/category_table.dart',
+            'empty targetEntity → no rewrite (silent data loss prevention)',
+        );
+        assert.ok(
+            !result.includes('_table.dart') || result.includes('category_table.dart'),
+            `path должен сохранять "category" prefix, не пустую строку: ${result}`,
+        );
+    });
+
+    test('TASK-024 Round 2 (H7): empty targetEntity preserves Configuration baseline file names', () => {
+        // Configuration baseline (simplified template) копируется через startProject
+        // manifest без model + без targetEntity. Все файлы должны сохранить имена.
+        const config = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: '/test/templates',
+            projectsPath: '/test/projects',
+            targetProject: 'app1',
+            templFeatureName: 'configuration',
+            targetFeaturePath: '/test/projects/app1/app1_flutter/lib/features/configuration',
+            workspacesPath: '/test/projects/app1',
+        });
+
+        const sourceFiles = [
+            'feature/data/datasources/local/daos/configuration_dao.dart',
+            'feature/data/repositories/configuration_repository_impl.dart',
+            'feature/domain/entities/configuration_entity.dart',
+            'feature/presentation/dialogs/configuration_dialog.dart',
+        ];
+
+        for (const src of sourceFiles) {
+            const result = getDestPath(service, src, config);
+            assert.strictEqual(
+                result,
+                src,
+                `empty targetEntity flow: file ${src} должен сохраниться verbatim, got ${result}`,
+            );
+        }
+    });
+
     test('TASK-014: junction CustomerUser (3 FK + nullable) → customer_user/ directory', () => {
         // CustomerUser fixture (TASK-013 false-negative #2). 3 FK включая nullable —
         // entity1=customer, entity2=user. Junction class name = CustomerUser.
