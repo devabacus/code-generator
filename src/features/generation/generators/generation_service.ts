@@ -280,8 +280,16 @@ export class GenerationService {
             // BUG-002: пути на диске должны быть snake_case (lower_case_with_underscores).
             // targetEntity приходит как camelCase (например, 'correctionButton'), а имена файлов/папок
             // в Dart-конвенции — snake_case ('correction_button_table.dart', 'correction_button/').
-            const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
-            destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
+            //
+            // TASK-024 Session E3d (defensive guard): когда targetEntity = '' (startProject
+            // flow без entity scope — simplified Configuration baseline copies as-is), нельзя
+            // делать `replaceAll(templEntity, '')` — это превращает `configuration_dao.dart`
+            // → `_dao.dart`. Если targetEntity пустой → пропускаем entity rewrite, файл
+            // копируется с template name (Configuration baseline preserved verbatim).
+            if (config.targetEntity && config.targetEntity.length > 0) {
+                const targetEntitySnake = toSnakeCase(unCap(config.targetEntity));
+                destinationRelativePath = relativePath.replaceAll(config.templEntity, targetEntitySnake);
+            }
         }
 
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
