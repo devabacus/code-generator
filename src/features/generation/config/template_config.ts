@@ -28,9 +28,10 @@
 export interface TemplateConfig {
     /**
      * Идентификатор template. Используется только для diagnostic / logging.
-     * Расширяется в TASK-B2 (`'simplified'`).
+     * Union type расширен заранее в TASK-B1 чтобы TASK-B2 мог plug-and-play
+     * добавить `simplifiedTemplateConfig()` factory без re-edit interface.
      */
-    name: 't115';
+    name: 't115' | 'simplified';
 
     /**
      * Конфиг для `RelationPatcher` (`src/features/generation/generators/relation_patcher.ts`).
