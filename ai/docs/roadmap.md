@@ -10,7 +10,7 @@
 
 **Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03). master `70650f7`. 17 PRs merged. 163 tests baseline + CI workflow.
 
-**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. Ready for TASK-B1 creation.
+**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. TASK-022 / TASK-023 / TASK-024 implemented.
 
 **Architectural pivot decisions:**
 - **Discussion #7** (archived 2026-05-03): Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative".
@@ -19,6 +19,7 @@
   - **Clean-slate amendment 2026-05-03:** weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance. Estimate 5-6 → ~3-4 months realistic.
 - **Discussion #10** (archived 2026-05-03): Initiative Phase A organization (13-point Decision).
 - **Discussion #11** (archived 2026-05-03): Initiative Phase B implementation strategy (12-point Decision) + **⚠ CRITICAL Stack-lock User decision** (стэк t115 baseline locked, package versions update к latest stable, simplified философия = ТОЛЬКО architecture ceremony reduction).
+- **Discussion #12** (archived 2026-05-04): **⚠ Pivot — t115 как default; simplified = opt-in.** Post-TASK-024 multi-agent review re-evaluation: simplified ≡ t115 минус 3 abstract layers (~30% file reduction marginal benefit); migration cost для weight (13 entities) > rebuild benefit. **DEFAULT_TEMPLATE reverts simplified → t115.** Weight TASK-018 ре-activated на t115 + sync_core wire-up (proven, no migration cost). Simplified = opt-in для new CRUD projects via `--template simplified`. Both templates долго-сохраняемые. Stack lock + 13 markers + Clean directory layout invariants preserved.
 
 ---
 

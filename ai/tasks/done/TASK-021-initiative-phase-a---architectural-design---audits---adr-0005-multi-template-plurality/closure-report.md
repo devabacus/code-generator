@@ -138,36 +138,52 @@
 
 ## Phase B — TASK-024 deliverable (simplified template directory bootstrap)
 
-**Status:** 🟡 In progress (pending review apply + merge approval) — Sessions A-E3d2 complete, ready for multi-agent review (4 reviewers)
+**Status:** 🟡 Round 2 review fixes applied (post-pivot Discussion #12); ready for PR creation + merge approval
 **Branch:** `feature/TASK-024-b2-simplified-template-directory-bootstrap`
-**Commits:** см. `git log --oneline master..HEAD` post-Session-E3d2 commits
+**Commits:** см. `git log --oneline master..HEAD` (Sessions A-E3d2 + Round 2 post-pivot revert + reviewer fixes)
+
+**Post-pivot Discussion #12 context (2026-05-04):** User pivot ре-evaluated default switch decision после TASK-024 multi-agent review. **DEFAULT_TEMPLATE reverts к 't115'**; weight TASK-018 stays на t115 + sync_core wire-up; simplified template = opt-in для new CRUD projects через `--template simplified`. Stack lock package set + 13 markers + Clean directory layout invariants preserved. См. [Discussion #12 archive](../../../discussions/archive/12-упрощение-шаблона-по-best-practices-с-со/) + [ADR-0005 amendment log entry 2026-05-04](../../../docs/decisions/adr-0005-multi-template-plurality.md#amendment-log).
 
 **Deliverables:**
 - Simplified template directory bootstrap (`G:/Templates/flutter/simplified/`) — Configuration baseline (singleton entity per ADR-0005 §3.1) + 4 fixture entities в `features/tasks/` (Category/Tag/Task/TaskTagMap) для substitution flow
-- Architecture ceremony stripped (per ADR-0005 §3.5): no usecases / no abstract repository interfaces / no business notifiers / no validation gen / no application services / no separate mappers / no Either-Result / no datasource interfaces в flutter app
+- Architecture ceremony stripped (per ADR-0005 §3.5 + carve-outs documented в amendment log entry 2026-05-04): no usecases / no abstract repository interfaces / no business notifiers / no validation gen / no application services / no separate mappers / no Either-Result / no datasource interfaces в flutter app. Retained per carve-outs: Configuration UI ceremony + `dependencies/` directories + separate Model layer (justifications в amendment log)
 - pubspec safe bumps к latest stable (Riverpod / Drift / sync_core / Serverpod packages — stack package SET locked per Discussion #11, только versions update)
-- Generator default switched к simplified (DEFAULT_TEMPLATE = 'simplified' in `template_profile.ts`); legacy path preserved через `--template t115` opt-in flag
+- **Default template = 't115'** (post-pivot Discussion #12 — `DEFAULT_TEMPLATE = 't115'` в `template_profile.ts`); simplified = opt-in через `--template simplified`. Both templates долго-сохраняемые
 - Bootstrapper dynamic depth-delta для path-deps к Packages (Approach 2 patcher для Templates/Packages/ + out-of-monorepo Projects/Packages/ paths)
 - Defensive empty-targetEntity guard в `generation_service._getDestinationPath`
 - Simplified template orchestrator file fixed (Configuration-only baseline; previously had Tasks fixture registrations baked в pre-E3d2 → не bootstrappable)
+- CLI `--template` flag валидация через `commander.Option.choices(['t115', 'simplified'])` в `create-project` + `generate-entity` commands (Round 2 H4 fix)
+- Unit test coverage для `resolveTemplateProfile()` (7 cases) + empty-targetEntity guard (2 cases) — Round 2 H7 fix
 
-**Verification (cited evidence):**
-- Mocha 181/181 passing post Session E3d2 fix (см. tail evidence в Session E3d2 step 3)
+**Verification (cited evidence post-pivot):**
+- Mocha **190/190** passing (181 baseline + 7 template_profile + 2 generation_service guard tests)
 - Compile clean (`npm run compile`)
-- Default flow smoke `t176`: `verify --name t176` PASS errors=0, warnings=0, infos=30
-  - Shape verify: 0 usecases в `t176_flutter/`, 0 abstract repository interfaces, features dir = baseline (auth/bluetooth/configuration/developer_tools/home/settings_definitions/) — без Tasks fixture leak
-- Legacy flow smoke `t177`: `verify --name t177 --template t115` PASS errors=0, warnings=1, infos=44 — regression preserved
-- Strip checklist (per ADR-0005 §3.5): all-zero usecases / interfaces в `t176_flutter`
+- Lint: 0 errors / 18 warnings (pre-existing)
+- **Default flow smoke `t178`** (post-pivot, no `--template` flag → t115): `verify --name t178` PASS **errors=0**, warnings=1, infos=44
+  - Shape verify: usecases present (`t178_flutter/lib/features/auth/domain/usecases`, `t178_flutter/lib/features/configuration/domain/usecases`), `i_*_repository.dart` present (`i_auth_repository.dart`) — t115 ceremony preserved
+- **Opt-in flow smoke `t179`** (`--template simplified`): `verify --name t179` PASS **errors=0**, warnings=0, infos=30
+  - Shape verify: **0 usecases** в `t179_flutter/lib/`, **0 abstract repository interfaces** — simplified shape preserved
 - Stack lock preserved (Riverpod + Drift + sync_core + Serverpod package SET unchanged)
 
-**BUG-019 closure:** end-to-end validated через default flow t176 + legacy flow t177 (both errors=0). Закрыт 2026-05-04. Marker scheme + config-driven snippets (TemplateConfig.orchestrator) work as designed; previous E3d default switch errantly set `templFeatureName='configuration'` для simplified flow → E3d2 corrected к 'tasks' (matching t115 — Configuration baseline копируется как-есть startProject manifest, substitution-источник = `features/tasks/` Category fixture в обоих templates). Также cleaned simplified template's `sync_orchestrator_provider.dart` — Configuration-only baseline (Tasks fixture registrations добавляются через `generate-entity` pipeline post-bootstrap).
+**Pre-pivot smoke evidence (Sessions E3d/E3d2 — superseded by post-pivot smokes above, retained как historical context):**
+- t176 default-was-simplified flow + t177 legacy-was-t115 flow — pre-pivot baselines
+
+**BUG-019 closure:** end-to-end validated через default flow + opt-in flow smokes (both errors=0). Закрыт 2026-05-04. Marker scheme + config-driven snippets (TemplateConfig.orchestrator) work as designed.
+
+**Round 2 reviewer fixes (post-pivot 2026-05-04):**
+- D1 (Adversarial DEAL-BREAKER zero-diff smoke): cited via post-pivot default flow t178 verify errors=0 evidence (t115 default behavior preserved)
+- H1 (Architecture byte-identical factories): documented в report.md — expected post-pivot under stack lock; factory pair preserved для future template divergence
+- H3 (Generator-core VS Code adapter divergence): no action — pivot makes VS Code default `t115` consistent с CLI default; clarifying comment added в `create_new_project.ts`
+- H4 (Architecture `resolveTemplateProfile` JSDoc + commander validation): JSDoc rewritten + `.choices(['t115', 'simplified'])` added к both `create-project` + `generate-entity` commands
+- H5 (Architecture §3.5 carve-outs documented): ADR-0005 amendment log entry 2026-05-04 records strip retain decisions (Configuration UI + `dependencies/` + Model layer)
+- H6 (Adversarial cross-repo race t115 bumps): t115 master commit `60ba4ba` Serverpod 3.1.1 → 3.4.8 bumps committed
+- H7 (Adversarial unit-test coverage): 9 new tests added (7 template_profile + 2 generation_service guard); 181 → 190 mocha passing
 
 **Sign-offs:**
-- @TeamLead ⏳ pending review apply
+- @TeamLead ⏳ pending Round 2 review confirmation
 - @User ⏳ pending merge approval
 
 **Pending для Phase B closure:**
-- Multi-agent review (4 reviewers) apply
 - PR created + reviewed + merged
 - Phase B section status updates → ✅ closed
 
@@ -214,7 +230,7 @@
 - [x] Phase A section ✅ closed (TeamLead + User counter-sign 2026-05-03)
 - [ ] Phase B section ✅ closed
 - [ ] Phase C section ✅ closed (synthetic t<200> verify PASS errors=0)
-- [ ] Phase D section ✅ closed (CLI flag + manifest markers wired; default `--template simplified`)
+- [ ] Phase D section ✅ closed (CLI flag + manifest markers wired; default `--template t115` per Discussion #12 pivot, simplified = opt-in)
 - [ ] Multi-agent review applied к каждой phase (catch rate ≥1 per review)
 - [ ] Documentation rulebook ("what generator generates / what agents write manually") finalized — references ADR-0005 + anti-examples
 

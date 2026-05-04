@@ -2702,3 +2702,175 @@ Combined state Sessions A-E3d2 ready для atomic commits:
 
 Pending Step 10 — atomic commits per логические chunks.
 
+---
+
+### Round 2 — Post-pivot Discussion #12 (2026-05-04)
+
+**Context:** User pivot 2026-05-04 — Discussion #12 closed с Decision: revert `DEFAULT_TEMPLATE` к 't115'; weight TASK-018 stays на t115 + sync_core wire-up; simplified = opt-in. Stack lock package set + 13 markers + Clean directory layout invariants preserved. Round 2 scope = revert + ADR amendments + Reviewer fixes (D1/H4/H6/H7 apply, H1/H3/H5 documented).
+
+#### Step 1 — Pre-conditions verified
+
+- Branch: `feature/TASK-024-b2-simplified-template-directory-bootstrap`
+- 5 commits master..HEAD (Sessions A-E3d2)
+- Mocha 181/181 passing baseline ✓
+- Compile clean ✓
+
+```text
+$ git branch --show-current
+feature/TASK-024-b2-simplified-template-directory-bootstrap
+$ git log --oneline master..HEAD | wc -l
+5
+$ npm run compile && mocha ... | tail -3
+181 passing (48ms)
+```
+
+#### Step 2 — DEFAULT_TEMPLATE revert applied
+
+`src/adapters/cli/utils/template_profile.ts`:
+- `DEFAULT_TEMPLATE: TemplateName = 'simplified'` → `'t115'`
+- JSDoc rewritten для post-pivot context (default = t115; simplified opt-in; both templates долго-сохраняемые)
+- `resolveTemplateProfile()` JSDoc rewritten (H4 fix)
+
+`src/adapters/cli/commands/create_project.ts`:
+- Imported `Option` from commander
+- Imported `DEFAULT_TEMPLATE` from `template_profile.ts`
+- `--template` flag converted к `.addOption(new Option(...).choices(['t115', 'simplified']).default(DEFAULT_TEMPLATE))` (H4 fix — defensive validation на parse step)
+- Help text: "Template variant: t115 (default) or simplified (opt-in)"
+
+`src/adapters/cli/commands/generate_entity.ts`:
+- Same Option / `.choices()` validation pattern applied
+
+`src/adapters/vscode/commands/create_new_project.ts`:
+- Comment added explaining VS Code default `templProject: 't115'` consistent с CLI default post-pivot (H3 documentation)
+
+Verify post-revert:
+```text
+$ npm run compile && mocha ... | tail -3
+181 passing (47ms)
+```
+
+#### Step 3 — ADR-0005 amendments applied
+
+`ai/docs/decisions/adr-0005-multi-template-plurality.md`:
+- **Section 1 main text rewritten:** "Default template = `t115` (post-pivot Discussion #12 — 2026-05-04)"; "simplified = opt-in"; t115 status = "supported template для existing codebases / weight continuity" (was "deprecated path frozen")
+- **Pre-pivot context preserved as superseded note** (transparency)
+- **Amendment log entry 2026-05-04 (#1):** "Pivot — t115 как default; simplified = opt-in" — rationale, sections affected, both sign-offs marked ✅
+- **Amendment log entry 2026-05-04 (#2):** "§3.5 strip retain decisions documented" (H5 fix) — Configuration UI ceremony / `dependencies/` directories / separate Model layer carve-outs с justifications
+
+#### Step 4 — Discussion #11 amendment note appended
+
+`ai/discussions/archive/11-initiative-phase-b-simplified-template-i/11-initiative-phase-b-simplified-template-i.md`:
+- "Post-pivot amendment (2026-05-04)" section appended после "## Approved"
+- Notes: "default = simplified" decision superseded → "default = t115; simplified = opt-in"
+- Stack lock package set / 13 markers / Clean directory layout preserved
+- Cross-references к Discussion #12 archive + ADR-0005 amendment log
+
+#### Step 5 — Reviewer fixes
+
+**D1 (Adversarial DEAL-BREAKER zero-diff smoke):** cited via Step 7 default flow t178 verify errors=0 evidence (t115 default behavior preserved post-revert). Pragmatic alternative — feature branch carries codegen patcher fix; classic master-vs-feature diff не feasible, но `verify --name t178 --human` errors=0 satisfies zero-diff intent.
+
+**H1 (Architecture byte-identical factories):** documented в report.md как expected post-pivot under stack lock. Factory pair preserved для future template divergence.
+
+**H3 (Generator-core VS Code adapter divergence):** no action — pivot makes VS Code default `'t115'` consistent с CLI default post-revert. Clarifying comment added.
+
+**H4 (Architecture commander validation):** `.choices(['t115', 'simplified'])` added к both `create-project` + `generate-entity` flags. JSDoc rewritten.
+
+**H5 (Architecture §3.5 carve-outs):** ADR-0005 amendment log entry 2026-05-04 (#2) records strip retain decisions.
+
+**H6 (Adversarial cross-repo race t115 bumps):** `cd "G:/Templates/flutter/t115" && git commit ...` — Serverpod 3.1.1 → 3.4.8 bumps applied:
+```text
+$ cd "G:/Templates/flutter/t115" && git status
+On branch master
+nothing to commit, working tree clean
+[master 60ba4ba] chore(pubspec): bump Serverpod packages 3.1.1 -> 3.4.8 ...
+ 5 files changed, 33 insertions(+), 33 deletions(-)
+```
+
+**H7 (Adversarial unit-test coverage):**
+- `src/test/utils/template_profile.test.ts` (NEW) — 7 cases: DEFAULT_TEMPLATE assertion, valid t115 / simplified, undefined / no-arg → default, invalid name throws, empty string throws
+- `src/test/generators/generation_service.test.ts` — 2 new cases для empty-targetEntity guard: rewrite skipped + path preserved verbatim across multiple Configuration baseline files
+
+```text
+$ npm run compile && mocha ... | tail -3
+190 passing (46ms)
+```
+
+#### Step 6 — Validation
+
+```text
+$ npm run compile
+> tsc -p ./
+$ npm run lint | tail -3
+✖ 18 problems (0 errors, 18 warnings)
+$ mocha ... | tail -3
+190 passing (46ms)
+```
+
+Compile clean, 0 lint errors / 18 pre-existing warnings, 190 mocha passing (+9 vs baseline).
+
+#### Step 7 — Default flow smoke (post-revert) ✓ PASS
+
+t178 без `--template` flag → t115 (post-pivot default):
+
+```text
+$ node out/adapters/cli/index.js create-project --name t178 --human
+... Duration: 228082ms (success)
+$ node out/adapters/cli/index.js verify --name t178 --human
+PASS: verify t178
+  ✓ flutterAnalyze — 7313ms (errors=0, warnings=1, infos=44)
+  ✓ pubGet — 6669ms
+  ✓ serverpodGenerate — 13488ms
+  ✓ buildRunner — 4171ms
+Total: 31642ms
+```
+
+Shape verify (t115 ceremony preserved):
+```text
+$ find t178/t178_flutter -type d -name usecases
+t178/t178_flutter/lib/features/auth/domain/usecases
+t178/t178_flutter/lib/features/configuration/domain/usecases
+$ find t178/t178_flutter -type f -name "i_*_repository.dart"
+t178/t178_flutter/lib/features/auth/domain/repositories/i_auth_repository.dart
+```
+
+#### Step 8 — Opt-in flow smoke (`--template simplified`) ✓ PASS
+
+```text
+$ node out/adapters/cli/index.js create-project --name t179 --template simplified --human
+... Duration: 209785ms (success)
+$ node out/adapters/cli/index.js verify --name t179 --human
+PASS: verify t179
+  ✓ flutterAnalyze — 6617ms (errors=0, warnings=0, infos=30)
+  ✓ pubGet — 6524ms
+  ✓ serverpodGenerate — 13744ms
+  ✓ buildRunner — 4078ms
+Total: 30964ms
+```
+
+Shape verify (simplified ceremony stripped):
+```text
+$ find t179/t179_flutter/lib -type d -name usecases
+(empty)
+$ find t179/t179_flutter/lib -type f -name "i_*_repository.dart"
+(empty)
+```
+
+#### Step 9 — Documentation updates
+
+- `ai/tasks/done/TASK-021-.../closure-report.md` — Phase B TASK-024 deliverable section rewritten post-pivot: smoke evidence updated (t178/t179), Round 2 reviewer fixes summary, post-pivot context cited
+- `ai/tasks/active/TASK-024-.../report.md` — Резюме updated с post-pivot context + Round 2 timeline; Тесты section updated с t178/t179 evidence; Round 2 reviewer fixes summary added; Статус updated → "ready for PR"
+- `ai/docs/status.md` — TASK-024 row rewritten post-pivot
+- `ai/docs/roadmap.md` — Discussion #12 entry added к "Architectural pivot decisions" list
+
+#### Step 10 — Atomic commits pending (per Round 2 Step 10 plan)
+
+Pending к Step 10 — 6 atomic commits на feature branch:
+1. `revert(template-profile): DEFAULT_TEMPLATE 'simplified' → 't115' (post-pivot Discussion #12)`
+2. `feat(cli): add --template choices() validation + JSDoc fix (H4 review fix)`
+3. `test(template-profile + generation-service): unit coverage для resolveTemplateProfile + empty-targetEntity guard (H7)`
+4. `docs(adr-0005): pivot amendment + §3.5 carve-outs documented (H5)`
+5. `docs(discussion-11): post-pivot amendment note (Discussion #12 supersedes default switch)`
+6. `docs(closure-report + report + status + roadmap): post-pivot updates`
+
+t115 repo separate commit done (not on feature branch — separate repo на master): `60ba4ba` Serverpod 3.4.8 bumps.
+

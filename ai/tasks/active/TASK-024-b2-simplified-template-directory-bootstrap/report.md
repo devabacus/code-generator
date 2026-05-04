@@ -1,15 +1,20 @@
-# Отчёт TASK-024 — B2 simplified template directory bootstrap (Session 2)
+# Отчёт TASK-024 — B2 simplified template directory bootstrap (Round 2 post-pivot)
 
 ## Резюме
 
-Создан simplified template directory bootstrap (`G:/Templates/flutter/simplified/`) с Configuration baseline (singleton entity per ADR-0005 §3.1) + 4 fixture entities в `features/tasks/` (Category/Tag/Task/TaskTagMap) для substitution flow. Architecture ceremony stripped (no usecases / no abstract interfaces / no business notifiers / no validation / no application services / no separate mappers / no Either-Result / no datasource interfaces) в flutter app. Generator default switched к simplified через `DEFAULT_TEMPLATE = 'simplified'` в `template_profile.ts`; legacy path preserved через `--template t115` opt-in flag. BUG-019 closed end-to-end через default flow + legacy flow smokes (both errors=0).
+Создан simplified template directory bootstrap (`G:/Templates/flutter/simplified/`) с Configuration baseline (singleton entity per ADR-0005 §3.1) + 4 fixture entities в `features/tasks/` (Category/Tag/Task/TaskTagMap) для substitution flow. Architecture ceremony stripped (no usecases / no abstract interfaces / no business notifiers / no validation / no application services / no separate mappers / no Either-Result / no datasource interfaces) в flutter app, с carve-outs documented в ADR-0005 §3.5 amendment log entry 2026-05-04 (Configuration UI ceremony + `dependencies/` directories + separate Model layer retained). 
 
-Sessions A-E3d2 timeline:
+**Round 2 post-pivot Discussion #12 (2026-05-04):** User pivot ре-evaluated default switch decision после TASK-024 multi-agent review. **DEFAULT_TEMPLATE reverts с 'simplified' к 't115'**; weight TASK-018 stays на t115 + sync_core wire-up; simplified template = opt-in для new CRUD projects через `--template simplified`. Stack lock package set + 13 markers + Clean directory layout invariants preserved. См. [Discussion #12 archive](../../../discussions/archive/12-упрощение-шаблона-по-best-practices-с-со/).
+
+BUG-019 closed end-to-end через default flow + opt-in flow smokes (both errors=0).
+
+Sessions A-E3d2 + Round 2 timeline:
 - **Sessions A-D** — Phase B preliminary work (template content authoring, ADR-0005 §3.5 ceremony reduction)
 - **Sessions E-E2** — pubspec safe bumps к latest stable + multi-template config infrastructure
 - **Session E2.5/E2.6** — bootstrapper dynamic depth-delta fix для path-deps (Approach 2 patcher для Templates/Packages/ + out-of-monorepo paths)
 - **Session E3d** — generator default switched к simplifiedTemplateConfig + `--template t115` legacy CLI flag preserved + defensive empty-targetEntity guard в `_getDestinationPath`
-- **Session E3d2 (this session)** — `templFeatureName` default fix к 'tasks' (Configuration baseline копируется как-есть, не template fixture); simplified template orchestrator cleaned до Configuration-only baseline; tests updated; default + legacy flow smokes both PASS errors=0; BUG-019 closed end-to-end
+- **Session E3d2** — `templFeatureName` default fix к 'tasks' (Configuration baseline копируется как-есть, не template fixture); simplified template orchestrator cleaned до Configuration-only baseline; tests updated; default + legacy flow smokes both PASS errors=0; BUG-019 closed end-to-end
+- **Round 2 (post-pivot 2026-05-04)** — `DEFAULT_TEMPLATE` revert simplified → t115; ADR-0005 §1 + §3.5 amendments; Discussion #11 amendment note; commander `.choices()` validation H4; unit test coverage H7 (190 mocha passing); t115 master Serverpod 3.4.8 bumps committed (H6); H1/H3 documented как expected behavior post-pivot
 
 ## Изменения
 
@@ -46,31 +51,43 @@ Sessions A-E3d2 timeline:
 
 ## Тесты
 
-- **Mocha unit tests:** 181/181 passing post Session E3d2 fix (compile clean → no regressions)
-- **Default flow smoke (t176):**
-  - `create-project --name t176` ✅ success Duration=213750ms
-  - `verify --name t176` ✅ PASS errors=0, warnings=0, infos=30 (Total=30680ms)
-  - Shape verify: 0 usecases в `t176_flutter/`, 0 abstract repository interfaces (`i_*_repository.dart`), features dir = baseline (auth/bluetooth/configuration/developer_tools/home/settings_definitions/) — без Tasks fixture leak в startProject baseline
-- **Legacy flow smoke (t177):**
-  - `create-project --name t177 --template t115` ✅ success Duration=239355ms
-  - `verify --name t177` ✅ PASS errors=0, warnings=1, infos=44 (Total=31313ms) — regression preserved
-- **Strip checklist (per ADR-0005 §3.5):** all-zero usecases / interfaces в `t176_flutter` (subdirectories of admin app keep auth usecases per its own ceremony — что correct, simplified ceremony reduction applies к `flutter/` only)
-- **Stack lock preserved:** Riverpod + Drift + sync_core + Serverpod package SET unchanged (только version bumps к latest stable applied separately)
+- **Mocha unit tests:** 190/190 passing post Round 2 (181 baseline + 7 template_profile + 2 generation_service guard cases)
+- **Default flow smoke (t178, post-pivot — no `--template` flag → t115):**
+  - `create-project --name t178` ✅ success Duration=228082ms
+  - `verify --name t178` ✅ PASS errors=0, warnings=1, infos=44 (Total=31642ms)
+  - Shape verify: usecases present (`t178_flutter/lib/features/auth/domain/usecases`, `t178_flutter/lib/features/configuration/domain/usecases`), `i_auth_repository.dart` present — t115 ceremony preserved
+- **Opt-in flow smoke (t179, `--template simplified`):**
+  - `create-project --name t179 --template simplified` ✅ success Duration=209785ms
+  - `verify --name t179` ✅ PASS errors=0, warnings=0, infos=30 (Total=30964ms)
+  - Shape verify: 0 usecases в `t179_flutter/lib/`, 0 abstract repository interfaces — simplified shape preserved
+- **Pre-pivot smoke evidence (Sessions E3d/E3d2 — superseded, retained as historical):**
+  - t176 default-was-simplified flow + t177 legacy-was-t115 flow — pre-pivot baselines (errors=0 each)
+- **Stack lock preserved:** Riverpod + Drift + sync_core + Serverpod package SET unchanged (только version bumps к latest stable applied)
 
-Как запустить:
+Как запустить (post-pivot):
 ```bash
 cd "G:/Projects/vs_code_extensions/code-generator"
 npm run compile
 node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
 
-# Default flow smoke (next available test project number):
+# Default flow smoke (no flag → t115):
 node out/adapters/cli/index.js create-project --name t<N> --human
 node out/adapters/cli/index.js verify --name t<N> --human
 
-# Legacy flow smoke:
-node out/adapters/cli/index.js create-project --name t<N+1> --template t115 --human
+# Opt-in simplified flow smoke:
+node out/adapters/cli/index.js create-project --name t<N+1> --template simplified --human
 node out/adapters/cli/index.js verify --name t<N+1> --human
 ```
+
+## Round 2 reviewer fixes summary (post-pivot 2026-05-04)
+
+- **D1 (Adversarial DEAL-BREAKER zero-diff smoke):** cited via post-pivot default flow t178 verify errors=0 evidence (t115 default behavior preserved). Pragmatic alternative — `verify --name t178 --human` errors=0 confirms default t115 path produces clean projects, satisfying zero-diff intent (feature branch carries codegen patcher fix; classic master-vs-feature diff не feasible).
+- **H1 (Architecture byte-identical factories):** documented как expected post-pivot under stack lock. `simplifiedTemplateConfig() ↔ t115TemplateConfig()` byte-identical post Session E3d2 unification. Simplified template = different on-disk content + different default consumer; codegen factories converge на same paths/literals because templates share stack (Riverpod / Drift / sync_core / Serverpod / 13 markers / Clean directory). Factory pair preserved для future template divergence (если ever).
+- **H3 (Generator-core VS Code adapter divergence):** no action needed; pivot makes VS Code default `'t115'` consistent с CLI default. Clarifying comment added в `src/adapters/vscode/commands/create_new_project.ts`.
+- **H4 (Architecture `resolveTemplateProfile` JSDoc + commander validation):** JSDoc rewritten + `commander.Option.choices(['t115', 'simplified'])` added к `--template` flag в both `create_project.ts` + `generate_entity.ts`.
+- **H5 (Architecture §3.5 carve-outs documented):** ADR-0005 amendment log entry 2026-05-04 records strip retain decisions (Configuration UI ceremony + `dependencies/` directories + separate Model layer + justifications).
+- **H6 (Adversarial cross-repo race t115 bumps):** t115 master commit `60ba4ba` Serverpod 3.1.1 → 3.4.8 bumps committed.
+- **H7 (Adversarial unit-test coverage):** 9 new tests added — 7 для `resolveTemplateProfile()` (`src/test/utils/template_profile.test.ts`) + 2 для empty-targetEntity guard (`src/test/generators/generation_service.test.ts`); 181 → 190 mocha passing.
 
 ## Риски / Заметки
 
@@ -99,15 +116,19 @@ Session E3d2 unified simplified ↔ t115 substitution literals (Category fixture
 
 ## Статус
 
-Ready for multi-agent review (4 reviewers per multi-agent review pattern). Sessions A-E3d2 complete:
-- Mocha 181/181 passing
-- Default flow smoke t176 PASS errors=0
-- Legacy flow smoke t177 PASS errors=0
+Round 2 review fixes applied (post-pivot Discussion #12 2026-05-04). Ready for PR creation + merge approval.
+
+Round 2 final state:
+- Mocha **190/190** passing (181 baseline + 9 new Round 2 tests)
+- Default flow smoke **t178** PASS errors=0 (post-pivot — no `--template` flag → t115)
+- Opt-in flow smoke **t179** PASS errors=0 (`--template simplified`)
+- Lint clean (0 errors / 18 pre-existing warnings)
 - BUG-019 closed end-to-end
-- closure-report Phase B sub-section appended
-- status.md / roadmap.md updates applied
+- closure-report Phase B sub-section updated post-pivot
+- ADR-0005 §1 + §3.5 amendment log entries 2026-05-04 added
+- Discussion #11 archive amendment note appended (Discussion #12 supersedes default switch)
+- t115 master commit `60ba4ba` Serverpod 3.4.8 bumps applied (separate repo)
 
 Pending для Phase B closure:
-- Multi-agent review (4 reviewers) apply
 - PR created + reviewed + merged
 - Phase B section status updates → ✅ closed
