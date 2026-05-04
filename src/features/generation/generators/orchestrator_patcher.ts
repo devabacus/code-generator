@@ -70,16 +70,21 @@ export class OrchestratorPatcher {
         const isJunction = JunctionDetector.isJunctionEntity(model);
 
         // Feature segment substitution (BUG-009 fix):
-        // template imports содержат `features/<X>/` literal (X = templateConfig.orchestrator.templateFeatureSegment).
+        // template imports содержат `features/<X>/` literal (X — anchor template feature segment).
         // Substitute на target feature segment (config.targetFeatureName — basename of targetFeaturePath).
         // Это критично когда developer вызывает generate-entity --feature-path .../features/<X>
         // где X != template default. Без substitution все imports ссылаются на features/<template-default>/...
         // которая не существует в target проекте → cascade uri_does_not_exist errors.
         //
-        // **TASK-023 (BUG-019 fix):** template feature segment приходит из config.templateConfig.orchestrator.templateFeatureSegment
-        // (default = 'tasks' для t115, 'configuration' для simplified). Pre-TASK-023 — hardcoded
-        // через config.templFeatureName side-effect (templFeatureName всегда 'tasks' implicitly).
-        const tplFeatureSnake = toSnakeCase(config.templateConfig.orchestrator.templateFeatureSegment);
+        // **TASK-023 (BUG-019 fix) + Round 2 H-1 fix:** anchor template feature segment приходит
+        // primary из `config.templFeatureName` (CLI `--templ-feature` flag, runtime user-overridable),
+        // fallback к `config.templateConfig.orchestrator.templateFeatureSegment` (default = 'tasks'
+        // для t115, 'configuration' для simplified). Pre-TASK-023 был ТОЛЬКО `config.templFeatureName`;
+        // post-Round-1 этот regression replaced на templateFeatureSegment ONLY → CLI override silently
+        // ignored. Round 2 restores CLI flag primary с config fallback (semantics: CLI wins, config = default).
+        const tplFeatureSnake = toSnakeCase(
+            config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment,
+        );
         const targetFeatureSnake = toSnakeCase(config.targetFeatureName);
 
         // Build all three snippets с substitutions подгоняя placeholders под
