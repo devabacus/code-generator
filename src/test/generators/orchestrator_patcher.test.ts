@@ -1,8 +1,9 @@
 import * as assert from 'assert';
 import { OrchestratorPatcher } from '../../features/generation/generators/orchestrator_patcher';
 import { GenerationConfig } from '../../features/generation/config/generation_config';
-import { t115TemplateConfig } from '../../features/generation/config/template_config';
+import { t115TemplateConfig, simplifiedTemplateConfig } from '../../features/generation/config/template_config';
 import { ServerpodModel, ServerpodField } from '../../features/generation/parsers/formatters/types';
+import { JunctionDetector } from '../../features/generation/parsers/junction_detector';
 import { MockFileSystem } from '../mocks/mock_file_system';
 
 const TEMPLATES_PATH = '/test/templates';
@@ -799,6 +800,7 @@ void wireUp() {
                 name: 't115',
                 relationPatcher: t115TemplateConfig().relationPatcher,
                 orchestrator: {
+                    ...t115TemplateConfig().orchestrator,
                     relativePath: ['lib', 'core', 'orchestrator', 'alt_orchestrator.dart'],
                 },
                 database: t115TemplateConfig().database,
@@ -848,6 +850,420 @@ void wireUp() {
 
         assert.strictEqual(explicitResult, defaultResult,
             'explicit t115TemplateConfig() = default config output (regression invariant)');
+    });
+
+    // ====================================================================================
+    // TASK-023 / Phase B2 — BUG-019 fix: snippet content из templateConfig
+    //
+    // Verifies что `OrchestratorPatcher` строит imports / register snippets из
+    // `config.templateConfig.orchestrator.{entityImportsTemplate, entityRegisterTemplate,
+    // junctionImportsTemplate, junctionRegisterTemplate, regularEntityFallback,
+    // junctionEntityFallback, junctionFkFallbacks, templateFeatureSegment}` вместо
+    // hardcoded constants `_ENTITY_*_TEMPLATE` / `_JUNCTION_*_TEMPLATE` + literal
+    // fallbacks `'category'` / `'taskTagMap'` / `'task'` / `'tag'`.
+    //
+    // Reference: ai/bug-reports/019-orchestrator-snippet-hardcoded-literals.md
+    // ====================================================================================
+
+    test('TASK-023 / BUG-019: simplifiedTemplateConfig() factory exposes snippet content fields', async () => {
+        // Smoke: simplified factory returns shape с расширенными polymorphism полями.
+        const config = simplifiedTemplateConfig();
+        assert.strictEqual(config.name, 'simplified');
+
+        // Snippet content presence
+        assert.ok(config.orchestrator.entityImportsTemplate.length > 0,
+            'simplified entityImportsTemplate should be non-empty');
+        assert.ok(config.orchestrator.entityRegisterTemplate.length > 0,
+            'simplified entityRegisterTemplate should be non-empty');
+        assert.ok(config.orchestrator.junctionImportsTemplate.length > 0,
+            'simplified junctionImportsTemplate should be non-empty');
+        assert.ok(config.orchestrator.junctionRegisterTemplate.length > 0,
+            'simplified junctionRegisterTemplate should be non-empty');
+
+        // Fallbacks
+        assert.strictEqual(config.orchestrator.regularEntityFallback, 'configuration',
+            'simplified regularEntityFallback должен быть `configuration` (Configuration baseline)');
+        assert.strictEqual(config.orchestrator.junctionEntityFallback, 'configurationMap',
+            'simplified junctionEntityFallback (placeholder для junction substitution)');
+        assert.deepStrictEqual(config.orchestrator.junctionFkFallbacks, { fk1: 'parentA', fk2: 'parentB' },
+            'simplified junctionFkFallbacks (generic placeholders since simplified bootstrap не содержит concrete junction)');
+        assert.strictEqual(config.orchestrator.templateFeatureSegment, 'configuration',
+            'simplified templateFeatureSegment = `configuration` (Configuration feature location)');
+
+        // Simplified snippet содержит Configuration / configuration literals (не Category / category t115 markers).
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('configuration_remote_adapter.dart'),
+            'simplified entityImportsTemplate содержит configuration adapter file path');
+        assert.ok(!config.orchestrator.entityImportsTemplate.includes('category_remote_adapter.dart'),
+            'simplified entityImportsTemplate НЕ содержит t115 category literal (BUG-019 isolation)');
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('features/configuration/'),
+            'simplified entityImportsTemplate содержит features/configuration/ feature segment');
+        assert.ok(!config.orchestrator.entityImportsTemplate.includes('features/tasks/'),
+            'simplified entityImportsTemplate НЕ содержит t115 features/tasks/ feature segment');
+
+        assert.ok(config.orchestrator.entityRegisterTemplate.includes('register<ConfigurationEntity>'),
+            'simplified entityRegisterTemplate содержит ConfigurationEntity register');
+        assert.ok(!config.orchestrator.entityRegisterTemplate.includes('register<CategoryEntity>'),
+            'simplified entityRegisterTemplate НЕ содержит t115 CategoryEntity literal');
+    });
+
+    test('TASK-023 / BUG-019: t115TemplateConfig() factory snippet content matches pre-TASK-023 hardcoded constants', async () => {
+        // Regression: t115 factory returns identical snippet content к pre-TASK-023 file-local constants.
+        const config = t115TemplateConfig();
+
+        // entity imports — t115 had `category` + `features/tasks/`.
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('category_remote_adapter.dart'),
+            't115 entityImportsTemplate содержит category_remote_adapter.dart (preserves pre-TASK-023 hardcoded)');
+        assert.ok(config.orchestrator.entityImportsTemplate.includes('features/tasks/'),
+            't115 entityImportsTemplate содержит features/tasks/ (preserves pre-TASK-023 hardcoded)');
+
+        // junction imports — t115 had `task_tag_map`.
+        assert.ok(config.orchestrator.junctionImportsTemplate.includes('task_tag_map_remote_adapter.dart'),
+            't115 junctionImportsTemplate содержит task_tag_map_remote_adapter.dart');
+
+        // entity register — t115 had `register<CategoryEntity>`.
+        assert.ok(config.orchestrator.entityRegisterTemplate.includes('register<CategoryEntity>'),
+            't115 entityRegisterTemplate содержит register<CategoryEntity>');
+
+        // junction register — t115 had `register<TaskTagMapEntity>` + `__FK1__` placeholders.
+        assert.ok(config.orchestrator.junctionRegisterTemplate.includes('register<TaskTagMapEntity>'),
+            't115 junctionRegisterTemplate содержит register<TaskTagMapEntity>');
+        assert.ok(config.orchestrator.junctionRegisterTemplate.includes('__FK1__'),
+            't115 junctionRegisterTemplate содержит __FK1__ placeholder (TASK-014 substitution token)');
+
+        // Fallbacks preserve pre-TASK-023 hardcoded literals.
+        assert.strictEqual(config.orchestrator.regularEntityFallback, 'category');
+        assert.strictEqual(config.orchestrator.junctionEntityFallback, 'taskTagMap');
+        assert.deepStrictEqual(config.orchestrator.junctionFkFallbacks, { fk1: 'task', fk2: 'tag' });
+        assert.strictEqual(config.orchestrator.templateFeatureSegment, 'tasks');
+    });
+
+    test('TASK-023 / BUG-019: simplified config produces simplified snippet output (positive proof)', async () => {
+        // Positive proof: patcher с simplified config produces output, содержащий simplified
+        // template literals (configuration / Configuration / features/configuration/), не t115
+        // literals (category / Category / features/tasks/).
+        // NB: simplified config substitution заменит `configuration` → target entity name.
+        // Поэтому test использует target entity 'Expense' и проверяет что:
+        // (a) `Expense` имена правильно substituted (не литералы template)
+        // (b) substitution произошёл из simplified template (anchor segment был
+        //     `features/configuration/`, не `features/tasks/` — verifies что patcher
+        //     ЧИТАЕТ simplified config, не fallback к t115 hardcoded)
+        const orchestratorBaseline = `// manifest: startProject
+import 'package:sync_core/sync_core.dart';
+
+// === generated_start:syncImports ===
+// === generated_end:syncImports ===
+
+const List<String> syncEntityTypes = <String>[
+  // === generated_start:syncEntityTypes ===
+  // === generated_end:syncEntityTypes ===
+];
+
+void wireUp() {
+  // === generated_start:syncRegistrations ===
+  // === generated_end:syncRegistrations ===
+}
+`;
+        const altOrchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/sync/sync_orchestrator_provider.dart`;
+
+        const simplifiedConfig = new GenerationConfig({
+            templProject: 'simplified',
+            templEntity: 'configuration',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            // NB: targetFeaturePath = lib/features/expense — substitution from simplified
+            // template's `features/configuration/` anchor → `features/expense/` target.
+            templFeatureName: 'configuration',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: simplifiedTemplateConfig(),
+        });
+
+        mockFs.setFile(altOrchestratorPath, orchestratorBaseline);
+
+        await patcher.patch(simplifiedConfig, makeModel('Expense'));
+
+        const result = await mockFs.readFile(altOrchestratorPath);
+
+        // POSITIVE: Expense imports (target entity properly substituted) + features/expense/ (target feature segment)
+        assert.ok(
+            result.includes("import '../../features/expense/data/adapters/expense/expense_remote_adapter.dart';"),
+            'simplified config + target=Expense: substitution produces features/expense/expense_remote_adapter.dart',
+        );
+        assert.ok(
+            result.includes('register<ExpenseEntity>'),
+            'simplified config + target=Expense: register<ExpenseEntity> emitted',
+        );
+
+        // NEGATIVE: t115 template literals НЕ leak.
+        assert.ok(
+            !result.includes('features/tasks/'),
+            'simplified config: t115 template feature segment `features/tasks/` НЕ leak в output',
+        );
+        assert.ok(
+            !result.includes('category_remote_adapter.dart'),
+            'simplified config: t115 template entity literal `category_remote_adapter.dart` НЕ leak в output',
+        );
+        assert.ok(
+            !result.includes('register<CategoryEntity>'),
+            'simplified config: t115 template entity literal `register<CategoryEntity>` НЕ leak в output',
+        );
+
+        // NEGATIVE: simplified template literal `configuration_remote_adapter.dart` тоже substituted
+        // (Expense target — `configuration` → `expense`).
+        assert.ok(
+            !result.includes('configuration_remote_adapter.dart'),
+            'simplified config: template literal `configuration_remote_adapter.dart` substituted на target',
+        );
+    });
+
+    test('TASK-023 / BUG-019: alt config с custom snippets produces alt content (alt-config positive-path proof)', async () => {
+        // Polymorphism proof: дёргаем patcher альтернативным templateConfig где snippet content
+        // совершенно не похож на t115 ("custom_marker" sentinel). Patcher должен use alt content
+        // (proof что snippet content идёт из config, не hardcoded constants).
+        const altConfig = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'tasks',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: {
+                name: 't115',
+                relationPatcher: t115TemplateConfig().relationPatcher,
+                orchestrator: {
+                    relativePath: t115TemplateConfig().orchestrator.relativePath,
+                    // Custom alt snippets с sentinel literals (не похожи на t115 / simplified):
+                    entityImportsTemplate: `// CUSTOM_ALT_IMPORTS_SENTINEL
+import 'package:custom/altmarker/category_alt.dart';`,
+                    entityRegisterTemplate: `  // CUSTOM_ALT_REGISTER_SENTINEL
+  altRegister<CategoryAlt>('category', altBundle);`,
+                    junctionImportsTemplate: `// CUSTOM_ALT_JUNCTION_IMPORTS`,
+                    junctionRegisterTemplate: `  // CUSTOM_ALT_JUNCTION_REGISTER`,
+                    regularEntityFallback: 'category',
+                    junctionEntityFallback: 'taskTagMap',
+                    junctionFkFallbacks: { fk1: 'task', fk2: 'tag' },
+                    templateFeatureSegment: 'tasks',
+                },
+                database: t115TemplateConfig().database,
+            },
+        });
+
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+
+        await patcher.patch(altConfig, makeModel('Expense'));
+
+        const result = await mockFs.readFile(ORCHESTRATOR_PATH);
+
+        // POSITIVE: alt sentinel snippets emitted (после substitution `category` → `expense`).
+        assert.ok(
+            result.includes('CUSTOM_ALT_IMPORTS_SENTINEL'),
+            'alt config: CUSTOM_ALT_IMPORTS_SENTINEL должен присутствовать в output (proof что imports читаются из config)',
+        );
+        assert.ok(
+            result.includes('CUSTOM_ALT_REGISTER_SENTINEL'),
+            'alt config: CUSTOM_ALT_REGISTER_SENTINEL должен присутствовать в output (proof что register читается из config)',
+        );
+        // Alt template содержал `category_alt.dart` → substituted на `expense_alt.dart`.
+        assert.ok(
+            result.includes('expense_alt.dart'),
+            'alt config: substitution `category` → `expense` корректно в alt snippet',
+        );
+        // Alt template содержал `altRegister<CategoryAlt>` → substituted на `altRegister<ExpenseAlt>`.
+        assert.ok(
+            result.includes('altRegister<ExpenseAlt>'),
+            'alt config: substitution `Category` → `Expense` корректно в alt snippet (PascalCase form)',
+        );
+
+        // NEGATIVE: t115 hardcoded snippet content НЕ leak (proof что patcher больше не reads file-local constants).
+        assert.ok(
+            !result.includes("import '../../features/tasks/data/adapters/expense/expense_remote_adapter.dart';"),
+            'alt config: t115 default imports format НЕ leak в output (snippet content НЕ из hardcoded constant)',
+        );
+        assert.ok(
+            !result.includes('register<ExpenseEntity>'),
+            'alt config: t115 default register format `register<ExpenseEntity>` НЕ leak (snippet content НЕ из hardcoded constant)',
+        );
+    });
+
+    test('TASK-023 / BUG-019: junction with <2 FKs falls back to junctionFkFallbacks config (Round 2 H-2 restructured)', async () => {
+        // Round 2 H-2 fix: previous test mislabeled — it provided 2 FK fields, so FK extraction
+        // succeeded и junctionFkFallbacks branch (`fkFields.length < 2`) НЕ срабатывал. Это
+        // оставляло `junctionFkFallbacks` config field полностью без test coverage.
+        //
+        // Restructured test: monkey-patch `JunctionDetector.isJunctionEntity` чтобы вернуть `true`
+        // для модели с 1 FK field (структурно junction detection требует ≥2 FK через public API,
+        // explicit `junction:true` flag throws JunctionValidationError при FK<2). Patch позволяет
+        // exercise dead-defensive branch в `_buildRegisterSnippet:289-293`:
+        //   ```
+        //   const fk1Name = fkFields.length >= 1 ? extract(fkFields[0]) : fk1Fallback;
+        //   const fk2Name = fkFields.length >= 2 ? extract(fkFields[1]) : fk2Fallback;
+        //   ```
+        // С 1 FK field: `fk1Name = extract(soloId) = 'solo'`, `fk2Name = fk2Fallback = 'parentB'`
+        // (config-driven для simplifiedTemplateConfig).
+        const altConfig = new GenerationConfig({
+            templProject: 'simplified',
+            templEntity: 'configuration',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            templFeatureName: 'configuration',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/configuration`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: simplifiedTemplateConfig(),
+        });
+
+        const orchestratorBaseline = `// manifest: startProject
+// === generated_start:syncImports ===
+// === generated_end:syncImports ===
+const List<String> syncEntityTypes = <String>[
+  // === generated_start:syncEntityTypes ===
+  // === generated_end:syncEntityTypes ===
+];
+void wireUp() {
+  // === generated_start:syncRegistrations ===
+  // === generated_end:syncRegistrations ===
+}
+`;
+        const orchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/sync/sync_orchestrator_provider.dart`;
+        mockFs.setFile(orchestratorPath, orchestratorBaseline);
+
+        // Junction model с 1 FK field. `JunctionDetector.isJunctionEntity()` через public API
+        // НЕ classify это как junction (FK<2). Monkey-patch чтобы заставить patcher войти в
+        // junction branch и exercise FK fallback.
+        const junctionWithOneFk = makeJunctionModel('IncompleteJunction', [
+            fkField('soloId', 'solo'),
+        ]);
+
+        const originalIsJunction = JunctionDetector.isJunctionEntity;
+        JunctionDetector.isJunctionEntity = () => true;
+        try {
+            await patcher.patch(altConfig, junctionWithOneFk);
+        } finally {
+            JunctionDetector.isJunctionEntity = originalIsJunction;
+        }
+
+        const result = await mockFs.readFile(orchestratorPath);
+
+        // POSITIVE: fk2 fallback из simplifiedTemplateConfig().junctionFkFallbacks (= `parentB`).
+        // Доказывает что fallback config-driven, не hardcoded.
+        assert.ok(
+            result.includes('junction FK→solo+parentB'),
+            'junction <2 FK: fk2 fallback `parentB` берётся из simplifiedTemplateConfig().junctionFkFallbacks (proof config-driven)',
+        );
+
+        // NEGATIVE: t115 hardcoded `tag` fallback НЕ leak (доказывает что fallback config-specific).
+        assert.ok(
+            !result.includes('junction FK→solo+tag'),
+            'junction <2 FK: t115 hardcoded `tag` fallback НЕ leak (proof simplified config governs fallback)',
+        );
+
+        // NEGATIVE: t115 hardcoded `task+tag` literal pair НЕ leak.
+        assert.ok(
+            !result.includes('junction FK→task+tag'),
+            'junction <2 FK: t115 hardcoded `task+tag` pair НЕ leak (proof config-driven)',
+        );
+    });
+
+    test('TASK-023 / BUG-019 / Round 2 H-1: --templ-feature CLI flag override consumed для feature substitution (regression)', async () => {
+        // H-1 fix: pre-TASK-023 master `orchestrator_patcher.ts` использовал `config.templFeatureName`
+        // (CLI `--templ-feature` flag value, default `'tasks'`) для feature segment anchor substitution.
+        // Round 1 refactor сменил на `templateConfig.orchestrator.templateFeatureSegment` (hardcoded
+        // в factory) → user-overridden `--templ-feature foo` против t115 templateConfig silently broken
+        // (snippet substitution искал `features/foo/` anchor который в t115 template = `features/tasks/`,
+        // не matched, no-op output retained literal `features/tasks/` import paths).
+        //
+        // Round 2: restored CLI flag primary с config fallback —
+        // `config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment`.
+        //
+        // Этот test exercises non-default CLI flag (templFeatureName='customFoo') против t115
+        // templateConfig (templateFeatureSegment='tasks'). Output должен иметь `features/expense/`
+        // (target feature, properly substituted из anchor), НЕ literal `features/tasks/` (silent
+        // breakage от Round 1 regression).
+        const altOrchestratorPath = `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/core/sync/sync_orchestrator_provider.dart`;
+        const orchestratorBaseline = `// manifest: startProject
+// === generated_start:syncImports ===
+// === generated_end:syncImports ===
+const List<String> syncEntityTypes = <String>[
+  // === generated_start:syncEntityTypes ===
+  // === generated_end:syncEntityTypes ===
+];
+void wireUp() {
+  // === generated_start:syncRegistrations ===
+  // === generated_end:syncRegistrations ===
+}
+`;
+
+        // Custom template config где snippet содержит anchor `features/custom_foo/` —
+        // эмулирует custom template's snippet literal. CLI flag value `customFoo` через
+        // toSnakeCase → `custom_foo` → matches anchor.
+        //
+        // КЛЮЧЕВАЯ деталь H-1 fix verification: `templateFeatureSegment` (config field) остаётся
+        // default `'tasks'` (из t115TemplateConfig spread). Pre-Round-2 patcher выбрал бы
+        // `'tasks'` → toSnakeCase('tasks')='tasks' → искал `features/tasks/` anchor в snippet —
+        // не нашёл (snippet содержит `features/custom_foo/`) → no-op → output retains literal
+        // `features/custom_foo/` (НЕ substituted на target).
+        //
+        // Round 2 patcher выбирает CLI flag value (primary) → toSnakeCase('customFoo')='custom_foo'
+        // → matches anchor `features/custom_foo/` → substitutes на target `features/expense/`.
+        const customTemplateConfig = {
+            ...t115TemplateConfig(),
+            orchestrator: {
+                ...t115TemplateConfig().orchestrator,
+                // Snippet с anchor `features/custom_foo/` — substitution требует snake_case anchor
+                // (per `_substitutePlaceholders` step 1: `features/${tplFeatureSnake}/`).
+                entityImportsTemplate: `import '../../features/custom_foo/data/adapters/category/category_remote_adapter.dart';`,
+                // templateFeatureSegment остаётся 'tasks' (default из t115TemplateConfig spread).
+                // CLI flag (`templFeatureName: 'customFoo'`) должен win primary.
+            },
+        };
+
+        const config = new GenerationConfig({
+            templProject: 't115',
+            templEntity: 'category',
+            targetEntity: '',
+            templatesPath: TEMPLATES_PATH,
+            projectsPath: PROJECTS_PATH,
+            targetProject: TARGET_PROJECT,
+            // CLI flag override — non-default. Pre-Round-2 silently ignored.
+            templFeatureName: 'customFoo',
+            targetFeaturePath: `${PROJECTS_PATH}/${TARGET_PROJECT}/${TARGET_PROJECT}_flutter/lib/features/expense`,
+            workspacesPath: `${PROJECTS_PATH}/${TARGET_PROJECT}`,
+            templateConfig: customTemplateConfig,
+        });
+
+        mockFs.setFile(altOrchestratorPath, orchestratorBaseline);
+
+        await patcher.patch(config, makeModel('Expense'));
+
+        const result = await mockFs.readFile(altOrchestratorPath);
+
+        // POSITIVE: CLI flag value `customFoo` (snake `custom_foo`) → matched anchor →
+        // substituted на target `features/expense/`.
+        assert.ok(
+            result.includes('features/expense/'),
+            'H-1 Round 2: CLI flag `templFeatureName: customFoo` (snake `custom_foo`) matches snippet anchor → substituted на target features/expense/',
+        );
+
+        // NEGATIVE: literal `features/custom_foo/` НЕ leak в output (substitution произошёл).
+        assert.ok(
+            !result.includes('features/custom_foo/'),
+            'H-1 Round 2: substitution успешно произошёл; literal features/custom_foo/ НЕ leak',
+        );
+
+        // NEGATIVE: `features/tasks/` НЕ должен появиться в output. Если patcher mistakenly
+        // использовал templateFeatureSegment='tasks' (Round 1 regression), anchor поиск
+        // `features/tasks/` не matches snippet `features/custom_foo/` → no-op → output retains
+        // literal `features/custom_foo/`. Тоже covered позитивным assertion выше через `expense`.
+        assert.ok(
+            !result.includes('features/tasks/'),
+            'H-1 Round 2: t115 templateFeatureSegment default `tasks` НЕ leak (CLI flag won, не config fallback)',
+        );
     });
 
     test('BUG-012: junction с multi-word snake parent (terminalSet) → docstring/methods используют lowerCamel form', async () => {

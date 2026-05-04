@@ -30,7 +30,8 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-022 | **B1 codegen core multi-template infrastructure** — refactor hardcoded literals в `RelationPatcher` / `OrchestratorPatcher` / `AppDatabaseGenerator` → `TemplateConfig` injection. Phase B sequenced TASKs (B1→B2→B3) per Discussion #11 12-point Decision. Estimate ~2-2.5 нед per ClaudeAdv evidence. См. [task.md](../tasks/active/TASK-022-b1-codegen-core-multi-template-infrastructure/task.md). | 🟡 in progress | 2026-05-03 |
+| TASK-022 | **B1 codegen core multi-template infrastructure** ✅ merged 2026-05-04 (PR #19, master `a3820e4`) — `TemplateConfig` injection + 173 passing tests, BUG-019 documented. См. [done/TASK-022-.../report.md](../tasks/done/TASK-022-b1-codegen-core-multi-template-infrastructure/report.md). | ✅ done | 2026-05-03 |
+| TASK-023 | **B2 simplified template content** — создание `G:/Templates/flutter/simplified/` с Configuration baseline + sync_core 0.3.0 wire-up под stack lock; `simplifiedTemplateConfig()` factory; **BUG-019 closure** (orchestrator snippets из config); package versions update к latest stable. Estimate ~1-1.5 нед per Discussion #11. См. [task.md](../tasks/active/TASK-023-b2-simplified-template-content/task.md). | 🟡 in progress | 2026-05-04 |
 
 ---
 
@@ -44,7 +45,8 @@
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| BUG-019 | Medium | Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`) — TASK-B2 landmine | TASK-B2 acceptance addresses |
+| BUG-019 | Medium | Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`) — TASK-B2 landmine | TASK-B2 Session 1 ✅ closes orchestrator-side (PR pending merge); junction-substitution-side в BUG-020 |
+| BUG-020 | Medium | Junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`) в `replacement_util.ts` + `generation_service.ts` + `relation_patcher.ts` — Session 2 landmine для simplified junction generate-entity | TASK-023 Session 2 либо follow-up TASK после Session 2 closure |
 | ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 (PR pending) — minimal single-job CI. 3-suite split deferred to Phase A test inventory audit. |
 
 ---

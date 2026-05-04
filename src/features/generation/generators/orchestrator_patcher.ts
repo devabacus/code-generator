@@ -23,11 +23,23 @@ import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
  *     `relation_patcher.ts` BUG-003 fix).
  *   - **Junction detection (TASK-013):** через `JunctionDetector.isJunctionEntity()`
  *     (shared utility per Discussion #2 Q3=A). Junction → snippet берётся из
- *     `_JUNCTION_*` templates с docstring о junction-specific routing
- *     update→createX и delete→noop. Replaces legacy `endsWith('Map')` heuristic
- *     которое производило false-negatives для junction'ов без `Map` суффикса
+ *     `junctionImportsTemplate` / `junctionRegisterTemplate` (config-driven с
+ *     TASK-023) с docstring о junction-specific routing update→createX и
+ *     delete→noop. Replaces legacy `endsWith('Map')` heuristic которое
+ *     производило false-negatives для junction'ов без `Map` суффикса
  *     (см. ai/bug-reports/junction-detection-audit.md).
  *   - **Commutative:** apply A → B == apply B → A в final state.
+ *
+ * **TASK-022 / Phase B1:** orchestrator path читается из
+ * `config.templateConfig.orchestrator.relativePath` (config-driven).
+ *
+ * **TASK-023 / Phase B2 (BUG-019 fix):** snippet templates + entity literal
+ * fallbacks + template feature segment читаются из `config.templateConfig.orchestrator.*`.
+ * Удалены hardcoded constants `_ENTITY_IMPORTS_TEMPLATE` / `_JUNCTION_IMPORTS_TEMPLATE`
+ * / `_ENTITY_REGISTER_TEMPLATE` / `_JUNCTION_REGISTER_TEMPLATE` + literal
+ * fallbacks `'category'` / `'taskTagMap'` / `'task'` / `'tag'`. Все они теперь
+ * приходят через `templateConfig.orchestrator.*Template` / `regularEntityFallback`
+ * / `junctionEntityFallback` / `junctionFkFallbacks`.
  *
  * Reference patterns:
  *   - `relation_patcher.ts` — pattern для idempotent + recovery-from-legacy-duplicates
@@ -58,20 +70,28 @@ export class OrchestratorPatcher {
         const isJunction = JunctionDetector.isJunctionEntity(model);
 
         // Feature segment substitution (BUG-009 fix):
-        // template imports содержат hardcoded `features/tasks/` literal. Заменяем
-        // template feature name (config.templFeatureName, default 'tasks') на target
-        // feature segment (config.targetFeatureName — basename of targetFeaturePath).
+        // template imports содержат `features/<X>/` literal (X — anchor template feature segment).
+        // Substitute на target feature segment (config.targetFeatureName — basename of targetFeaturePath).
         // Это критично когда developer вызывает generate-entity --feature-path .../features/<X>
-        // где X != tasks. Без substitution все imports ссылаются на features/tasks/...
-        // которая не существует в свежем create-project'е → cascade uri_does_not_exist errors.
-        const tplFeatureSnake = toSnakeCase(config.templFeatureName);
+        // где X != template default. Без substitution все imports ссылаются на features/<template-default>/...
+        // которая не существует в target проекте → cascade uri_does_not_exist errors.
+        //
+        // **TASK-023 (BUG-019 fix) + Round 2 H-1 fix:** anchor template feature segment приходит
+        // primary из `config.templFeatureName` (CLI `--templ-feature` flag, runtime user-overridable),
+        // fallback к `config.templateConfig.orchestrator.templateFeatureSegment` (default = 'tasks'
+        // для t115, 'configuration' для simplified). Pre-TASK-023 был ТОЛЬКО `config.templFeatureName`;
+        // post-Round-1 этот regression replaced на templateFeatureSegment ONLY → CLI override silently
+        // ignored. Round 2 restores CLI flag primary с config fallback (semantics: CLI wins, config = default).
+        const tplFeatureSnake = toSnakeCase(
+            config.templFeatureName ?? config.templateConfig.orchestrator.templateFeatureSegment,
+        );
         const targetFeatureSnake = toSnakeCase(config.targetFeatureName);
 
         // Build all three snippets с substitutions подгоняя placeholders под
         // model.className + feature segment.
-        const importsSnippet = this._buildImportsSnippet(model, isJunction, tplFeatureSnake, targetFeatureSnake);
+        const importsSnippet = this._buildImportsSnippet(config, model, isJunction, tplFeatureSnake, targetFeatureSnake);
         const entityTypeSnippet = this._buildEntityTypeSnippet(model);
-        const registerSnippet = this._buildRegisterSnippet(model, isJunction);
+        const registerSnippet = this._buildRegisterSnippet(config, model, isJunction);
 
         // Patch каждый marker блок.
         content = this._patchMarkerBlock(content, 'syncImports', importsSnippet);
@@ -197,28 +217,36 @@ export class OrchestratorPatcher {
      * Builds imports snippet (7 import lines) для regular или junction entity.
      *
      * BUG-009 fix: принимает `tplFeatureSnake` / `targetFeatureSnake` для подмены
-     * `features/tasks/` literal в template на актуальный target feature path.
+     * `features/<template>/` literal в template на актуальный target feature path.
+     *
+     * **TASK-023 (BUG-019 fix):** snippet templates + regular/junction entity
+     * fallbacks читаются из `config.templateConfig.orchestrator`.
      */
     private _buildImportsSnippet(
+        config: GenerationConfig,
         model: ServerpodModel,
         isJunction: boolean,
         tplFeatureSnake: string,
         targetFeatureSnake: string,
     ): string {
-        const tplEntity = isJunction ? 'taskTagMap' : 'category';
+        // TASK-023: regular/junction entity fallbacks из config (pre-TASK-023 hardcoded 'category'/'taskTagMap').
+        const tplEntity = isJunction
+            ? config.templateConfig.orchestrator.junctionEntityFallback
+            : config.templateConfig.orchestrator.regularEntityFallback;
         const tplEntitySnake = toSnakeCase(tplEntity);
 
         const targetEntityCamel = unCap(model.className);
         const targetEntitySnake = toSnakeCase(targetEntityCamel);
 
+        // TASK-023: snippet templates из config (pre-TASK-023 file-local constants).
         const template = isJunction
-            ? this._JUNCTION_IMPORTS_TEMPLATE
-            : this._ENTITY_IMPORTS_TEMPLATE;
+            ? config.templateConfig.orchestrator.junctionImportsTemplate
+            : config.templateConfig.orchestrator.entityImportsTemplate;
 
         return this._substitutePlaceholders(template, {
-            tplPascal: cap(tplEntity), // 'Category' / 'TaskTagMap'
-            tplCamel: tplEntity, // 'category' / 'taskTagMap'
-            tplSnake: tplEntitySnake, // 'category' / 'task_tag_map'
+            tplPascal: cap(tplEntity),
+            tplCamel: tplEntity,
+            tplSnake: tplEntitySnake,
             targetPascal: cap(targetEntityCamel),
             targetCamel: targetEntityCamel,
             targetSnake: targetEntitySnake,
@@ -245,9 +273,15 @@ export class OrchestratorPatcher {
      * `ByTaskAndTag`) на actual FK names из model. Используем placeholders
      * `__FK1__` / `__FK2__` / `__FK1Pascal__` / `__FK2Pascal__` (специальные tokens
      * чтобы не конфликтовать с PascalCase/snake substitution из existing flow).
+     *
+     * **TASK-023 (BUG-019 fix):** snippet templates + regular/junction entity
+     * fallbacks + junction FK fallbacks читаются из `config.templateConfig.orchestrator`.
      */
-    private _buildRegisterSnippet(model: ServerpodModel, isJunction: boolean): string {
-        const tplEntity = isJunction ? 'taskTagMap' : 'category';
+    private _buildRegisterSnippet(config: GenerationConfig, model: ServerpodModel, isJunction: boolean): string {
+        // TASK-023: regular/junction entity fallbacks из config.
+        const tplEntity = isJunction
+            ? config.templateConfig.orchestrator.junctionEntityFallback
+            : config.templateConfig.orchestrator.regularEntityFallback;
         const tplEntitySnake = toSnakeCase(tplEntity);
 
         const targetEntityCamel = unCap(model.className);
@@ -256,15 +290,22 @@ export class OrchestratorPatcher {
         if (isJunction) {
             // TASK-014: extract FK names из model для junction docstring substitution.
             // Берём первые 2 FK fields в порядке declaration (per task.md Option A).
-            // Fallback на `task`/`tag` если FK extraction не работает (defensive).
+            // TASK-023 (BUG-019 fix): defensive fallbacks приходят из config (pre-TASK-023 hardcoded 'task'/'tag').
             const fkFields = model.fields.filter((f: ServerpodField) => f.isRelation === true);
-            const fk1Name = fkFields.length >= 1 ? this._extractEntityNameFromField(fkFields[0]) : 'task';
-            const fk2Name = fkFields.length >= 2 ? this._extractEntityNameFromField(fkFields[1]) : 'tag';
+            const fk1Fallback = config.templateConfig.orchestrator.junctionFkFallbacks.fk1;
+            const fk2Fallback = config.templateConfig.orchestrator.junctionFkFallbacks.fk2;
+            const fk1Name = fkFields.length >= 1 ? this._extractEntityNameFromField(fkFields[0]) : fk1Fallback;
+            const fk2Name = fkFields.length >= 2 ? this._extractEntityNameFromField(fkFields[1]) : fk2Fallback;
 
             // Substitute с FK literals + entity tokens. FK substitutions делаем через
             // `_substituteJunctionFKs` (специализированный — заменяет только в docstring
             // и method-name fragments, не задевая class names или snake_case identifiers).
-            let snippet = this._substituteJunctionFKs(this._JUNCTION_REGISTER_TEMPLATE, fk1Name, fk2Name);
+            // TASK-023: snippet template из config.
+            let snippet = this._substituteJunctionFKs(
+                config.templateConfig.orchestrator.junctionRegisterTemplate,
+                fk1Name,
+                fk2Name,
+            );
 
             // Standard entity substitution (taskTagMap → roleP_permission, etc).
             snippet = this._substitutePlaceholders(snippet, {
@@ -280,16 +321,20 @@ export class OrchestratorPatcher {
             return snippet;
         }
 
-        return this._substitutePlaceholders(this._ENTITY_REGISTER_TEMPLATE, {
-            tplPascal: cap(tplEntity),
-            tplCamel: tplEntity,
-            tplSnake: tplEntitySnake,
-            targetPascal: cap(targetEntityCamel),
-            targetCamel: targetEntityCamel,
-            targetSnake: targetEntitySnake,
-            tplFeatureSnake: '',
-            targetFeatureSnake: '',
-        });
+        // TASK-023: snippet template из config.
+        return this._substitutePlaceholders(
+            config.templateConfig.orchestrator.entityRegisterTemplate,
+            {
+                tplPascal: cap(tplEntity),
+                tplCamel: tplEntity,
+                tplSnake: tplEntitySnake,
+                targetPascal: cap(targetEntityCamel),
+                targetCamel: targetEntityCamel,
+                targetSnake: targetEntitySnake,
+                tplFeatureSnake: '',
+                targetFeatureSnake: '',
+            },
+        );
     }
 
     /**
@@ -398,78 +443,4 @@ export class OrchestratorPatcher {
     private _escapeRegex(s: string): string {
         return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
-
-    // ── Templates ──────────────────────────────────────────────────────────
-
-    /**
-     * Imports template для regular entity.
-     * Placeholders: `category` (snake/camel — same), `Category` (Pascal).
-     *
-     * Reference: t115/TASK-001 Phase 2b orchestrator post-add state.
-     */
-    private readonly _ENTITY_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/category/category_event_adapter.dart';
-import '../../features/tasks/data/adapters/category/category_local_apply.dart';
-import '../../features/tasks/data/adapters/category/category_payload_codec.dart';
-import '../../features/tasks/data/adapters/category/category_pull_adapter.dart';
-import '../../features/tasks/data/adapters/category/category_remote_adapter.dart';
-import '../../features/tasks/data/datasources/local/daos/category/category_dao.dart';
-import '../../features/tasks/domain/entities/category/category_entity.dart';`;
-
-    /**
-     * Imports template для junction entity.
-     * Placeholders: `task_tag_map` (snake), `taskTagMap` (camel), `TaskTagMap` (Pascal).
-     */
-    private readonly _JUNCTION_IMPORTS_TEMPLATE = `import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_event_adapter.dart';
-import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_local_apply.dart';
-import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_payload_codec.dart';
-import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_pull_adapter.dart';
-import '../../features/tasks/data/adapters/task_tag_map/task_tag_map_remote_adapter.dart';
-import '../../features/tasks/data/datasources/local/daos/task_tag_map/task_tag_map_dao.dart';
-import '../../features/tasks/domain/entities/task_tag_map/task_tag_map_entity.dart';`;
-
-    /**
-     * Register block template для regular entity.
-     */
-    private readonly _ENTITY_REGISTER_TEMPLATE = `  // ── Adapter bundle: Category ────────────────────────────────────────────
-  orchestrator.register<CategoryEntity>(
-    'category',
-    AdapterBundle<CategoryEntity>(
-      writeAdapter: CategoryRemoteAdapter(client),
-      codec: const CategoryPayloadCodec(),
-      localApply: CategoryLocalApply(CategoryDao(dbService)),
-      pullAdapter: CategoryPullAdapter(client),
-      eventAdapter: CategoryEventAdapter(client),
-    ),
-  );`;
-
-    /**
-     * Register block template для junction entity (с docstring о routing
-     * update→createX и delete→noop).
-     *
-     * **TASK-014:** docstring и method-name fragments параметризованы через
-     * `__FK1__` / `__FK2__` / `__FK1Pascal__` / `__FK2Pascal__` placeholders
-     * (заменяются `_substituteJunctionFKs` ДО standard entity substitution).
-     * Это закрывает Bomb #6 из TASK-013 adversarial — RolePermission получает
-     * docstring `junction FK→role+permission` (NOT `task+tag`) и method-name
-     * `deleteRolePermissionByRoleAndPermission` (NOT `...ByTaskAndTag`).
-     *
-     * Reference: t115/TASK-001 Phase 2d TaskTagMap register block.
-     */
-    private readonly _JUNCTION_REGISTER_TEMPLATE = `  // ── Adapter bundle: TaskTagMap (junction FK→__FK1__+__FK2__) ───────────────────
-  // Junction-specific: server has no \`updateTaskTagMap\` RPC, only
-  // \`createTaskTagMap\` (idempotent create + resurrect) and
-  // \`deleteTaskTagMapBy__FK1Pascal__And__FK2Pascal__\` (soft-delete via business key).
-  // \`update()\` adapter routes через \`createTaskTagMap\`; \`delete()\` is
-  // a noop (Repository должен решать delete-flow — см.
-  // task_tag_map_remote_adapter.dart docstring).
-  orchestrator.register<TaskTagMapEntity>(
-    'task_tag_map',
-    AdapterBundle<TaskTagMapEntity>(
-      writeAdapter: TaskTagMapRemoteAdapter(client),
-      codec: const TaskTagMapPayloadCodec(),
-      localApply: TaskTagMapLocalApply(TaskTagMapDao(dbService)),
-      pullAdapter: TaskTagMapPullAdapter(client),
-      eventAdapter: TaskTagMapEventAdapter(client),
-    ),
-  );`;
 }
