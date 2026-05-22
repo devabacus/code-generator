@@ -94,6 +94,11 @@ export class GenerationService {
                 const isRelevant = config.allManifests.some(feature => fileManifest.types.includes(feature as any));
                 if (!isRelevant) { continue; }
 
+                // Взаимоисключающий выбор по флагу --with-interfaces:
+                // шаблоны с `flags: withInterfaces` / `withoutInterfaces` фильтруются
+                // здесь. Файлы без flags-маркера всегда проходят (backward compat).
+                if (!MarkerAnalyzer.matchesInterfaceFlag(fileManifest, config.withInterfaces)) { continue; }
+
                 // Добавляем задачу обработки файла в очередь
                 const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
                 const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config, model));
@@ -293,6 +298,15 @@ export class GenerationService {
         }
 
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
+
+        // Сентинел `.withif` в имени файла — маркер альтернативного шаблона для
+        // взаимоисключающего выбора по `--with-interfaces`. Срезаем его из
+        // destination, чтобы `<entity>_repository_impl.withif.dart` лёг в тот же
+        // путь, что и базовый `<entity>_repository_impl.dart`. Файл выбирается
+        // фильтром `MarkerAnalyzer.matchesInterfaceFlag` ещё до этого шага, так
+        // что коллизии destination между вариантами не возникает.
+        destinationRelativePath = destinationRelativePath.replace(/\.withif(\.[^.]+)$/, '$1');
+
         return destinationRelativePath;
     }
 }

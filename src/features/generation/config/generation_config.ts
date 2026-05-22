@@ -43,6 +43,14 @@ export interface IGenerationConfig {
      * См. [ADR-0005 amendment 2026-05-03 stack lock](../../docs/decisions/adr-0005-multi-template-plurality.md).
      */
     templateConfig?: TemplateConfig;
+    /**
+     * Opt-in флаг (Phase D): сохранить repository-интерфейс поверх stripped
+     * шаблона. Управляет взаимоисключающим выбором шаблонов через
+     * `MarkerAnalyzer.matchesInterfaceFlag` (`flags: withInterfaces` /
+     * `flags: withoutInterfaces`). Default false — backward compat: шаблоны без
+     * flags-маркера не реагируют на флаг.
+     */
+    withInterfaces?: boolean;
 }
 
 export class GenerationConfig {
@@ -73,6 +81,9 @@ export class GenerationConfig {
      */
     public templateConfig: TemplateConfig;
 
+    /** Opt-in: сохранить repository-интерфейс поверх stripped-шаблона (Phase D). */
+    public withInterfaces: boolean;
+
 
     constructor(config: IGenerationConfig) {
         this.templProject = config.templProject || 't2';
@@ -98,6 +109,7 @@ export class GenerationConfig {
         // TASK-022 / Phase B1: default template config = t115 если не указано.
         // Backwards compat для всех existing call-sites (create_project / generate_entity / tests).
         this.templateConfig = config.templateConfig || t115TemplateConfig();
+        this.withInterfaces = config.withInterfaces || false;
     }
 
 

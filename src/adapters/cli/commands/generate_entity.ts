@@ -31,6 +31,8 @@ interface GenerateEntityOptions {
     json: boolean;
     human?: boolean;
     skipValidation?: boolean;
+    /** Phase D opt-in: сохранить repository-интерфейс поверх stripped-шаблона. */
+    withInterfaces?: boolean;
 }
 
 export function registerGenerateEntity(program: Command): void {
@@ -59,6 +61,10 @@ export function registerGenerateEntity(program: Command): void {
         .option('--json', 'Output as JSON (default)', true)
         .option('--human', 'Output as human-readable text')
         .option('--skip-validation', 'Skip pre-flight validation of YAML (6-field pattern, sync-event)', false)
+        // Phase D opt-in: сохранить repository-интерфейс поверх stripped-шаблона
+        // (simplified). Управляет взаимоисключающим выбором шаблонов через
+        // `flags: withInterfaces` / `flags: withoutInterfaces` маркеры.
+        .option('--with-interfaces', 'Keep repository interface layer (simplified opt-in)', false)
         .action(async (opts: GenerateEntityOptions) => {
             await handleGenerateEntity(opts);
         });
@@ -122,6 +128,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             targetJunctionClassName: model.isRelation ? model.className : undefined,
             manifest: features,
             templatesPath: opts.templatesPath,
+            withInterfaces: opts.withInterfaces,
         });
 
         const inner = new DefaultFileSystem();
