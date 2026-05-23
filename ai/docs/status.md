@@ -28,11 +28,23 @@
 
 ## Активные задачи
 
+> **Cross-repo origin (2026-05-23):** 5 task package пришёл из weight-system [TASK-021 handoff](../../../../Flutter/serverpod/weight/ai/tasks/active/TASK-021-generator-root-followup/task.md) — фиксы шаблонов после TASK-019 sync_core wire-up review. User decisions Q1-Q6 зафиксированы. Порядок: 4→1→2→3→5. Тестирование = отдельные `t<N+i>` (t180..t184) per PR (политика репо). Multi-agent review: 2 baseline / 3 для Bug 3 + Bug 5. Без регена weight (политика TASK-019 + ADR-0016).
+
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-022 | **B1 codegen core multi-template infrastructure** ✅ merged 2026-05-04 (PR #19, master `a3820e4`) — `TemplateConfig` injection + 173→179 tests. См. [done/TASK-022-.../report.md](../tasks/done/TASK-022-b1-codegen-core-multi-template-infrastructure/report.md). | ✅ done | 2026-05-03 |
-| TASK-023 | **B2 Session 1 — BUG-019 fix subset** ✅ merged 2026-05-04 (PR #20, master `ff8f9d9`) — orchestrator snippet content abstraction + `simplifiedTemplateConfig()` factory + 173→179 tests + BUG-020 documented. См. [done/TASK-023-.../report.md](../tasks/done/TASK-023-b2-simplified-template-content/report.md). | ✅ done | 2026-05-04 |
-| TASK-024 | **B2 Session 2 — simplified template directory bootstrap** — Sessions A-E3d2 + Round 2 complete. **Post-pivot Discussion #12 (2026-05-04):** `DEFAULT_TEMPLATE` revert simplified → t115; weight TASK-018 stays на t115 + sync_core wire-up; simplified = opt-in via `--template simplified` для new CRUD projects. Round 2 reviewer fixes applied: D1 zero-diff smoke / H1 documented / H3 no-op (VS Code consistent) / H4 `.choices()` validation / H5 §3.5 carve-outs documented / H6 t115 master Serverpod 3.4.8 bumps committed / H7 9 new tests. Mocha **190/190** passing; default flow **t178** PASS errors=0 (t115 shape) + opt-in flow **t179** PASS errors=0 (simplified shape). Pending PR creation + merge approval. См. [task.md](../tasks/active/TASK-024-b2-simplified-template-directory-bootstrap/task.md) + [report.md](../tasks/active/TASK-024-b2-simplified-template-directory-bootstrap/report.md). | 🟡 ready for PR | 2026-05-04 |
+| TASK-025 | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (закрывает [BUG-001](../bug-reports/001-state-provider-ref-disposed.md)). Порядок: **1-й**. См. [task.md](../tasks/active/TASK-025-bug-4---riverpod-ref-mounted-в-state-providers/task.md). | 🟡 created | 2026-05-23 |
+| TASK-026 | **Bug 1 — entityType const snake_case casing fix.** `replacement_util.ts` ENTITY snake-rule lookahead расширен на quote-boundary (`'`/`"`). Порядок: 2-й. См. [task.md](../tasks/active/TASK-026-bug-1---entitytype-const-snake-case/task.md). | 🟡 created | 2026-05-23 |
+| TASK-027 | **Bug 2 — enum `byName` → graceful helper.** Замена `EnumType.values.byName(raw)` на `_tryParseEnum(...)` с дефолтом. Порядок: 3-й. См. [task.md](../tasks/active/TASK-027-bug-2---enum-byname-graceful-helper/task.md). | 🟡 created | 2026-05-23 |
+| TASK-028 | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый critical** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull. 3 adversarial reviewers. Порядок: 4-й. См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | 🟡 created | 2026-05-23 |
+| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers. Порядок: 5-й (последний). См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | 🟡 created | 2026-05-23 |
+
+### Закрыто в Phase B (для истории)
+
+| ID | Описание | Status |
+|---|---|---|
+| TASK-022 | **B1 codegen core multi-template infrastructure** ✅ merged 2026-05-04 (PR #19, master `a3820e4`). | ✅ done |
+| TASK-023 | **B2 Session 1 — BUG-019 fix subset** ✅ merged 2026-05-04 (PR #20, master `ff8f9d9`). | ✅ done |
+| TASK-024 | **B2 Session 2 — simplified template directory bootstrap** ✅ merged 2026-05-04 (PR #21, master `accb1e2`). `DEFAULT_TEMPLATE` revert simplified → t115; simplified opt-in. | ✅ done |
 
 ---
 
