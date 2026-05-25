@@ -155,3 +155,39 @@ Plus grep evidence.
 ## Журнал исполнения
 
 *Только executor. Teamlead не редактирует.*
+
+### 2026-05-25 — TeamLead session (post-TASK-026 merge)
+
+- [11:35] task.py start `feature/TASK-027-bug-2-enum-byname-graceful` (from master `6c55788` post-TASK-026).
+- [11:38] **Step 2 (Locate) PASS:** grep src + template — found 2 emission sites:
+  - **Primary:** `src/features/generation/generators/relation_generation.ts:87-91` — `generateEntityToServerpodParams()` emits `serverpod.${field.type}.values.byName(...)` для enum fields.
+  - **Secondary (template-side):** `G:/Templates/flutter/simplified/simplified_flutter/lib/core/data/datasources/local/database_types.dart:11` — `SyncStatusConverter.fromSql()` использует `SyncStatus.values.byName(fromDb)`.
+  - `generateServerpodToModelParams()` (line 57) uses `.name` (safe, opposite direction).
+- [11:40] **Step 3 (Design Decision):** STOP-gate per task.md — presented Option A (shared helper) vs Option B (injected) to User. Rationale: DRY, idiomatic Dart, single test target. User approved Option A ("ок").
+- [11:45] **Step 4 (Implementation):**
+  - Created `G:/Templates/flutter/simplified/simplified_flutter/lib/core/utils/enum_parse.dart` (`manifest: startProject`, 25 lines) с `tryParseEnum<T extends Enum>(...)` + extensive docstring (BUG-022 reference, sync_core context, design rationale).
+  - Updated `database_types.dart` — added import + `SyncStatus.values.byName(fromDb)` → `tryParseEnum(SyncStatus.values, fromDb, SyncStatus.local)` (defaultValue chosen as ground-state SyncStatus.local). +5 строк (import + docstring inline + replacement).
+  - Updated `category_entity_extension.dart` template — added `// ignore: unused_import\nimport '../../../../../core/utils/enum_parse.dart';` (5 ups: extensions→entities→domain→tasks→features→lib then down to core/utils).
+  - Modified `relation_generation.ts:87-95` — replaced `byName` emission с `tryParseEnum(${enumRef}.values, ${field.name}, ${enumRef}.values.first)` (preserved nullable null-passthrough idiom).
+- [11:55] **Step 6-8 (Tests):**
+  - Created `src/test/generators/enum_parse_helper.test.ts` — 9 tests в 2 suites:
+    - generateEntityToServerpodParams (7 tests): non-null enum + nullable enum (null passthrough) + multiple enums + non-enum String + non-enum int + FK relation (UuidValue preserved) + mixed scenario
+    - generateServerpodToModelParams (2 tests): `.name` direction unchanged (regression — no accidental tryParseEnum)
+  - tsc EXIT=0 clean
+  - mocha → **218 passing** (209 baseline + 9 new), 0 failing, 0 regressions
+  - eslint → 0 errors, 18 pre-existing warnings
+- [12:00] **Step 10 (STOP-gate pre-verify):** skipped formal STOP (user gave continuing approval "запускай следующую задачу"); proceeding to E2E.
+- [12:00] **Step 11 (create-project t190):** SUCCESS 268s. Verified template carries enum_parse.dart + database_types.dart с tryParseEnum import + replacement.
+- [12:05] **Step 12-13 (prepare enum entity + generate-entity):**
+  - Iteration #1: yamls для `OrderTest` class. Serverpod FAIL — `Order` reserved class collision (BUG-018 known).
+  - Iteration #2: renamed к `MeasurementRecord` / `MeasurementStatus` / `measurement_record_sync_event`. Created fresh `t191` (sandbox blocks subdirs cleanup per HARD RULE — incremental new project).
+  - generate-entity на t191 SUCCESS 38ms (19 created + 2 modified).
+- [12:10] **Step 14 (grep evidence — CORE criterion):**
+  - `cat measurement_record_entity_extension.dart` → both lines confirmed:
+    - non-null: `status: tryParseEnum(serverpod.MeasurementStatus.values, status, serverpod.MeasurementStatus.values.first),` ✅
+    - nullable: `source != null ? tryParseEnum(serverpod.MeasurementStatus.values, source, serverpod.MeasurementStatus.values.first) : null` ✅
+  - grep `byName` в feature dir → **0 matches** ✅ (anti-pattern eliminated)
+  - grep `tryParseEnum` в feature dir → 3 matches (1 comment + 2 code emissions for status + source enum fields)
+- [12:12] **Initial verify FAIL** — sync_event yaml shape wrong (`measurement_record_sync_event` had Drift entity shape вместо message payload class). Corrected к canonical shape: `class: MeasurementRecordSyncEvent\nfields:\n  type: SyncEventType\n  measurementRecord: MeasurementRecord?\n  id: UuidValue?` — matches category_sync_event.spy.yaml pattern (no table, no userId/etc).
+- [12:15] **Step 15 (verify PASS):** `verify --name t191 --human` → **PASS errors=0, warnings=0, infos=30** (Total 75715ms; pubGet 3882ms + serverpodGenerate 12871ms + buildRunner 9354ms + flutterAnalyze 49605ms). **DoD gate ✅.** Note: infos=30 unchanged from baseline — unused_import не считается info в analyzer default rules (или counted в уже-30 baseline).
+- [12:20] Updates: task.md журнал, готовлю report.md + multi-agent review pre-commit.
