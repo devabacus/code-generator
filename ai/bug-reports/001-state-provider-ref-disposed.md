@@ -1,9 +1,65 @@
 # BUG-001: Ref disposed в сгенерированном state_providers при async операциях
 
-**Статус:** Open
+**Статус:** Resolved for simplified template (TASK-025, 2026-05-25); **t115 deferred** (frozen path per Discussion #11)
 **Обнаружено:** 2026-04-18
+**Частично закрыто:** 2026-05-25 (TASK-025, simplified template patch + 9 unit tests + e2e t186 verify PASS errors=0)
 **Источник:** проект weight (Flutter), логи `.logs/flutter-android.log`
 **Затронутые сущности:** `CorrectionButton`, `WeighingCorrection` (предположительно все новые сгенерированные entity-notifier'ы)
+
+## Scope of resolution (важно)
+
+- ✅ **Simplified template** — anti-pattern истреблён (TASK-025). Любая новая сущность сгенерированная через `codegen generate-entity --template simplified` получает guard out-of-box.
+- ⚠ **t115 template** — НЕ patched. Под Discussion #11 stack-lock decision t115 = frozen / deprecated path; правки только critical maintenance. `*_state_providers.dart` в `G:/Templates/flutter/t115/...` сохраняют anti-pattern.
+- ⚠ **weight v1 (на t115)** — production crashes (`CorrectionButton`/`WeighingCorrection`) **НЕ исправлены** этой задачей. Требуют либо:
+  - (a) ручной patch уже-сгенерированных файлов в weight repo (manual);
+  - (b) regenerate существующих 13 сущностей на simplified в рамках `<weight-build TASK>` (clean-slate, fresh app);
+  - (c) отдельной chore-задачи "TASK-XXX patch t115 state_providers" — capacity-driven, не приоритет под clean-slate decision (weight v1 НЕ в production).
+- ⚠ **Существующие проекты на simplified** (например t179..t186) — содержат старо-сгенерированные файлы до TASK-025. Любая регенерация сущности (через `generate-entity --template simplified`) принесёт guard; либо ручной patch.
+
+## Resolution (TASK-025, 2026-05-25)
+
+**Фикс — template patch only** (4 файла в `G:/Templates/flutter/simplified/.../presentation/providers/<entity>/<entity>_state_providers.dart`):
+
+```dart
+// BEFORE (BUG-001 anti-pattern):
+state = await AsyncValue.guard(() async {
+  await repository.createCategory(category);
+  return repository.getCategories();
+});
+
+// AFTER (TASK-025 fix):
+final result = await AsyncValue.guard(() async {
+  await repository.createCategory(category);
+  return repository.getCategories();
+});
+if (!ref.mounted) return;
+state = result;
+```
+
+**Изменения (simplified template, 11 mutation методов total):**
+- `category/category_state_providers.dart` — 3 mutation (add/update/delete) ✅
+- `task/task_state_providers.dart` — 3 mutation ✅
+- `tag/tag_state_providers.dart` — 3 mutation ✅
+- `task_tag_map/task_tag_map_state_providers.dart` — 2 mutation (addTag/removeTag); `state = const AsyncValue.loading();` pre-await сохранён (синхронно, не race) ✅
+- `configuration/configuration_state_providers.dart` — skip (только stream, mutation методов нет)
+
+**Regression tests** ([src/test/generators/state_providers_ref_mounted_test.ts](../../src/test/generators/state_providers_ref_mounted_test.ts)) — 9 тестов в 3 suite'ах:
+- 3 inline golden (pre-substitution shape — guards count + state=result count + 0 anti-pattern + ordering)
+- 2 post-substitution invariant (ReplacingFileProcessor + ENTITY rules Category→Order / Category→Widget — guards survive substitution)
+- 4 live template regression (disk-dependent, skip if template path недоступен на CI)
+- Total: 190 mocha passing (baseline 181 + 9 новых).
+
+**End-to-end DoD evidence** (t186, 2026-05-25 post-TASK-030 master `bffe07a`):
+- `generate-entity` для CargoType (multi-word entity) → `cargo_type_state_providers.dart` с 3 guards / 3 state=result / 0 anti-pattern (substitution Category→CargoType сохранила guards intact).
+- `codegen verify --name t186 --human` → **PASS errors=0 warnings=0 infos=30** (Total 39887ms).
+
+**t115 template НЕ trog'ался** — frozen / deprecated path per Discussion #11 stack-lock decision. Если weight v1 нужно patches на t115 шаблон — отдельная задача (capacity-driven, не часть TASK-025 scope).
+
+См. [TASK-025 report.md](../tasks/done/TASK-025-bug-4---riverpod-ref-mounted-в-state-providers/report.md) (после merge) для full closure evidence + multi-agent review summary.
+
+---
+
+## Original analysis (preserved для context)
 
 ## Симптом
 
