@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-25 (TASK-030 closure — pubGet drift fix через caret bump custom_lint; BUG-021 registered; agent_memory gotcha "Template pubspec pub deps drift" added)
+**Последнее обновление:** 2026-05-25 evening (Pipeline 3/5 merged — TASK-025/026/027 closed; test filename convention gotcha added; BUG-001/BUG-022 closed; meta-bug rename `_test.ts` → `.test.ts` для test discovery)
 
 ---
 

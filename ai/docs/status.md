@@ -1,28 +1,28 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-25 (TASK-030 closure — pubGet drift fix через caret bump `custom_lint`; BUG-021 registered; TASK-025..029 ready to resume post-merge)
+**Обновлено:** 2026-05-25 evening (Pipeline 3/5 closed — TASK-025/026/027 merged через PRs #23/#24/#25; **next: TASK-028 critical** + TASK-029 last)
 
 ---
 
 ## Текущая фаза
 
-**Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03).
+**Phase 1.5 + Phase A + Phase B ✅ CLOSED** (2026-05-03 → 2026-05-04). **Active pipeline 3/5 closed** (2026-05-25).
 
-**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. **Ready for TASK-B1 creation** (codegen core multi-template infrastructure refactor).
-
-После 9 PRs Phase 1.5 sequence — codegen acceptance gate clean (verify PASS errors=0 на t164). 9 discussions archived. Architectural roadmap settled через Discussion #7-#9.
+После 9 PRs Phase 1.5 sequence + Phase A/B + active pipeline — codegen acceptance gate clean (verify PASS errors=0 на t186/t187/t188/t189/t191/t192 post-merge). 11 discussions archived. Architectural roadmap settled через Discussion #7-#12.
 
 **Latest pivot (Discussion #9 + clean-slate amendment 2026-05-03):** Weight build на simplified template — **clean slate** (User confirmed weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance). TASK-018 cancelled. Weight build = fresh app, hard switch deploy. Estimate revised 5-6 → ~3-4 months realistic, hard ceiling 4 months.
 
-**⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115. Phase B-D + weight build inherit this constraint. ADR-0005 Section 7.1/7.2/7.3 TBD RESOLVED via stack lock. test-inventory Open Q #1/#2/#3 resolved as YES RelationPatcher / inherits t115 DI / preserve Clean directory layout.
+**⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state
+### Master state (2026-05-25 evening)
 
-- **Branch:** `master 70650f7` (post stack-lock chore PR #17)
-- **Tests:** 163 passing, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
-- **Compile:** clean
-- **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + 163 unit tests)
-- **Total PRs merged:** 17 (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + this docs refresh chore in flight)
+- **Branch:** `master 0a91e2b` (post TASK-027 PR #25 squash merge)
+- **Tests:** **218 passing**, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
+  - Baseline 190 (post-Phase B + scaffolding) + 9 TASK-025 (revived через meta-bug rename `_test.ts` → `.test.ts`) + 10 TASK-026 + 9 TASK-027 = 218
+- **Compile:** clean (`tsc -p ./` EXIT=0)
+- **Lint:** 0 errors, 18 pre-existing warnings (curly rule на existing files)
+- **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
+- **Total PRs merged:** **25** (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + Phase B 3 + post-Phase-B 2 + TASK-030 + TASK-025 + TASK-026 + TASK-027 + this docs handoff chore)
 
 ---
 
@@ -33,10 +33,10 @@
 | ID | Описание | Status | Started |
 |---|---|---|---|
 | ~~TASK-025~~ | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (закрывает [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified). ✅ **MERGED PR #23 (master `9c9b472` 2026-05-25)**. Template patch 4 simplified state_providers (11 guards) + 9 unit tests. Verified t186/t187 PASS errors=0. Порядок: 1-й. | ✅ done | 2026-05-23 |
-| TASK-026 | **Bug 1 — entityType const snake_case casing fix.** `replacement_util.ts` ENTITY + 2× M2M snake-rule lookahead расширен на quote-boundary (`'`/`"`). 10 unit tests. **Verified t188 PASS errors=0, warnings=0, infos=30** (77444ms). Grep evidence: `_cargoTypeEntityType = 'cargo_type'` snake everywhere = orchestrator key — strings совпадают, Bug 1 mismatch устранён. **Bonus meta-bug fix:** rename TASK-025+TASK-026 test files `_test.ts` → `.test.ts` (TASK-025 9 dead tests revived в CI). Порядок: **2-й** (готов к commit). См. [task.md](../tasks/active/TASK-026-bug-1---entitytype-const-snake-case/task.md). | 🟡 ready for commit | 2026-05-25 |
-| TASK-027 | **Bug 2 — enum `byName` → graceful `tryParseEnum` helper.** Option A shared helper `lib/core/utils/enum_parse.dart` (manifest: startProject) + `relation_generation.ts:87-95` emit'ит `tryParseEnum(values, raw, values.first)` вместо `byName` + `database_types.dart` SyncStatusConverter аналогично + import injection в `category_entity_extension.dart` template. 9 unit tests. **Verified t191 PASS errors=0, warnings=0, infos=30** (75715ms). Grep evidence на сгенерированном `measurement_record_entity_extension.dart`: 2 tryParseEnum emissions (status non-null + source nullable) / 0 byName. Порядок: **3-й** (готов к commit). | 🟡 ready for commit | 2026-05-25 |
-| TASK-028 | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый critical** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull. 3 adversarial reviewers. Порядок: 4-й. **⏸ BLOCKED на TASK-025 merge**. См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | ⏸ blocked | 2026-05-23 |
-| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers. Порядок: 5-й (последний). **⏸ BLOCKED на TASK-025 merge**. См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | ⏸ blocked | 2026-05-23 |
+| ~~TASK-026~~ | **Bug 1 — entityType const snake_case casing fix.** ✅ **MERGED PR #24 (master `6c55788` 2026-05-25)**. `replacement_util.ts` ENTITY + 2× M2M snake-rule lookahead расширен на quote-boundary (`'`/`"`). 10 unit tests. Verified t188/t189 PASS errors=0. **Bonus meta-bug fix:** rename test files `_test.ts` → `.test.ts` (TASK-025 9 dead tests revived в CI). Порядок: 2-й. | ✅ done | 2026-05-23 |
+| ~~TASK-027~~ | **Bug 2 — enum `byName` → graceful `tryParseEnum` helper.** ✅ **MERGED PR #25 (master `0a91e2b` 2026-05-25)**. Option A shared helper `lib/core/utils/enum_parse.dart` (manifest: startProject) + `relation_generation.ts:87-95` emit'ит `tryParseEnum(values, raw, values.first)` + `database_types.dart` SyncStatusConverter + import injection в category/task/tag entity_extension templates. 9 unit tests. Verified t191/t192 PASS errors=0. Закрывает [BUG-022](../bug-reports/022-enum-byname-state-error.md). Порядок: 3-й. | ✅ done | 2026-05-25 |
+| **TASK-028** | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый CRITICAL в pipeline** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull (stale event перезаписывает свежие данные). 3 adversarial reviewers per Q5 user decision. Reference impl уже есть: `weight/weighing_local_apply.dart` (manual TASK-019 guard). JunctionDetector интеграция для opt-out detection. Порядок: 4-й (**NEXT**). См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | 🔴 next | 2026-05-23 |
+| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers per Q5. Co-fix `create_project.ts` если нужно. Порядок: 5-й (последний). **⏸ BLOCKED на TASK-028 merge**. См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | ⏸ blocked | 2026-05-23 |
 
 ### Закрыто в Phase B (для истории)
 

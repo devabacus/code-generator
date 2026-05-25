@@ -2,15 +2,22 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-25 (Phase B ✅ executed — TASK-022/023/024 merged; Discussion #12 pivot DEFAULT_TEMPLATE simplified→t115; Active: 5-task cross-repo pipeline TASK-025..029 from weight TASK-019 review + TASK-030 BLOCKER chore)
+**Обновлено:** 2026-05-25 evening (Pipeline 3/5 closed — TASK-025/026/027 merged; **next: TASK-028 critical** + TASK-029 last)
 
 ---
 
 ## Текущий статус
 
-**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). master `2437157` (scaffolding commit для 5-task pack) + `03baa30 feat(generator): opt-in --with-interfaces` + `accb1e2 TASK-024` + `ff8f9d9 TASK-023` + `a3820e4 TASK-022`. 21+ PRs merged. 181 tests на master (190 при resume stashed TASK-025).
+**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **Active pipeline 3/5 closed** (2026-05-25). master `0a91e2b` (post TASK-027 PR #25 squash merge). **25 PRs merged** total. **218 tests** passing на master.
 
-**🔴 Active 2026-05-25:** Cross-repo 5-task pipeline TASK-025..029 (фиксы шаблонов после weight TASK-019 sync_core wire-up adversarial review) + **TASK-030 BLOCKER** chore (template `pubGet` drift fix через caret bump `custom_lint: 0.8.0 → ^0.8.0`). TASK-030 ready for commit (multi-agent review pass #2 ✅, verified t184 PASS errors=0). TASK-025 implementation done (stashed). TASK-026..029 sequential not-started. См. [status.md](status.md) для detail + [handoff.prompt.md](../prompts/handoff.prompt.md) "Active pipeline" section.
+**🟡 Active pipeline 2026-05-25 evening (2/5 remaining):**
+
+- ✅ **TASK-030 BLOCKER** (PR #22, master `bffe07a`) — template pubGet drift fix через caret bump `custom_lint`. Closes [BUG-021](../bug-reports/021-pub-deps-drift-template-pubspec.md).
+- ✅ **TASK-025 Bug 4** (PR #23, master `9c9b472`) — Riverpod `ref.mounted` guard в state_providers. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified.
+- ✅ **TASK-026 Bug 1** (PR #24, master `6c55788`) — entityType const snake_case casing fix (lookahead quote-boundary). Bonus: meta-bug rename `_test.ts` → `.test.ts` (TASK-025 dead tests revived).
+- ✅ **TASK-027 Bug 2** (PR #25, master `0a91e2b`) — enum `byName` → `tryParseEnum` graceful helper. Closes [BUG-022](../bug-reports/022-enum-byname-state-error.md).
+- 🔴 **TASK-028 Bug 3 — NEXT** (samые critical) — LWW skip-stale guard default ON, junction opt-out. Silent data corruption на cross-device pull без него.
+- ⏸ **TASK-029 Bug 5 LAST** — `generate-entity --with-server` opt-in default OFF (breaking CLI).
 
 **Phase B execution outcomes:**
 - TASK-022 (PR #19, `a3820e4`) — TemplateConfig injection, 173→179 tests
