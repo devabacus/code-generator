@@ -246,6 +246,8 @@ node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "
 
 ⚠ Использовать **explicit `node node_modules/mocha/bin/mocha.js`**, НЕ `npx mocha` — mocha = transitive dep через `@vscode/test-cli`. `npx` fallback'нул бы на latest из реестра при `npm prune --production` или patch bump cli, breaking workflow silently. Эта же команда работает в CI ([.github/workflows/test.yml](../../.github/workflows/test.yml), TASK-CI-001 / TASK-020). Соответствует prior-art TASK-013/016.
 
+⚠ **Test filename convention: `<name>.test.ts`** (dot prefix), НЕ `<name>_test.ts` (underscore). Mocha glob `out/test/**/*.test.js` матчит **только** dot-prefix. Файлы с `_test.js` суффиксом **silently skipped** — не попадают ни в локальный test suite, ни в CI. **Discovered 2026-05-25 (TASK-026):** TASK-025 ввёл `state_providers_ref_mounted_test.ts` с underscore — 9 тестов dead до TASK-026 rename. Multi-agent Standard + Adversarial оба пропустили (читали file content, не filename pattern). **Lesson:** при создании test file **всегда** называть `<name>.test.ts` + проверять `mocha ... | grep "passing"` count = baseline + N (где N = число новых тестов). Если N не появилось — filename convention violation.
+
 ### Server port blocking
 
 `errno = 10048, address = ::, port = 8082` — зомби `dart.exe` процесс. Resolve через Bash + pwsh (НЕ PowerShell tool):

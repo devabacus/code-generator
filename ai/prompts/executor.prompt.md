@@ -46,8 +46,9 @@
 7. **Обновляй task.md секции "План работы" / "STOP-gates" / "Журнал исполнения" по ходу работы** — см. ниже
 8. Реализуй ТОЛЬКО то, что в scope
 9. Runtime тестирование через Bash CLI (`npm test`, `npm run lint`, `tsc -p ./`) — **НЕ через `mcp__dart__analyze_files` (N/A для TS-проекта)**
-10. Закоммить с описательным сообщением (Conventional Commits, русский, без Co-Authored-By)
-11. Напиши report.md с реальным выводом CLI (не ожидаемым)
+10. **⚠ Test filename convention:** новые test files называй `<name>.test.ts` (dot prefix), НЕ `<name>_test.ts` (underscore). Mocha glob `out/test/**/*.test.js` НЕ матчит underscore-prefix → файлы silently skipped в CI. После создания test'а проверяй mocha count = baseline + N новых; если не вырос — выверь filename. См. [agent_memory.md → Test filename convention](../docs/agent_memory.md).
+11. Закоммить с описательным сообщением (Conventional Commits, русский, без Co-Authored-By)
+12. Напиши report.md с реальным выводом CLI (не ожидаемым)
 12. Уведоми TeamLead, что работа готова к ревью
 
 ## Обновление прогресса в task.md

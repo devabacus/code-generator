@@ -41,10 +41,14 @@ const dictionaryRegistry: Record<DictionaryName, RuleGenerator> = {
             { from: baseForms.ds, to: newForms.ds },
             { from: baseForms.D, to: newForms.D },
             // snake-case rule должен идти ПЕРЕД camelCase d-rule:
-            // ловит `category` за которым следует `_`, `/` или `.dart` (path/file context)
-            // и подставляет snake_case форму вместо camelCase. Не трогает `categoryTable`,
-            // `category.id` и подобные identifier-контексты — те обрабатываются d-rule.
-            { from: `${baseForms.d}(?=_|/|\\.dart\\b)`, to: newForms.dSnake },
+            // ловит `category` за которым следует `_`, `/`, `.dart`, либо quote `'`/`"`
+            // (entityType string literals). Не трогает `categoryTable`, `category.id` и
+            // подобные identifier-контексты — те обрабатываются d-rule.
+            // TASK-026 (weight TASK-019 Bug 1 pack): quote-boundary добавлен для
+            // устранения mismatch между `_<entity>EntityType = 'cargoType'` (camelCase) и
+            // orchestrator registration `'cargo_type'` (snake) — sync push/pull
+            // молча не находили bundle для multi-word entity (weight TASK-019).
+            { from: `${baseForms.d}(?=_|/|\\.dart\\b|'|")`, to: newForms.dSnake },
             { from: baseForms.d, to: newForms.d },
         ];
     },
@@ -102,14 +106,16 @@ const dictionaryRegistry: Record<DictionaryName, RuleGenerator> = {
         rules.push(
             { from: pluralConvert(cap(templEntity1)), to: pluralConvert(cap(config.targetEntity1)) },
             { from: cap(templEntity1), to: cap(config.targetEntity1) },
-            { from: `${unCap(templEntity1)}(?=_|/|\\.dart\\b)`, to: toSnakeCase(unCap(config.targetEntity1)) },
+            // TASK-026: quote-boundary в lookahead (симметрично ENTITY snake-rule)
+            { from: `${unCap(templEntity1)}(?=_|/|\\.dart\\b|'|")`, to: toSnakeCase(unCap(config.targetEntity1)) },
             { from: unCap(templEntity1), to: unCap(config.targetEntity1) },
         );
 
         rules.push(
             { from: pluralConvert(cap(templEntity2)), to: pluralConvert(cap(config.targetEntity2)) },
             { from: cap(templEntity2), to: cap(config.targetEntity2) },
-            { from: `${unCap(templEntity2)}(?=_|/|\\.dart\\b)`, to: toSnakeCase(unCap(config.targetEntity2)) },
+            // TASK-026: quote-boundary в lookahead (симметрично ENTITY snake-rule)
+            { from: `${unCap(templEntity2)}(?=_|/|\\.dart\\b|'|")`, to: toSnakeCase(unCap(config.targetEntity2)) },
             { from: unCap(templEntity2), to: unCap(config.targetEntity2) },
         );
         return rules;
