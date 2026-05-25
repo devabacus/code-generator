@@ -2,15 +2,20 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-03 (clean-slate amendment + ⚠ CRITICAL stack-lock decision — стэк t115 baseline (Riverpod annotations + Drift + Clean directory + sync_core + Serverpod) НЕ меняется без User approval; package versions update к latest stable (включая Serverpod); simplified = ТОЛЬКО architecture ceremony reduction)
+**Обновлено:** 2026-05-25 (Phase B ✅ executed — TASK-022/023/024 merged; Discussion #12 pivot DEFAULT_TEMPLATE simplified→t115; Active: 5-task cross-repo pipeline TASK-025..029 from weight TASK-019 review + TASK-030 BLOCKER chore)
 
 ---
 
 ## Текущий статус
 
-**Phase 1.5 + Phase A ✅ CLOSED** (2026-05-03). master `70650f7`. 17 PRs merged. 163 tests baseline + CI workflow.
+**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). master `2437157` (scaffolding commit для 5-task pack) + `03baa30 feat(generator): opt-in --with-interfaces` + `accb1e2 TASK-024` + `ff8f9d9 TASK-023` + `a3820e4 TASK-022`. 21+ PRs merged. 181 tests на master (190 при resume stashed TASK-025).
 
-**Phase B Discussion #11 ✅ archived** — 12-point Decision finalized. TASK-022 / TASK-023 / TASK-024 implemented.
+**🔴 Active 2026-05-25:** Cross-repo 5-task pipeline TASK-025..029 (фиксы шаблонов после weight TASK-019 sync_core wire-up adversarial review) + **TASK-030 BLOCKER** chore (template `pubGet` drift fix через caret bump `custom_lint: 0.8.0 → ^0.8.0`). TASK-030 ready for commit (multi-agent review pass #2 ✅, verified t184 PASS errors=0). TASK-025 implementation done (stashed). TASK-026..029 sequential not-started. См. [status.md](status.md) для detail + [handoff.prompt.md](../prompts/handoff.prompt.md) "Active pipeline" section.
+
+**Phase B execution outcomes:**
+- TASK-022 (PR #19, `a3820e4`) — TemplateConfig injection, 173→179 tests
+- TASK-023 (PR #20, `ff8f9d9`) — simplified template content session 1, BUG-019 fix
+- TASK-024 (PR #21, `accb1e2`) — simplified directory bootstrap, **Discussion #12 pivot:** DEFAULT_TEMPLATE simplified → t115; simplified opt-in via `--template simplified` для new CRUD projects. Both templates долго-сохраняемые.
 
 **Architectural pivot decisions:**
 - **Discussion #7** (archived 2026-05-03): Multi-template plurality. t115 → legacy/advanced. New "Simplified Template Initiative".

@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; Discussion #11 archived; ready for Phase B execution)
+**Обновлено:** 2026-05-25 (TASK-030 closure — pubGet drift fix через caret bump `custom_lint`; BUG-021 registered; TASK-025..029 ready to resume post-merge)
 
 ---
 
@@ -32,11 +32,12 @@
 
 | ID | Описание | Status | Started |
 |---|---|---|---|
-| TASK-025 | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (закрывает [BUG-001](../bug-reports/001-state-provider-ref-disposed.md)). Порядок: **1-й**. См. [task.md](../tasks/active/TASK-025-bug-4---riverpod-ref-mounted-в-state-providers/task.md). | 🟡 created | 2026-05-23 |
-| TASK-026 | **Bug 1 — entityType const snake_case casing fix.** `replacement_util.ts` ENTITY snake-rule lookahead расширен на quote-boundary (`'`/`"`). Порядок: 2-й. См. [task.md](../tasks/active/TASK-026-bug-1---entitytype-const-snake-case/task.md). | 🟡 created | 2026-05-23 |
-| TASK-027 | **Bug 2 — enum `byName` → graceful helper.** Замена `EnumType.values.byName(raw)` на `_tryParseEnum(...)` с дефолтом. Порядок: 3-й. См. [task.md](../tasks/active/TASK-027-bug-2---enum-byname-graceful-helper/task.md). | 🟡 created | 2026-05-23 |
-| TASK-028 | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый critical** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull. 3 adversarial reviewers. Порядок: 4-й. См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | 🟡 created | 2026-05-23 |
-| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers. Порядок: 5-й (последний). См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | 🟡 created | 2026-05-23 |
+| TASK-030 | **Chore: fix simplified template `pubGet` drift** (custom_lint strict pin блокировал analyzer 8 cascade auto-resolution). Fix: caret bump `custom_lint: 0.8.0 → ^0.8.0` (single-char change, no overrides). Verified t184 PASS errors=0. Multi-agent review pass #2 ✅ — `report.md` + `BUG-021` updated. См. [task.md](../tasks/active/TASK-030-chore---fix-simplified-template-custom-lint-pin--pubget-drift/task.md). | 🟡 ready for commit | 2026-05-23 |
+| TASK-025 | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (закрывает [BUG-001](../bug-reports/001-state-provider-ref-disposed.md)). **⏸ BLOCKED на TASK-030** (verify pipeline сломан pubGet drift'ом). Implementation done (template patches + unit test + 190 mocha passing) — stashed; resume на t182 после TASK-030 merge. Порядок: **1-й**. См. [task.md](../tasks/active/TASK-025-bug-4---riverpod-ref-mounted-в-state-providers/task.md). | ⏸ blocked | 2026-05-23 |
+| TASK-026 | **Bug 1 — entityType const snake_case casing fix.** `replacement_util.ts` ENTITY snake-rule lookahead расширен на quote-boundary (`'`/`"`). Порядок: 2-й. **⏸ BLOCKED на TASK-030** (verify pipeline). См. [task.md](../tasks/active/TASK-026-bug-1---entitytype-const-snake-case/task.md). | ⏸ blocked | 2026-05-23 |
+| TASK-027 | **Bug 2 — enum `byName` → graceful helper.** Замена `EnumType.values.byName(raw)` на `_tryParseEnum(...)` с дефолтом. Порядок: 3-й. **⏸ BLOCKED на TASK-030**. См. [task.md](../tasks/active/TASK-027-bug-2---enum-byname-graceful-helper/task.md). | ⏸ blocked | 2026-05-23 |
+| TASK-028 | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый critical** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull. 3 adversarial reviewers. Порядок: 4-й. **⏸ BLOCKED на TASK-030**. См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | ⏸ blocked | 2026-05-23 |
+| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers. Порядок: 5-й (последний). **⏸ BLOCKED на TASK-030**. См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | ⏸ blocked | 2026-05-23 |
 
 ### Закрыто в Phase B (для истории)
 
