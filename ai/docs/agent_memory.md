@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; Discussion #11 archived; ready for Phase B execution)
+**Последнее обновление:** 2026-05-25 (TASK-030 closure — pubGet drift fix через caret bump custom_lint; BUG-021 registered; agent_memory gotcha "Template pubspec pub deps drift" added)
 
 ---
 
@@ -266,6 +266,25 @@ pwsh -NoProfile -Command "Get-NetTCPConnection -LocalPort 8082 -State Listen | F
 ### Reserved Serverpod class names
 
 `Order` collisions с `package:serverpod/src/database/concepts/order.dart`. BUG-018 backlog. Use `Invoice`/etc. вместо.
+
+### Template pubspec pub deps drift
+
+Pinned versions в `G:/Templates/flutter/simplified/*/pubspec.yaml` могут конфликтовать с transitive deps updates от pub registry **и от flutter SDK pins** (matcher, test_api). Симптом: `flutter pub get` FAIL "version solving failed" + secondary "sdk >=1.8.0 <3.0.0" advisory (pub solver hint, не отдельный root cause).
+
+**Root cause pattern:** **strict** pin на key package (например `custom_lint: 0.8.0` без caret) блокирует cascade resolution к newer compatible versions. Свежие transitive deps (`test >=1.28 → analyzer >=8` через flutter SDK matcher pin + `serverpod_client → web_socket_channel ^3.0.3`) требуют analyzer 8, который недоступен из-за strict pin.
+
+**⚠ Diagnostic lesson (TASK-030):** **сравни sibling templates до диагноза.** TASK-030 first-pass диагноз показал "analyzer ^7 lockstep — bump impossible without cascade всего generated code". **Это была ошибка.** Sibling `simplified_admin/pubspec.yaml` имел IDENTICAL constraints (включая `json_serializable: 6.11.2` strict + `freezed: ^3.0.6` + `serverpod_flutter 3.4.8`) **кроме одного**: `custom_lint: ^0.8.0` (caret). Admin's `pubspec.lock` empirically доказал что caret resolves к `analyzer 8.4.0 + custom_lint 0.8.1 + freezed 3.2.3 + build_runner 2.15.0 + json_serializable 6.11.2` — все coexist. Adversarial reviewer поймал эту diagnostic error.
+
+**Fix patterns (по убыванию preference):**
+- **Caret bump strict pin** (`X.Y.Z` → `^X.Y.Z`) — minimal disruptive, single character change, forward-compatible. **Applied в TASK-030** для `custom_lint`. Verify через sibling-template lockfile evidence.
+- `dependency_overrides:` для pin transitive deps к compatible versions — fallback если caret bump conflicts с другими strict pins. Risk: override flutter SDK hint pins (matcher/test_api) — widget runtime tests НЕ покрыты verify chain'ом.
+- Major version bump entire lockstep (analyzer 7→8 cascade explicitly) — last resort, **обычно не нужен** если caret bump работает (admin proves cascade auto-resolves).
+
+**Documentation rot warning:** comments типа "analyzer ^7 lockstep — bump к analyzer 8 ломает X" могут rotted at scale больше года. **Verify empirically** через sibling lockfile до доверия комментарию. TASK-030 нашёл 3 rotted claims в `simplified_flutter/pubspec.yaml` (build_runner / json_serializable / freezed) — все обновлены.
+
+**Prevention:** Периодический audit `cd G:/Templates/flutter/simplified/simplified_flutter && flutter pub outdated` критичен. Cross-check siblings (`simplified_admin/`, `simplified_server/`) если они resolve успешно. См. [BUG-021](../bug-reports/021-pub-deps-drift-template-pubspec.md) для canonical fix pattern + diagnostic lessons.
+
+См. также [TASK-030 report.md](../tasks/active/TASK-030-chore---fix-simplified-template-custom-lint-pin--pubget-drift/report.md).
 
 ---
 

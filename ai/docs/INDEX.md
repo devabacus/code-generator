@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-05-03 (Phase 1.5 + Phase A ✅ closed; clean-slate + ⚠ CRITICAL stack-lock decisions; ready for Phase B execution)
+**Обновлено:** 2026-05-25 (Phase B ✅ executed — TASK-022/023/024 merged; Active: 5-task cross-repo pipeline TASK-025..029 from weight TASK-019 review + TASK-030 BLOCKER chore ready for commit)
 
 ## Что это за проект
 
@@ -10,27 +10,25 @@
 
 ## Текущее состояние
 
-**Phase 1.5 ✅ + Phase A ✅ CLOSED** (2026-05-03).
+**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04).
 
-- 163 unit tests passing
-- 17 PRs merged суммарно
-- master `70650f7` — post stack-lock chore (PR #17)
+- 181 unit tests passing на master (190 включая stashed TASK-025 unit tests)
+- 21+ PRs merged (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + TASK-022/023/024 Phase B)
+- master `2437157` (scaffolding "1" commit для TASK-025..029 pack) + `03baa30` (post-Phase-B opt-in `--with-interfaces`)
 - CI workflow active ([.github/workflows/test.yml](../../.github/workflows/test.yml))
-- t115 template (`devabacus/t115`) — **deprecated path** (frozen, removal в 6-12 месяцев)
+- t115 template (`devabacus/t115`) — **deprecated path** (frozen)
+- simplified template (`G:/Templates/flutter/simplified/`) — opt-in via `--template simplified` (Discussion #12 pivot 2026-05-04)
 - sync_core 0.3.0 в master, validated multi-entity cross-device
-- ADR-0005 promoted + accepted в `ai/docs/decisions/`
 
-**Latest pivots (2026-05-03):**
+**🔴 Active state (2026-05-25):** 5-task cross-repo pipeline TASK-025..029 (фиксы шаблонов из weight TASK-019 sync_core wire-up review) + **TASK-030 BLOCKER chore** (template `pubGet` drift fix через caret bump `custom_lint`). См. [status.md](status.md) Активные задачи + [handoff.prompt.md](../prompts/handoff.prompt.md) "Active pipeline" section для full detail.
 
-- **Clean-slate decision** (Discussion #9 amendment): weight v1 НЕ в production, нет users, fresh build на simplified template, no dual-running concerns, no cutover. Estimate 5-6 → ~3-4 months realistic, hard ceiling 4 months.
-- **⚠ CRITICAL Stack-lock decision** (Discussion #11 User_2 override): стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Package versions update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony reduction.
+**Architectural decisions still active:**
 
-**Phase B sequence (Discussion #11 12-point Decision):**
-1. TASK-B1 (~2-2.5 weeks): codegen core multi-template infrastructure
-2. TASK-B2 (~1-1.5 weeks): simplified template content в `G:/Templates/flutter/simplified/`
-3. TASK-B3 (~1 week): tests for simplified-suite + Open Q resolution
+- **Clean-slate** (Discussion #9 amendment 2026-05-03): weight v1 НЕ в production, нет dual-running concerns.
+- **⚠ CRITICAL Stack-lock** (Discussion #11 User_2 override 2026-05-03): стэк t115 baseline (Riverpod annotations + Drift + Clean directory + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Versions update к latest stable.
+- **Discussion #12 pivot** (2026-05-04): DEFAULT_TEMPLATE simplified → t115; simplified opt-in. Both templates долго-сохраняемые.
 
-**Total Phase B estimate:** 5-7 weeks (per ClaudeAdv evidence-based revision from initial 3.5-4.5).
+**Diagnostic lesson** (TASK-030, MUST remember): compare sibling templates (admin/server) **before** "cascade impossible" diagnosis. Pubspec comments rot at scale — verify через current lockfile evidence. См. [BUG-021](../bug-reports/021-pub-deps-drift-template-pubspec.md) для canonical pattern.
 
 ## Onboarding flow для нового teamlead
 
