@@ -84,11 +84,17 @@ export function generateEntityToServerpodParams(model: ServerpodModel): string {
                 ? `${field.name} == null ? null : serverpod.UuidValue.fromString(${field.name}!)`
                 : `serverpod.UuidValue.fromString(${field.name})`;
         }
-        // Enums: String → enum via serverpod.EnumType.values.byName()
+        // Enums: String → enum via tryParseEnum (graceful fallback на unknown raw).
+        // TASK-027 (BUG-022 / weight TASK-019 Bug 2 pack): `EnumType.values.byName(raw)`
+        // бросает StateError на unknown raw → outbox retry loop → silent freeze.
+        // `tryParseEnum` возвращает `EnumType.values.first` gracefully (lossy > crash).
+        // Helper из `lib/core/utils/enum_parse.dart` (manifest: startProject) — import
+        // statically включён в template category_entity_extension.dart.
         if (field.isEnum) {
+            const enumRef = `serverpod.${field.type}`;
             fieldValue = field.nullable
-                ? `${field.name} != null ? serverpod.${field.type}.values.byName(${field.name}!) : null`
-                : `serverpod.${field.type}.values.byName(${field.name})`;
+                ? `${field.name} != null ? tryParseEnum(${enumRef}.values, ${field.name}, ${enumRef}.values.first) : null`
+                : `tryParseEnum(${enumRef}.values, ${field.name}, ${enumRef}.values.first)`;
         }
         return `${field.name}: ${fieldValue}`;
     }).join(',\n      ');
