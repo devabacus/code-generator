@@ -2,22 +2,28 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-25 evening (Pipeline 3/5 closed — TASK-025/026/027 merged; **next: TASK-028 critical** + TASK-029 last)
+**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete)
 
 ---
 
 ## Текущий статус
 
-**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **Active pipeline 3/5 closed** (2026-05-25). master `0a91e2b` (post TASK-027 PR #25 squash merge). **25 PRs merged** total. **218 tests** passing на master.
+**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **🎉 Pipeline 5/5 CLOSED** (2026-05-26). master `5296ce3` (post TASK-029 PR #28 squash merge). **28 PRs merged** total. **253 tests** passing на master.
 
-**🟡 Active pipeline 2026-05-25 evening (2/5 remaining):**
+**🎉 Pipeline 5/5 closed:**
 
 - ✅ **TASK-030 BLOCKER** (PR #22, master `bffe07a`) — template pubGet drift fix через caret bump `custom_lint`. Closes [BUG-021](../bug-reports/021-pub-deps-drift-template-pubspec.md).
 - ✅ **TASK-025 Bug 4** (PR #23, master `9c9b472`) — Riverpod `ref.mounted` guard в state_providers. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified.
 - ✅ **TASK-026 Bug 1** (PR #24, master `6c55788`) — entityType const snake_case casing fix (lookahead quote-boundary). Bonus: meta-bug rename `_test.ts` → `.test.ts` (TASK-025 dead tests revived).
 - ✅ **TASK-027 Bug 2** (PR #25, master `0a91e2b`) — enum `byName` → `tryParseEnum` graceful helper. Closes [BUG-022](../bug-reports/022-enum-byname-state-error.md).
-- 🔴 **TASK-028 Bug 3 — NEXT** (samые critical) — LWW skip-stale guard default ON, junction opt-out. Silent data corruption на cross-device pull без него.
-- ⏸ **TASK-029 Bug 5 LAST** — `generate-entity --with-server` opt-in default OFF (breaking CLI).
+- ✅ **TASK-028 Bug 3** (PR #27, master `1cb9bf3`) — LWW skip-stale guard default ON, junction opt-out. 4 simplified `*_local_apply.dart` patched. Adversarial caught Configuration "singleton" claim — fixed inline. Follow-up TASK-031/032 suggested.
+- ✅ **TASK-029 Bug 5** (PR #28, master `5296ce3`) — `generate-entity --with-server` opt-in default OFF. Breaking CLI change. Adversarial caught RelationPatcher leak — fixed inline.
+
+**Suggested follow-up TASKs (capacity-driven):**
+
+- **TASK-031** (suggested per TASK-028 adversarial R2 H-1): t115 LWW guard parity. ADR-0005 amendment "bug-fix-as-needed" rationale. ~1-2 часа.
+- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): Configuration legacy paths consolidation. ~2-3 часа.
+- **Post-pipeline weight backlog** (cross-repo): регенерировать 13 сущностей weight v1 под новые шаблоны.
 
 **Phase B execution outcomes:**
 - TASK-022 (PR #19, `a3820e4`) — TemplateConfig injection, 173→179 tests

@@ -1,42 +1,53 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-25 evening (Pipeline 3/5 closed — TASK-025/026/027 merged через PRs #23/#24/#25; **next: TASK-028 critical** + TASK-029 last)
+**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete. Все 5 фиксов + TASK-030 blocker merged через PRs #22/#23/#24/#25/#27/#28)
 
 ---
 
 ## Текущая фаза
 
-**Phase 1.5 + Phase A + Phase B ✅ CLOSED** (2026-05-03 → 2026-05-04). **Active pipeline 3/5 closed** (2026-05-25).
+**Phase 1.5 + Phase A + Phase B ✅ CLOSED** (2026-05-03 → 2026-05-04). **🎉 Pipeline 5/5 CLOSED** (2026-05-26).
 
-После 9 PRs Phase 1.5 sequence + Phase A/B + active pipeline — codegen acceptance gate clean (verify PASS errors=0 на t186/t187/t188/t189/t191/t192 post-merge). 11 discussions archived. Architectural roadmap settled через Discussion #7-#12.
+После 9 PRs Phase 1.5 sequence + Phase A/B + pipeline 5/5 (TASK-030/025/026/027/028/029) — codegen acceptance gate clean (verify PASS errors=0 на t186-t194 post-merge). 11 discussions archived. Architectural roadmap settled через Discussion #7-#12.
 
 **Latest pivot (Discussion #9 + clean-slate amendment 2026-05-03):** Weight build на simplified template — **clean slate** (User confirmed weight v1 НЕ в production, нет users → нет dual-running concerns, нет cutover, нет decision matrix v1 maintenance). TASK-018 cancelled. Weight build = fresh app, hard switch deploy. Estimate revised 5-6 → ~3-4 months realistic, hard ceiling 4 months.
 
 **⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state (2026-05-25 evening)
+### Master state (2026-05-26 — post pipeline 5/5 closure)
 
-- **Branch:** `master 0a91e2b` (post TASK-027 PR #25 squash merge)
-- **Tests:** **218 passing**, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
-  - Baseline 190 (post-Phase B + scaffolding) + 9 TASK-025 (revived через meta-bug rename `_test.ts` → `.test.ts`) + 10 TASK-026 + 9 TASK-027 = 218
+- **Branch:** `master 5296ce3` (post TASK-029 PR #28 squash merge; до этого chore — post-merge state)
+- **Tests:** **253 passing**, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
+  - Baseline 218 post-TASK-027 + **15 TASK-028 LWW guard** + **20 TASK-029 with-server filter** = 253
 - **Compile:** clean (`tsc -p ./` EXIT=0)
 - **Lint:** 0 errors, 18 pre-existing warnings (curly rule на existing files)
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
-- **Total PRs merged:** **25** (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + Phase B 3 + post-Phase-B 2 + TASK-030 + TASK-025 + TASK-026 + TASK-027 + this docs handoff chore)
+- **Total PRs merged:** **28** (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + Phase B 3 + post-Phase-B 2 + TASK-030/025/026/027 + handoff sync + **TASK-028 + TASK-029** + this closure docs sync chore)
 
 ---
 
 ## Активные задачи
 
-> **Cross-repo origin (2026-05-23):** 5 task package пришёл из weight-system [TASK-021 handoff](../../../../Flutter/serverpod/weight/ai/tasks/active/TASK-021-generator-root-followup/task.md) — фиксы шаблонов после TASK-019 sync_core wire-up review. User decisions Q1-Q6 зафиксированы. Порядок: 4→1→2→3→5. Тестирование = отдельные `t<N+i>` (t180..t184) per PR (политика репо). Multi-agent review: 2 baseline / 3 для Bug 3 + Bug 5. Без регена weight (политика TASK-019 + ADR-0016).
+**Нет активных задач** — pipeline 5/5 closed (2026-05-26). См. "Suggested follow-up TASKs" ниже для capacity-driven next steps.
 
-| ID | Описание | Status | Started |
+### Suggested follow-up TASKs (capacity-driven, не started)
+
+- **TASK-031** (suggested per TASK-028 adversarial R2 H-1): **t115 LWW guard parity** — apply identical 4-file LWW guard pattern к t115 template `category/task/tag/configuration_local_apply.dart`. Reasoning: ADR-0005 amendment 2026-05-04 — t115 = "supported template + bug-fix-as-needed". Bug 3 = bug fix. Закрывает weight TASK-018 migration risk. ~1-2 часа (identical pattern, copy-paste).
+- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): **Configuration legacy paths consolidation** — `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` methods делают unconditional UPSERT bypass LocalApply guard. Либо удалить (если sync_core 0.3.0 заменил), либо добавить identical LWW guard. ~2-3 часа.
+- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Capacity-driven** when User starts. Это работа в weight репо, не codegen.
+
+### Закрыто в pipeline 5/5 (TASK-019 weight handoff package)
+
+> **Cross-repo origin (2026-05-23):** 5 task package пришёл из weight-system [TASK-021 handoff](../../../../Flutter/serverpod/weight/ai/tasks/active/TASK-021-generator-root-followup/task.md) — фиксы шаблонов после TASK-019 sync_core wire-up review. User decisions Q1-Q6 зафиксированы. Порядок: 4→1→2→3→5. Тестирование = отдельные `t<N+i>` per PR (политика репо). Multi-agent review: 2 baseline / 3 для Bug 3 + Bug 5. Без регена weight (политика TASK-019 + ADR-0016).
+
+| ID | Описание | Status | Merged |
 |---|---|---|---|
-| ~~TASK-025~~ | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (закрывает [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified). ✅ **MERGED PR #23 (master `9c9b472` 2026-05-25)**. Template patch 4 simplified state_providers (11 guards) + 9 unit tests. Verified t186/t187 PASS errors=0. Порядок: 1-й. | ✅ done | 2026-05-23 |
-| ~~TASK-026~~ | **Bug 1 — entityType const snake_case casing fix.** ✅ **MERGED PR #24 (master `6c55788` 2026-05-25)**. `replacement_util.ts` ENTITY + 2× M2M snake-rule lookahead расширен на quote-boundary (`'`/`"`). 10 unit tests. Verified t188/t189 PASS errors=0. **Bonus meta-bug fix:** rename test files `_test.ts` → `.test.ts` (TASK-025 9 dead tests revived в CI). Порядок: 2-й. | ✅ done | 2026-05-23 |
-| ~~TASK-027~~ | **Bug 2 — enum `byName` → graceful `tryParseEnum` helper.** ✅ **MERGED PR #25 (master `0a91e2b` 2026-05-25)**. Option A shared helper `lib/core/utils/enum_parse.dart` (manifest: startProject) + `relation_generation.ts:87-95` emit'ит `tryParseEnum(values, raw, values.first)` + `database_types.dart` SyncStatusConverter + import injection в category/task/tag entity_extension templates. 9 unit tests. Verified t191/t192 PASS errors=0. Закрывает [BUG-022](../bug-reports/022-enum-byname-state-error.md). Порядок: 3-й. | ✅ done | 2026-05-25 |
-| **TASK-028** | **Bug 3 — LWW skip-stale guard default ON, opt-out для junction.** ⚠ **Самый CRITICAL в pipeline** — без него любой реген operational/reference сущности → silent data corruption на cross-device pull (stale event перезаписывает свежие данные). 3 adversarial reviewers per Q5 user decision. Reference impl уже есть: `weight/weighing_local_apply.dart` (manual TASK-019 guard). JunctionDetector интеграция для opt-out detection. Порядок: 4-й (**NEXT**). См. [task.md](../tasks/active/TASK-028-bug-3---lww-skip-stale-guard-default-on/task.md). | 🔴 next | 2026-05-23 |
-| TASK-029 | **Bug 5 — `generate-entity` opt-in `--with-server`, default OFF.** Breaking-change CLI behavior — least-surprise после TASK-019 B2 incident (silent scope-creep в weight_server/). 3 adversarial reviewers per Q5. Co-fix `create_project.ts` если нужно. Порядок: 5-й (последний). **⏸ BLOCKED на TASK-028 merge**. См. [task.md](../tasks/active/TASK-029-bug-5---generate-entity-opt-in---with-server/task.md). | ⏸ blocked | 2026-05-23 |
+| TASK-030 | **BLOCKER — template pubGet drift** (caret bump `custom_lint: 0.8.0 → ^0.8.0`). Closes BUG-021. | ✅ done | PR #22 (master `bffe07a` 2026-05-25) |
+| TASK-025 | **Bug 4 — Riverpod `ref.mounted` guard в state_providers** (11 guards в 4 simplified files + 9 unit tests). Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified. Порядок: 1-й. | ✅ done | PR #23 (master `9c9b472` 2026-05-25) |
+| TASK-026 | **Bug 1 — entityType const snake_case casing fix** (`replacement_util.ts` ENTITY + 2× M2M snake-rule lookahead, 10 unit tests). **Bonus meta-bug fix:** rename test files `_test.ts` → `.test.ts` (TASK-025 9 dead tests revived). Порядок: 2-й. | ✅ done | PR #24 (master `6c55788` 2026-05-25) |
+| TASK-027 | **Bug 2 — enum `byName` → graceful `tryParseEnum` helper** (Option A shared `lib/core/utils/enum_parse.dart` + import injection в category/task/tag entity_extension templates, 9 unit tests). Closes [BUG-022](../bug-reports/022-enum-byname-state-error.md). Порядок: 3-й. | ✅ done | PR #25 (master `0a91e2b` 2026-05-25) |
+| TASK-028 | **Bug 3 — LWW skip-stale guard default ON, junction opt-out** (4 simplified `*_local_apply.dart` patched + 15 unit tests). Closes silent data corruption на cross-device pull. **Adversarial caught:** Configuration "singleton" claim misleading → docstring fixed inline. Follow-up TASK-031/032 suggested. Порядок: 4-й. | ✅ done | PR #27 (master `1cb9bf3` 2026-05-25) |
+| TASK-029 | **Bug 5 — `generate-entity --with-server` opt-in (default OFF)** (4 core files + VS Code quickPick + 20 tests). Breaking-change CLI — least-surprise после TASK-019 B2 incident. **Adversarial caught:** RelationPatcher тоже bypass filter → inline fix (RelationPatcher теперь filter'ит `server/` scan когда `!withServer`). Порядок: 5-й (последний). | ✅ done | PR #28 (master `5296ce3` 2026-05-26) |
 
 ### Закрыто в Phase B (для истории)
 

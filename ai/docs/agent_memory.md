@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-25 evening (Pipeline 3/5 merged — TASK-025/026/027 closed; test filename convention gotcha added; BUG-001/BUG-022 closed; meta-bug rename `_test.ts` → `.test.ts` для test discovery)
+**Последнее обновление:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete: TASK-030/025/026/027/028/029 все merged через PRs #22/#23/#24/#25/#27/#28. **TASK-029 default OFF gotcha added** для `generate-entity --with-server`.)
 
 ---
 
