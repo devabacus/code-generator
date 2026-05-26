@@ -55,6 +55,28 @@ export async function createDataFilesByReplacement() {
         templatesPath: templatesPath
     });
 
+    // TASK-029 Bug 5: explicit scope choice ДО feature pickPath — user может
+    // abort'нуть scope раньше, не теряя времени на feature selection. Esc на
+    // quickPick = abort с info message. ignoreFocusOut предотвращает silent
+    // dismissal при переключении на другие окна.
+    const SERVER_SCOPE_CLIENT_ONLY = 'Client only (default)';
+    const SERVER_SCOPE_CLIENT_SERVER = 'Client + Server';
+    const writeServerChoice = await window.showQuickPick(
+        [
+            { label: SERVER_SCOPE_CLIENT_ONLY, description: 'Generate Flutter side only — recommended' },
+            { label: SERVER_SCOPE_CLIENT_SERVER, description: 'Also write endpoint + sync_event files to <project>_server/' },
+        ],
+        {
+            placeHolder: 'Choose what to generate: client-only (recommended) or client + server',
+            ignoreFocusOut: true,
+        },
+    );
+    if (writeServerChoice === undefined) {
+        window.showInformationMessage('Generation cancelled (scope not selected)');
+        return;
+    }
+    config.withServer = writeServerChoice.label === SERVER_SCOPE_CLIENT_SERVER;
+
     const featurePath = await pickPath("Select feature", config.featuresPath);
 
     if (featurePath) {

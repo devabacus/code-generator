@@ -265,6 +265,25 @@ pwsh -NoProfile -Command "Get-NetTCPConnection -LocalPort 8082 -State Listen | F
 - `serverpod generate` — ~10 сек.
 - `flutter pub run build_runner build` — 30-60 сек.
 
+### `generate-entity --with-server` opt-in (TASK-029, breaking change для callers)
+
+⚠ **`generate-entity` по умолчанию НЕ пишет в `<project>_server/`.** Default OFF, opt-in через `--with-server` flag. Применяется к manifest'ам `entity` и `manyToMany` — `server/` scan_dir исключается из `directoriesToScan` когда `withServer=false`. Filter logic в [generation_service.ts `shouldScanDir`/`computeScanDirs`](../../src/features/generation/generators/generation_service.ts).
+
+**Exempt от filter (server всегда генерится):**
+- `startProject` — `create-project` bootstrap (иначе пустой `<project>_server/`)
+- `deploy`, `pythonStart`, `goStart`, `nodeStart` — independent от CRUD entity flow
+
+**Почему default OFF:** TASK-019 Bug 5 incident (weight) — vanilla `generate-entity` молча модифицировал 6 endpoint'ов в `weight_server/` + создал snake-дубли (`category_endpoint.dart` + `task_tag_map_endpoint.dart` etc). Пришлось `git checkout HEAD -- weight_server/` руками. Least-surprise: каллер должен explicit'но указать намерение писать на server.
+
+**Caller migration:** любой existing script / agent / VS Code workflow который полагался на server writes должен добавить `--with-server`. CLI:
+```bash
+node out/adapters/cli/index.js generate-entity --yaml X.spy.yaml --feature-path ... --workspace ... --with-server
+```
+
+VS Code: после feature pickPath появляется `quickPick` с выбором scope (Client only / Client + Server). Esc = abort, default selection = client-only.
+
+⚠ **При spawn новых проектов через `create-project` — server baseline всё ещё генерится автоматически** (startProject exempt). Filter применяется ТОЛЬКО к последующим `generate-entity` вызовам.
+
 ### Reserved Serverpod class names
 
 `Order` collisions с `package:serverpod/src/database/concepts/order.dart`. BUG-018 backlog. Use `Invoice`/etc. вместо.

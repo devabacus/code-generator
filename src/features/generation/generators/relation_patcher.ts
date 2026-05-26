@@ -36,7 +36,13 @@ export class RelationPatcher {
             return;
         }
 
-        const directories = config.templateConfig.relationPatcher.scanDirectories;
+        // TASK-029 Bug 5 consistency: skip `server/` scan когда `!config.withServer`.
+        // Без этого RelationPatcher writes к existing `<project>_server/.../X_endpoint.dart`
+        // на regen — даже хотя GenerationService filter уже отрезал server scan.
+        // На fresh project это масked exists-check на line ~138 (no destination →
+        // continue), но regen scenario был leak до TASK-029.
+        const directories = config.templateConfig.relationPatcher.scanDirectories
+            .filter(dir => dir !== 'server/' || config.withServer);
 
         for (const dirKey of directories) {
             const { sourceBasePath, destinationBasePath } = getPathInfo(config, dirKey);
