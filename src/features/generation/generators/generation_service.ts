@@ -9,6 +9,63 @@ import { ServerpodModel } from '../parsers/formatters/types';
 import { getPathInfo, PathInfo } from '../config/path_handle';
 import { FileManifest, MarkerAnalyzer } from './marker_analyzer';
 import { allManifests, manifestType } from './manifests';
+
+/**
+ * TASK-029 Bug 5: determines whether a given (manifest, scan_dir) pair должен
+ * быть scanned, учитывая `withServer` opt-in.
+ *
+ * **Design:** explicit blacklist `entity | manyToMany` (а НЕ generic
+ * "filter everything except whitelist"). Trade-off:
+ *   - **Pro:** новые manifest types (e.g. `softDelete`, `tombstone`) которые
+ *     добавятся в `manifests.ts` получают default-safe behaviour — `server/`
+ *     scan не блокируется, server bootstrap не ломается accidentally.
+ *   - **Con:** если новый manifest type семантически = entity-like (e.g.,
+ *     `oneToManyExplicit`), developer **должен** руками добавить его в blacklist —
+ *     иначе server writes leak. Добавление нового manifest type требует
+ *     code review с заметкой "TASK-029 filter applicability".
+ *
+ * Для `startProject` exempt оправдано независимо от naming: create-project
+ * bootstrap абсолютно требует server baseline (иначе пустой `<project>_server/`).
+ *
+ * Exported для unit-тестирования (см. `with_server_filter.test.ts`).
+ */
+export function shouldScanDir(
+    manifestName: manifestType,
+    dir: string,
+    withServer: boolean,
+): boolean {
+    if (dir === 'server/') {
+        const isEntityScan = manifestName === 'entity' || manifestName === 'manyToMany';
+        if (isEntityScan && !withServer) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * TASK-029 Bug 5: computes effective scan_dirs Set для config'а — применяет
+ * `shouldScanDir` filter ко всем manifests + dirs.
+ *
+ * Exported для unit-тестирования.
+ */
+export function computeScanDirs(
+    manifestNames: readonly manifestType[],
+    withServer: boolean,
+): Set<string> {
+    const result = new Set<string>();
+    for (const name of manifestNames) {
+        const manifest = allManifests[name];
+        if (manifest?.scan_dirs) {
+            manifest.scan_dirs.forEach(dir => {
+                if (shouldScanDir(name, dir, withServer)) {
+                    result.add(dir);
+                }
+            });
+        }
+    }
+    return result;
+}
 import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { RelationPatcher } from './relation_patcher';
 import { OrchestratorPatcher } from './orchestrator_patcher';
@@ -42,15 +99,12 @@ export class GenerationService {
     public async generate(config: GenerationConfig, model?: ServerpodModel): Promise<void> {
 
         const allPromises: Promise<void>[] = [];
-        const directoriesToScan = new Set<string>();
 
-        // Собираем все директории, которые нужно просканировать исходя из выбранных манифестов
-        for (const _manifest of config.allManifests) {
-            const manifest = allManifests[_manifest as manifestType];
-            if (manifest?.scan_dirs) {
-                manifest.scan_dirs.forEach(dir => directoriesToScan.add(dir));
-            }
-        }
+        // Собираем все директории, которые нужно просканировать исходя из выбранных
+        // манифестов. TASK-029 Bug 5: для entity/manyToMany manifests `server/`
+        // исключается из scan если `!config.withServer` (least-surprise default —
+        // см. `shouldScanDir` docstring).
+        const directoriesToScan = computeScanDirs(config.allManifests, config.withServer);
 
         // Проверяем, идет ли генерация сущностей (entity) или связей Many-to-Many
         const isEntityBasedGeneration = config.allManifests.includes('entity') || config.allManifests.includes('manyToMany');

@@ -33,6 +33,8 @@ interface GenerateEntityOptions {
     skipValidation?: boolean;
     /** Phase D opt-in: сохранить repository-интерфейс поверх stripped-шаблона. */
     withInterfaces?: boolean;
+    /** TASK-029 Bug 5: opt-in server writes (default false, см. CLI flag docstring). */
+    withServer?: boolean;
 }
 
 export function registerGenerateEntity(program: Command): void {
@@ -65,6 +67,11 @@ export function registerGenerateEntity(program: Command): void {
         // (simplified). Управляет взаимоисключающим выбором шаблонов через
         // `flags: withInterfaces` / `flags: withoutInterfaces` маркеры.
         .option('--with-interfaces', 'Keep repository interface layer (simplified opt-in)', false)
+        // TASK-029 Bug 5: opt-in server writes. Default OFF — predotvращает silent
+        // scope creep в <project>_server/ (TASK-019 B2 incident: vanilla generate-entity
+        // молча модифицировал 6 endpoint'ов + создал snake-дубли). startProject
+        // manifest exempt — create-project продолжает генерить server baseline.
+        .option('--with-server', 'Also write server-side endpoint/sync_event files (default: client-only). TASK-029: prevents silent scope creep.', false)
         .action(async (opts: GenerateEntityOptions) => {
             await handleGenerateEntity(opts);
         });
@@ -91,6 +98,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
         const features: manifestType[] = model.isRelation ? ['manyToMany'] : ['entity'];
 
         logger.info(`Entity: ${model.className} (${model.fields.length} fields, relation: ${model.isRelation})`);
+        logger.info(`Scope: ${opts.withServer ? 'client + server' : 'client-only (TASK-029 default — use --with-server to also write server-side files)'}`);
 
         if (!opts.skipValidation) {
             const errors: ValidationError[] = [];
@@ -129,6 +137,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             manifest: features,
             templatesPath: opts.templatesPath,
             withInterfaces: opts.withInterfaces,
+            withServer: opts.withServer,
         });
 
         const inner = new DefaultFileSystem();

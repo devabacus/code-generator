@@ -51,6 +51,17 @@ export interface IGenerationConfig {
      * flags-маркера не реагируют на флаг.
      */
     withInterfaces?: boolean;
+    /**
+     * TASK-029 Bug 5: opt-in server writes для `entity` / `manyToMany` manifests.
+     * Default `false` — `generate-entity` пишет только в client side
+     * (`feature/` scan_dir), `server/` исключается из scan. С `true` — server
+     * generates как раньше (endpoint + sync_event). `startProject` manifest
+     * exempt от фильтра (`create-project` всегда генерит server baseline,
+     * иначе пустой `<project>_server/`). Мотивация: TASK-019 B2 incident —
+     * vanilla `generate-entity` silent scope creep в `weight_server/`,
+     * least-surprise default.
+     */
+    withServer?: boolean;
 }
 
 export class GenerationConfig {
@@ -84,6 +95,9 @@ export class GenerationConfig {
     /** Opt-in: сохранить repository-интерфейс поверх stripped-шаблона (Phase D). */
     public withInterfaces: boolean;
 
+    /** TASK-029 Bug 5: opt-in server writes для entity/manyToMany (default false). */
+    public withServer: boolean;
+
 
     constructor(config: IGenerationConfig) {
         this.templProject = config.templProject || 't2';
@@ -110,6 +124,7 @@ export class GenerationConfig {
         // Backwards compat для всех existing call-sites (create_project / generate_entity / tests).
         this.templateConfig = config.templateConfig || t115TemplateConfig();
         this.withInterfaces = config.withInterfaces || false;
+        this.withServer = config.withServer || false;
     }
 
 
