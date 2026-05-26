@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-05-25 (Pipeline 3/5 merged — TASK-025/026/027 ✅ done через PRs #23/#24/#25; **next: TASK-028 critical** + TASK-029 last)
+**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete. Все 5 фиксов merged через PRs #22/#23/#24/#25/#27/#28)
 
 ## Что это за проект
 
@@ -10,23 +10,30 @@
 
 ## Текущее состояние
 
-**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **Active pipeline 3/5 closed** (2026-05-25).
+**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **🎉 Pipeline 5/5 CLOSED** (2026-05-26).
 
-- **218 unit tests passing** на master (190 baseline + 9 TASK-025 + 9 TASK-026 + 9 TASK-027 + 10 TASK-026 entity_snake_quote already counted в `+9` — actual breakdown 190+9+10+9 = 218; meta-bug fix revived 9 TASK-025 tests through rename `_test.ts` → `.test.ts`)
-- **25 PRs merged** total (Phase 1.5/A/B sequence + TASK-030 + TASK-025 + TASK-026 + TASK-027 + chore stack-lock + post-Phase-B opt-in)
-- **master `0a91e2b`** (post TASK-027 squash merge — PR #25)
+- **253 unit tests passing** на master (218 baseline post-TASK-027 + 15 TASK-028 LWW guard + 20 TASK-029 with-server filter)
+- **28 PRs merged** total (Phase 1.5/A/B sequence + TASK-030 + TASK-025/026/027/028/029 + chore stack-lock + post-Phase-B opt-in + handoff sync + closure docs sync chore)
+- **master `5296ce3`** (post TASK-029 squash merge — PR #28; до этого chore — post-merge state)
 - CI workflow active ([.github/workflows/test.yml](../../.github/workflows/test.yml))
-- t115 template (`devabacus/t115`) — **deprecated path** (frozen)
-- simplified template (`G:/Templates/flutter/simplified/`) — opt-in via `--template simplified` (Discussion #12 pivot 2026-05-04); **3 fixes applied 2026-05-25** (TASK-025 ref.mounted guards + TASK-026 quote-boundary snake-rule + TASK-027 tryParseEnum + new `lib/core/utils/enum_parse.dart`)
+- t115 template (`devabacus/t115`) — supported path (per ADR-0005 amendment 2026-05-04, bug-fix-as-needed)
+- simplified template (`G:/Templates/flutter/simplified/`) — opt-in via `--template simplified` (Discussion #12 pivot 2026-05-04); **5 fixes applied в pipeline 5/5** (TASK-025 ref.mounted + TASK-026 quote-boundary snake + TASK-027 tryParseEnum + TASK-028 LWW guard + TASK-029 --with-server opt-in)
 - sync_core 0.3.0 в master, validated multi-entity cross-device
 
-**🟡 Active pipeline (2026-05-25 evening — 2/5 remaining):**
+**🎉 Pipeline 5/5 closed (TASK-019 weight handoff package complete):**
 
+- ✅ **TASK-030 BLOCKER** (PR #22, master `bffe07a`) — template pubGet drift fix через caret bump `custom_lint`.
 - ✅ **TASK-025** Bug 4 (Riverpod `ref.mounted` guard) — PR #23 merged. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified.
 - ✅ **TASK-026** Bug 1 (entityType const snake_case fix + meta-bug test filename convention) — PR #24 merged.
 - ✅ **TASK-027** Bug 2 (enum `byName` → `tryParseEnum` graceful) — PR #25 merged. Closes [BUG-022](../bug-reports/022-enum-byname-state-error.md).
-- 🔴 **TASK-028** Bug 3 (LWW skip-stale guard default ON, junction opt-out) — ⚠ **самый CRITICAL** (silent data corruption на cross-device pull без него). 3 adversarial reviewers per Q5. **NEXT в очереди.**
-- ⏸ **TASK-029** Bug 5 (`generate-entity --with-server` opt-in default OFF) — breaking CLI change, last в pipeline. 3 adversarial reviewers per Q5.
+- ✅ **TASK-028** Bug 3 (LWW skip-stale guard default ON, junction opt-out) — PR #27 merged. **Adversarial caught Configuration "singleton" claim** — fixed docstring inline. Follow-up TASK-031 (t115 LWW parity) + TASK-032 (Configuration legacy paths) suggested.
+- ✅ **TASK-029** Bug 5 (`generate-entity --with-server` opt-in default OFF) — PR #28 merged. **Adversarial caught RelationPatcher leak** — fixed inline (RelationPatcher теперь тоже filter'ит `server/` scan).
+
+**Suggested follow-up TASKs (capacity-driven, post pipeline closure):**
+
+- **TASK-031** (suggested per TASK-028 adversarial R2 H-1): apply identical 4-file LWW guard pattern к t115 template (ADR-0005 amendment "bug-fix-as-needed"). ~1-2 часа (copy pattern).
+- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): Configuration legacy paths (`handleSyncEvent` + `insertOrUpdateFromServer`) consolidation. ~2-3 часа.
+- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Capacity-driven** when User starts.
 
 **Architectural decisions still active:**
 
