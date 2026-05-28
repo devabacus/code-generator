@@ -302,6 +302,23 @@ VS Code adapter проблемы не имеет — передаёт full path 
 
 **TASK-031 lesson 2026-05-28:** изначально mislabeled этот usage error как "t115 generate-entity bug" + предложил TASK-033. Bisect (4 commits до pre-Phase B) показал воспроизводимость везде → не регрессия. Root cause = relative path. **Verify CLI usage перед заявлением "generator bug".** Optional UX fix (low-pri): CLI мог бы reject/resolve relative `--feature-path`.
 
+### Junction (M2M) generation — prove-out t201 (2026-05-28)
+
+⚠ **Junction-генерация на t115 РАБОТАЕТ** (вопреки stale backlog BUG-016/020). Прогон t201:
+- **Canonical** `task_tag_map` (task+tag parents) → verify PASS errors=0
+- **Custom-named** `author_book_map` (author+book parents, library feature, имена ≠ task/tag) → verify PASS errors=0, substitution чистая (0 stray task/tag в коде, DAO правильно authorId/bookId)
+
+**Mechanism:** CLI передаёт `targetEntity1`/`targetEntity2`/`targetJunctionClassName` из parsed YAML FK relations → target-side substitution `task_tag_map` → `<custom>_map` корректна независимо от template-side `task`/`tag` defaults.
+
+**Junction generate-entity flow (t115):**
+1. Parent entities должны существовать первыми (junction FK targets) — generate в dependency order
+2. Junction YAML: 2 FK `relation(parent=X)` + unique index. Parser → `manifest: manyToMany`
+3. Parent YAML нужен back-relation `<junction>s: List<Junction>?, relation`
+4. **`--with-server` обязателен** иначе client ссылается на несгенерённый endpoint → 11 compile errors
+5. **full absolute `--feature-path`** (см. gotcha выше)
+
+**Stale backlog (re-classified):** BUG-016 (junction substitution) → appears RESOLVED; BUG-020 (hardcoded task/tag) → likely MOOT (оба templates сохранили task_tag_map fixture). **BUG-015 (cross-feature junction — parents в РАЗНЫХ features) — НЕ тестировался**, остаётся открытым edge. Cosmetic: generated junction dao содержит Russian "задачи" в debug-print (comment leftover, не код).
+
 ### Reserved Serverpod class names
 
 `Order` collisions с `package:serverpod/src/database/concepts/order.dart`. BUG-018 backlog. Use `Invoice`/etc. вместо.

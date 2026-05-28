@@ -39,9 +39,9 @@
 
 ### Suggested follow-up TASKs (capacity-driven, не started; ID присваивается скриптом)
 
-- **Configuration legacy paths consolidation** (per TASK-028 adversarial R2 C-1): `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` делают unconditional UPSERT bypass LocalApply guard. Либо удалить, либо добавить LWW guard. ~2-3 часа.
-- **t115 pubspec rotted comments symmetry sweep** (per TASK-031 Rev 2 H3): apply TASK-030 simplified comment updates к t115 (build_runner / json_serializable / freezed). Minor.
-- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Readiness → HIGH** (Bug 4 gap закрыт TASK-032 + session_manager TASK-033). Остаётся `:base` overwrite git-diff procedure. **Capacity-driven** when User starts.
+- ~~**Configuration legacy paths consolidation** (TASK-028 adversarial R2 C-1)~~ — **CLOSED 2026-05-28 (variant A — leave, User approved).** Investigation: `reconcileServerChanges` / `handleSyncEvent` / `insertOrUpdateFromServer` в `configuration_local_data_source.dart` = **dead code, 0 call sites** (sync идёт через `configuration_local_apply.dart` LocalApply path). C-1 premise "active UPSERT bypass" опровергнут — методы не вызываются. Авторский комментарий: оставлены намеренно "как часть интерфейса". Удаление = blast radius ради marginal cleanup → leave per author intent.
+- ~~**t115 pubspec rotted comments symmetry sweep** (TASK-031 Rev 2 H3)~~ — **DONE 2026-05-28 (chore).** build_runner + json_serializable rotted comments в `t115_flutter/pubspec.yaml` обновлены на accurate (t199 evidence: build_runner 2.15.0 + json_serializable 6.11.2 + analyzer 8.4.0, verify PASS). Comment-only (constraints не trognyты — caret floors resolve корректно). drift_dev/freezed comments не было (constraints ^2.26.0/^3.0.4 resolve к 2.31.0/3.2.3 — работают, не трогаем).
+- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Readiness → HIGH** (Bug 4 gap закрыт TASK-032 + session_manager TASK-033). Остаётся `:base` overwrite git-diff procedure. **Capacity-driven, требует context shift в weight репо + User explicit start.** ← следующий substantive item.
 
 ### Закрыто в pipeline 5/5 (TASK-019 weight handoff package)
 
@@ -70,15 +70,16 @@
 
 | ID | Severity | Description | Action |
 |---|---|---|---|
-| BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
+| ~~BUG-001~~ | ~~High UI~~ | ~~Ref disposed в state_providers (Riverpod async)~~ | ✅ **CLOSED 2026-05-28** — TASK-025 (simplified state_providers) + TASK-032 (t115 state_providers) + TASK-033 (session_manager оба). Anti-pattern истреблён в обоих templates. |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-build TASK>`-driven |
-| BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
-| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
+| BUG-015 | ⚠ High codegen → **untested** | Cross-feature junction (parents в **разных** features) generation broken | ⚠ **t201 prove-out (2026-05-28): same-feature junction PASS errors=0** (canonical task_tag_map + custom author_book_map). **Cross-feature (parents в разных features) НЕ тестировался** — остаётся открытым edge. Re-test перед weight regen если weight имеет cross-feature junction. |
+| ~~BUG-016~~ | ~~Medium~~ | ~~Junction MANY_TO_MANY substitution analog TASK-017~~ | ✅ **Appears RESOLVED (verified t201 2026-05-28)** — custom-named junction (author_book_map) substitution чистая errors=0, target names из YAML relations. Вероятно закрыт TASK-014/017. |
+| BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity). НЕ тестировался в t201 prove-out. |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |
-| ~~BUG-019~~ | ~~Medium~~ | ~~Orchestrator snippet templates содержат hardcoded entity literals (`category`/`taskTagMap`/`features/tasks/`)~~ | ✅ Closed 2026-05-04 (TASK-024 Session E3d2) — default flow t176 + legacy flow t177 verify PASS errors=0; junction-substitution-side → BUG-020 |
-| BUG-020 | Medium | Junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`) в `replacement_util.ts` + `generation_service.ts` + `relation_patcher.ts` — Session 2 landmine для simplified junction generate-entity | TASK-023 Session 2 либо follow-up TASK после Session 2 closure |
-| ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 (PR pending) — minimal single-job CI. 3-suite split deferred to Phase A test inventory audit. |
+| ~~BUG-019~~ | ~~Medium~~ | ~~Orchestrator snippet hardcoded literals~~ | ✅ Closed 2026-05-04 (TASK-024). |
+| ~~BUG-020~~ | ~~Medium → Low~~ | ~~Junction substitution hardcoded `templEntity1`/`templEntity2` defaults (`task`/`tag`)~~ | ⚠ **Likely MOOT (re-classified 2026-05-28)** — premise не материализовался (оба templates сохранили `task_tag_map` fixture → defaults match). t201 custom junction PASS. Target-side substitution из YAML работает. См. [BUG-020](../bug-reports/020-junction-substitution-template-coupling.md). |
+| BUG-005 | backlog | `:base` section overwrite при regen теряет custom code | git-diff procedure перед regen. Open architectural. Релевантно weight regen. |
+| ~~TASK-CI-001~~ | ~~Medium~~ | ~~Minimal automated gate~~ | ✅ Done via TASK-020 — minimal single-job CI. |
 
 ---
 
