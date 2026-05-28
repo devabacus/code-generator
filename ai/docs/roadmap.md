@@ -22,11 +22,11 @@
 **Active / Suggested follow-up TASKs:**
 
 - ~~**TASK-031**~~ ✅ **merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity (4 `*_local_apply.dart`) + caret bump `custom_lint`. Template в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" = CLI usage error (TASK-033 cancelled).
-- **TASK-032** ✅ **implementation complete, awaiting User merge** — t115 ref.mounted guard parity (Bug 4, closes BUG-001 для t115). 4 `*_state_providers.dart` (11 guards) + 6 tests (264 passing), verify t198 PASS errors=0. Adversarial F1 CI-coverage fixed inline. (auto-ID 032; nominal handoff "TASK-035")
-- **Configuration legacy paths consolidation** (suggested per TASK-028 R2 C-1): ~2-3 часа. (ID присваивается скриптом)
-- **session_manager ref.mounted guard** (suggested per TASK-032 adversarial F3): unguarded `state = userContext` в обоих templates. ~1 час.
-- ~~t115 generate-entity disk write bug~~ — CANCELLED 2026-05-28 (CLI usage error, bisect confirmed).
+- **TASK-032** ✅ **merged** (PR #31, master `6b42bd4`, 2026-05-28) — t115 ref.mounted guard parity (Bug 4). 4 `*_state_providers.dart` (11 guards). Template `devabacus/t115` (`1b2b683`). Adversarial F1 CI-coverage fixed inline.
+- **TASK-033** ✅ **implementation complete, awaiting User merge** — session_manager ref.mounted guard в **обоих** templates (последний BUG-001 residual, TASK-032 adversarial F3). 8 guards + 7 tests (271 passing), verify t199+t200 PASS errors=0. Standard + Adversarial APPROVE. **🎉 BUG-001 fully closed после merge.**
+- **Configuration legacy paths consolidation** (suggested per TASK-028 R2 C-1): ~2-3 часа.
 - **t115 pubspec rotted comments symmetry sweep** (suggested per TASK-031 Rev 2 H3): mirror TASK-030.
+- ~~t115 generate-entity disk write bug~~ — CANCELLED 2026-05-28 (CLI usage error, bisect confirmed).
 - **Post-pipeline weight backlog** (cross-repo): регенерировать 13 сущностей weight v1 под новые шаблоны.
 
 **Phase B execution outcomes:**

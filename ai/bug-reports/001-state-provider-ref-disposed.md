@@ -1,6 +1,6 @@
 # BUG-001: Ref disposed в сгенерированном state_providers при async операциях
 
-**Статус:** Resolved для **обоих** templates — simplified (TASK-025, 2026-05-25) + t115 (TASK-032, 2026-05-28). ⚠ Residual: `core/providers/session_manager_provider.dart` unguarded `state = userContext` после await (adversarial F3, оба templates, pre-existing) → follow-up TASK.
+**Статус:** ✅ **FULLY RESOLVED** для обоих templates. Entity state_providers: simplified (TASK-025) + t115 (TASK-032). Core session_manager: оба (TASK-033, 2026-05-28 — закрыл последний residual `_fetchUserContext` unguarded shape). Anti-pattern (`state =` после await без `ref.mounted`) истреблён во всех известных местах.
 **Обнаружено:** 2026-04-18
 **Частично закрыто:** 2026-05-25 (TASK-025, simplified template patch + 9 unit tests + e2e t186 verify PASS errors=0)
 **Источник:** проект weight (Flutter), логи `.logs/flutter-android.log`

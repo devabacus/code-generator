@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-28 (**TASK-031 merged (PR #30, master `c8ad1b5`)** — t115 LWW guard parity. **TASK-032 implementation complete, awaiting User merge** — t115 ref.mounted guard parity (Bug 4) + 6 new tests, verify t198 PASS errors=0, Standard APPROVE + Adversarial REQUEST CHANGES (F1 CI-coverage + F2 report fixed inline))
+**Обновлено:** 2026-05-28 (**TASK-031 + TASK-032 merged** (PR #30 `c8ad1b5` + PR #31 `6b42bd4`). **TASK-033 implementation complete, awaiting User merge** — session_manager ref.mounted guard в **обоих** templates (последний BUG-001 residual), 8 guards + 7 tests (271 passing), verify t199+t200 PASS errors=0, Standard + Adversarial оба APPROVE)
 
 ---
 
@@ -14,11 +14,11 @@
 
 **⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state (2026-05-28 — post TASK-031 merge)
+### Master state (2026-05-28 — post TASK-032 merge)
 
-- **Branch:** `master c8ad1b5` (post TASK-031 PR #30 squash merge)
-- **Tests:** **258 passing** на master (253 + 5 TASK-031 live regression t115). На ветке TASK-032 — **264 passing** (+6).
-  - Baseline 253 (pipeline 5/5) + **5 TASK-031** = 258 master; +6 TASK-032 (4 live t115 + inline golden + post-substitution) = 264 on branch
+- **Branch:** `master 6b42bd4` (post TASK-032 PR #31 squash merge)
+- **Tests:** **264 passing** на master (258 + 6 TASK-032). На ветке TASK-033 — **271 passing** (+7 session_manager: 3 inline golden + 4 live regression).
+  - 253 (pipeline 5/5) + 5 TASK-031 + 6 TASK-032 = 264 master; +7 TASK-033 = 271 on branch
 - **Compile:** clean (`tsc -p ./` EXIT=0)
 - **Lint:** 0 errors, 18 pre-existing warnings (curly rule на existing files)
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
@@ -28,20 +28,20 @@
 
 ## Активные задачи
 
-- **TASK-032 (in review)** — **t115 ref.mounted guard parity (Bug 4)**. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для t115 (после TASK-025 для simplified). 4 t115 `*_state_providers.dart` patched (11 guards: category/task/tag = 3, junction = 2) + 6 new tests (4 live t115 + inline golden + post-substitution) → mocha 264 passing. verify t198 PASS errors=0. Standard APPROVE + Adversarial REQUEST CHANGES (F1 CI-coverage gap + F2 empty report — fixed inline; F3 session_manager residual → follow-up). **Branch:** `feature/TASK-032-bug-4-t115-ref-mounted-guard-parity`. **Awaiting User "коммить".**
-  - ⚠ **ID note:** auto-ID присвоил 032 (nominal handoff label был "TASK-035"). Ранее-suggested "TASK-032 Configuration legacy" / "TASK-034 pubspec comments" — nominal, получат реальные ID при создании через скрипт.
+- **TASK-033 (in review)** — **session_manager ref.mounted guard в обоих templates** (последний BUG-001 residual, выявлен TASK-032 adversarial F3). `core/providers/session_manager_provider.dart` `_fetchUserContext()` — `state = userContext`/`state = null` после await без guard. 4 файла (t115 + simplified, flutter + admin) × 2 guards = 8. + 7 tests (3 inline golden CI-safe + 4 live regression) → mocha 271 passing. verify t199 (t115) + t200 (simplified) PASS errors=0. **Standard + Adversarial оба APPROVE.** **Branch:** `feature/TASK-033-session-manager-ref-mounted-guard-both-templates`. **Awaiting User merge.**
 
 ### Закрыто недавно
 
-- **TASK-031 ✅ merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity + caret bump custom_lint. Template changes в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" был CLI usage error (TASK-033 cancelled).
+- **TASK-032 ✅ merged** (PR #31, master `6b42bd4`, 2026-05-28) — t115 ref.mounted guard parity (Bug 4). 4 `*_state_providers.dart` (11 guards). Template в `devabacus/t115` (`1b2b683`). Adversarial F1 (t115 CI-coverage) fixed inline.
+- **TASK-031 ✅ merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity + caret bump custom_lint. Template в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" был CLI usage error (TASK-033-nominal cancelled).
 
-### Suggested follow-up TASKs (capacity-driven, не started; ID = nominal, присваивается скриптом)
+**🎉 BUG-001 полностью закрыт** (после TASK-033 merge): entity state_providers (TASK-025 simplified + TASK-032 t115) + core session_manager (TASK-033 оба). Anti-pattern истреблён в обоих templates.
+
+### Suggested follow-up TASKs (capacity-driven, не started; ID присваивается скриптом)
 
 - **Configuration legacy paths consolidation** (per TASK-028 adversarial R2 C-1): `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` делают unconditional UPSERT bypass LocalApply guard. Либо удалить, либо добавить LWW guard. ~2-3 часа.
-- **session_manager ref.mounted guard** (per TASK-032 adversarial F3, NEW): `core/providers/session_manager_provider.dart` `_fetchUserContext()` — unguarded `state = userContext` после await. В **обоих** templates (pre-existing, не TASK-025/032 introduced). ~1 час.
 - **t115 pubspec rotted comments symmetry sweep** (per TASK-031 Rev 2 H3): apply TASK-030 simplified comment updates к t115 (build_runner / json_serializable / freezed). Minor.
-- ~~t115 generate-entity disk write bug~~ — **CANCELLED 2026-05-28** (CLI usage error, не баг; bisect confirmed).
-- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Readiness → HIGH** после TASK-032 merge (Bug 4 gap закрыт). Остаётся `:base` overwrite git-diff procedure + session_manager follow-up. **Capacity-driven** when User starts.
+- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Readiness → HIGH** (Bug 4 gap закрыт TASK-032 + session_manager TASK-033). Остаётся `:base` overwrite git-diff procedure. **Capacity-driven** when User starts.
 
 ### Закрыто в pipeline 5/5 (TASK-019 weight handoff package)
 
@@ -164,3 +164,4 @@ Sequence per Discussion #4 → #6:
 См. [TASK-019 report](../tasks/done/TASK-019-re-acceptance-full-fk-alias-scenario-verify-phase-1-5-final-gate/report.md) для full closure evidence.
 | TASK-031 | Bug 3 t115 LWW guard parity | 🟡 In Progress | 2026-05-27 |
 | TASK-032 | Bug 4 t115 ref.mounted guard parity | 🟡 In Progress | 2026-05-28 |
+| TASK-033 | session manager ref.mounted guard both templates | 🟡 In Progress | 2026-05-28 |
