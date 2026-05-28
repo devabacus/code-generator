@@ -21,10 +21,12 @@
 
 **Active / Suggested follow-up TASKs:**
 
-- ~~**TASK-031**~~ ✅ **implementation complete 2026-05-27, awaiting User merge** — t115 LWW guard parity (4 `*_local_apply.dart` patched byte-identical с simplified) + scope expansion caret bump `custom_lint` в `t115_flutter/pubspec.yaml` (TASK-030 parity). verify t196 PASS errors=0, mocha 258 passing (+5). Adversarial 2 CRITICAL fixed inline.
-- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): Configuration legacy paths consolidation. ~2-3 часа.
-- ~~**TASK-033** t115 generate-entity disk write bug~~ — CANCELLED 2026-05-28 (CLI usage error, не баг; bisect + root cause confirmed).
-- **TASK-034** (suggested per TASK-031 Rev 2 H3): t115 pubspec rotted comments symmetry sweep с TASK-030.
+- ~~**TASK-031**~~ ✅ **merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity (4 `*_local_apply.dart`) + caret bump `custom_lint`. Template в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" = CLI usage error (TASK-033 cancelled).
+- **TASK-032** ✅ **implementation complete, awaiting User merge** — t115 ref.mounted guard parity (Bug 4, closes BUG-001 для t115). 4 `*_state_providers.dart` (11 guards) + 6 tests (264 passing), verify t198 PASS errors=0. Adversarial F1 CI-coverage fixed inline. (auto-ID 032; nominal handoff "TASK-035")
+- **Configuration legacy paths consolidation** (suggested per TASK-028 R2 C-1): ~2-3 часа. (ID присваивается скриптом)
+- **session_manager ref.mounted guard** (suggested per TASK-032 adversarial F3): unguarded `state = userContext` в обоих templates. ~1 час.
+- ~~t115 generate-entity disk write bug~~ — CANCELLED 2026-05-28 (CLI usage error, bisect confirmed).
+- **t115 pubspec rotted comments symmetry sweep** (suggested per TASK-031 Rev 2 H3): mirror TASK-030.
 - **Post-pipeline weight backlog** (cross-repo): регенерировать 13 сущностей weight v1 под новые шаблоны.
 
 **Phase B execution outcomes:**

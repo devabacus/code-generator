@@ -1,6 +1,6 @@
 # BUG-001: Ref disposed в сгенерированном state_providers при async операциях
 
-**Статус:** Resolved for simplified template (TASK-025, 2026-05-25); **t115 deferred** (frozen path per Discussion #11)
+**Статус:** Resolved для **обоих** templates — simplified (TASK-025, 2026-05-25) + t115 (TASK-032, 2026-05-28). ⚠ Residual: `core/providers/session_manager_provider.dart` unguarded `state = userContext` после await (adversarial F3, оба templates, pre-existing) → follow-up TASK.
 **Обнаружено:** 2026-04-18
 **Частично закрыто:** 2026-05-25 (TASK-025, simplified template patch + 9 unit tests + e2e t186 verify PASS errors=0)
 **Источник:** проект weight (Flutter), логи `.logs/flutter-android.log`
@@ -9,7 +9,8 @@
 ## Scope of resolution (важно)
 
 - ✅ **Simplified template** — anti-pattern истреблён (TASK-025). Любая новая сущность сгенерированная через `codegen generate-entity --template simplified` получает guard out-of-box.
-- ⚠ **t115 template** — НЕ patched. Под Discussion #11 stack-lock decision t115 = frozen / deprecated path; правки только critical maintenance. `*_state_providers.dart` в `G:/Templates/flutter/t115/...` сохраняют anti-pattern.
+- ✅ **t115 template** — anti-pattern истреблён (TASK-032, 2026-05-28). Identical 11-guard pattern в 4 `*_state_providers.dart` (usecase variant). Под ADR-0005 amendment "bug-fix-as-needed" (t115 supported, не strictly frozen). verify t198 PASS errors=0. Template в `devabacus/t115`.
+- ⚠ **Residual (оба templates):** `core/providers/session_manager_provider.dart` `_fetchUserContext()` — `state = userContext;` после `await` без `ref.mounted` guard (другой shape, не покрыт grep `state = await AsyncValue.guard`). Pre-existing, не TASK-025/032 introduced. Adversarial F3 finding → отдельный follow-up TASK для core/providers обоих templates.
 - ⚠ **weight v1 (на t115)** — production crashes (`CorrectionButton`/`WeighingCorrection`) **НЕ исправлены** этой задачей. Требуют либо:
   - (a) ручной patch уже-сгенерированных файлов в weight repo (manual);
   - (b) regenerate существующих 13 сущностей на simplified в рамках `<weight-build TASK>` (clean-slate, fresh app);

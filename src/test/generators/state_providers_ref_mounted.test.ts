@@ -173,6 +173,68 @@ class RelatedTagsForTask extends _$RelatedTagsForTask {
 }
 `;
 
+/**
+ * TASK-032: inline golden t115-варианта `category_state_providers.dart`
+ * (post-patch). Отличается от simplified inner-структурой — usecase providers
+ * (`getCategoriesUseCaseProvider`) вместо repository. Guard idiom **identical**.
+ * Даёт CI-coverage для t115 patch (live disk tests skip'аются на CI) — без этой
+ * const t115 regression на disk прошёл бы CI незамеченным (adversarial F1).
+ */
+const CATEGORY_STATE_PROVIDERS_T115_PATCHED = `// manifest: entity
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../domain/entities/category/category_entity.dart';
+import '../../../domain/providers/category/category_usecase_providers.dart';
+
+part 'category_state_providers.g.dart';
+
+@riverpod
+class Categories extends _$Categories {
+  @override
+  Future<List<CategoryEntity>> build() {
+    return ref.read(getCategoriesUseCaseProvider)!();
+  }
+
+  Future<void> addCategory(CategoryEntity category) async {
+    final result = await AsyncValue.guard(() async {
+      await ref.read(createCategoryUseCaseProvider)!(category);
+      return ref.read(getCategoriesUseCaseProvider)!();
+    });
+    if (!ref.mounted) return;
+    state = result;
+  }
+
+  Future<void> updateCategory(CategoryEntity category) async {
+    final result = await AsyncValue.guard(() async {
+      await ref.read(updateCategoryUseCaseProvider)!(category);
+      return ref.read(getCategoriesUseCaseProvider)!();
+    });
+    if (!ref.mounted) return;
+    state = result;
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final result = await AsyncValue.guard(() async {
+      await ref.read(deleteCategoryUseCaseProvider)!(id);
+      return ref.read(getCategoriesUseCaseProvider)!();
+    });
+    if (!ref.mounted) return;
+    state = result;
+  }
+}
+
+@riverpod
+Stream<List<CategoryEntity>> categoriesStream(Ref ref) {
+  final watchUseCase = ref.watch(watchCategoriesUseCaseProvider);
+
+  if (watchUseCase == null) {
+    return Stream.value(<CategoryEntity>[]);
+  }
+
+  return watchUseCase();
+}
+`;
+
 // ── Disk paths (для optional live regression check) ────────────────────────
 
 const SIMPLIFIED_TEMPLATE_ROOT =
@@ -193,6 +255,31 @@ const LIVE_STATE_PROVIDERS_PATHS: Record<string, { path: string; expectedGuards:
     },
     taskTagMap: {
         path: `${SIMPLIFIED_TEMPLATE_ROOT}/tasks/presentation/providers/task_tag_map/task_tag_map_state_providers.dart`,
+        expectedGuards: 2,
+    },
+};
+
+// TASK-032 (Bug 4 t115 parity): t115 template получает identical ref.mounted
+// guard pattern (TASK-025). Internal differs (usecase providers vs repository),
+// но guard counts identical: category/task/tag = 3 each, junction = 2.
+const T115_TEMPLATE_ROOT =
+    'G:/Templates/flutter/t115/t115_flutter/lib/features';
+
+const LIVE_T115_STATE_PROVIDERS_PATHS: Record<string, { path: string; expectedGuards: number }> = {
+    category: {
+        path: `${T115_TEMPLATE_ROOT}/tasks/presentation/providers/category/category_state_providers.dart`,
+        expectedGuards: 3,
+    },
+    task: {
+        path: `${T115_TEMPLATE_ROOT}/tasks/presentation/providers/task/task_state_providers.dart`,
+        expectedGuards: 3,
+    },
+    tag: {
+        path: `${T115_TEMPLATE_ROOT}/tasks/presentation/providers/tag/tag_state_providers.dart`,
+        expectedGuards: 3,
+    },
+    taskTagMap: {
+        path: `${T115_TEMPLATE_ROOT}/tasks/presentation/providers/task_tag_map/task_tag_map_state_providers.dart`,
         expectedGuards: 2,
     },
 };
@@ -273,6 +360,31 @@ suite('TASK-025: state_providers ref.mounted guard (BUG-001 fix)', () => {
             assert.ok(
                 /state\s*=\s*const\s+AsyncValue\.loading\(\);/.test(content),
                 'pre-await `state = const AsyncValue.loading();` должен сохраниться',
+            );
+        });
+
+        test('t115 category_state_providers.dart (usecase variant): 3 mutation methods guarded', () => {
+            // TASK-032: CI-coverage для t115 patch (usecase-provider inner shape).
+            const content = CATEGORY_STATE_PROVIDERS_T115_PATCHED;
+            assert.strictEqual(
+                countGuards(content),
+                3,
+                't115: expected 3 `if (!ref.mounted) return;` guards (add/update/delete)',
+            );
+            assert.strictEqual(
+                countStateResultAssignments(content),
+                3,
+                't115: expected 3 `state = result;` assignments',
+            );
+            assert.strictEqual(
+                countUnguardedStateGuards(content),
+                0,
+                't115: BUG-001 anti-pattern должен быть истреблён (usecase variant)',
+            );
+            // Sanity: t115 использует usecase providers, не repository.
+            assert.ok(
+                /ref\.read\(getCategoriesUseCaseProvider\)/.test(content),
+                't115 golden должен использовать usecase providers (не repository)',
             );
         });
 
@@ -358,6 +470,58 @@ suite('TASK-025: state_providers ref.mounted guard (BUG-001 fix)', () => {
             );
         });
 
+        test('t115 ENTITY substitution Category→Order сохраняет 3 guards (usecase variant)', async () => {
+            // TASK-032: t115 usecase-variant прогон через substitution — guard
+            // idiom + usecase provider refs выживают rename. CI-coverage для t115.
+            const srcPath = '/test/templates/t115/category/category_state_providers.dart';
+            const destPath = '/test/projects/order/order_state_providers.dart';
+            mockFs.setFile(srcPath, CATEGORY_STATE_PROVIDERS_T115_PATCHED);
+
+            const config = new GenerationConfig({
+                templProject: 't115',
+                templEntity: 'category',
+                targetEntity: 'order',
+                templatesPath: '/test/templates',
+                projectsPath: '/test/projects',
+                targetProject: 'app1',
+                templFeatureName: 'tasks',
+                targetFeaturePath: '/test/projects/app1/lib/features/orders',
+                workspacesPath: '/test/projects/app1',
+            });
+
+            const rules = getDictionaryRules(['common', 'entity'], config);
+            const tasks: ReplaceTask[] = [
+                { sourcePath: srcPath, destinationPath: destPath, rules },
+            ];
+            await processor.process(tasks);
+
+            const result = await mockFs.readFile(destPath);
+            assert.strictEqual(
+                countGuards(result),
+                3,
+                't115: после substitution Category→Order должно остаться 3 guards',
+            );
+            assert.strictEqual(
+                countStateResultAssignments(result),
+                3,
+                't115: 3 `state = result;` assignments сохраняются',
+            );
+            assert.strictEqual(
+                countUnguardedStateGuards(result),
+                0,
+                't115: substitution не должен случайно ввести anti-pattern',
+            );
+            assert.ok(
+                /class\s+Orders\s+extends\s+_\$Orders/.test(result),
+                't115: substitution должен переименовать класс Categories → Orders',
+            );
+            // usecase provider ref должен быть переименован, не повреждён.
+            assert.ok(
+                /getOrdersUseCaseProvider/.test(result),
+                't115: usecase provider ref переименован getCategories→getOrders',
+            );
+        });
+
         test('ENTITY substitution не задевает `ref.mounted` / `result` literals', async () => {
             // Defensive: убедимся что substitution rules не содержат коллизию с
             // `ref`, `mounted`, `result`, `state` (если бы targetEntity = 'ref'
@@ -425,6 +589,40 @@ suite('TASK-025: state_providers ref.mounted guard (BUG-001 fix)', () => {
                     0,
                     `live ${path.basename(info.path)}: BUG-001 anti-pattern (` +
                     `\`state = await AsyncValue.guard\`) обнаружен. Patch TASK-025 откатан?`,
+                );
+            });
+        }
+    });
+
+    suite('Live template regression t115 (TASK-032, disk-dependent, optional)', () => {
+        // t115 template parity (TASK-032 Bug 4): identical guard counts с simplified
+        // (3/3/3/2). Internal differs (usecase providers), но countGuards /
+        // countUnguardedStateGuards regex'ы template-agnostic. Скип на CI.
+
+        for (const [entity, info] of Object.entries(LIVE_T115_STATE_PROVIDERS_PATHS)) {
+            test(`t115/${entity}: live template содержит ${info.expectedGuards} guards`, function () {
+                if (!fs.existsSync(info.path)) {
+                    (this as Mocha.Context).skip();
+                    return;
+                }
+                const content = fs.readFileSync(info.path, 'utf-8');
+                assert.strictEqual(
+                    countGuards(content),
+                    info.expectedGuards,
+                    `live t115 ${path.basename(info.path)}: expected ${info.expectedGuards} guards, ` +
+                    `got ${countGuards(content)}. Возможно регрессия TASK-032 patch?`,
+                );
+                assert.strictEqual(
+                    countStateResultAssignments(content),
+                    info.expectedGuards,
+                    `live t115 ${path.basename(info.path)}: \`state = result;\` count ` +
+                    `(${countStateResultAssignments(content)}) != guard count (${info.expectedGuards}).`,
+                );
+                assert.strictEqual(
+                    countUnguardedStateGuards(content),
+                    0,
+                    `live t115 ${path.basename(info.path)}: BUG-001 anti-pattern (` +
+                    `\`state = await AsyncValue.guard\`) обнаружен. Patch TASK-032 откатан?`,
                 );
             });
         }
