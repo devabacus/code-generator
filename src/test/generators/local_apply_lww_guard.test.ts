@@ -155,6 +155,23 @@ const LIVE_NON_JUNCTION_PATHS: Record<string, string> = {
 const LIVE_JUNCTION_PATH =
     `${SIMPLIFIED_TEMPLATE_ROOT}/tasks/data/adapters/task_tag_map/task_tag_map_local_apply.dart`;
 
+// TASK-031 (Bug 3 t115 LWW guard parity): t115 template получает identical
+// LWW guard pattern за исключением junction (task_tag_map, manifest: manyToMany).
+// Эти paths parallel SIMPLIFIED_* выше — same 4 non-junction + 1 junction.
+
+const T115_TEMPLATE_ROOT =
+    'G:/Templates/flutter/t115/t115_flutter/lib/features';
+
+const LIVE_T115_NON_JUNCTION_PATHS: Record<string, string> = {
+    category: `${T115_TEMPLATE_ROOT}/tasks/data/adapters/category/category_local_apply.dart`,
+    task: `${T115_TEMPLATE_ROOT}/tasks/data/adapters/task/task_local_apply.dart`,
+    tag: `${T115_TEMPLATE_ROOT}/tasks/data/adapters/tag/tag_local_apply.dart`,
+    configuration: `${T115_TEMPLATE_ROOT}/configuration/data/adapters/configuration/configuration_local_apply.dart`,
+};
+
+const LIVE_T115_JUNCTION_PATH =
+    `${T115_TEMPLATE_ROOT}/tasks/data/adapters/task_tag_map/task_tag_map_local_apply.dart`;
+
 // ── Helper assertions ──────────────────────────────────────────────────────
 
 /**
@@ -487,6 +504,52 @@ suite('TASK-028: local_apply LWW skip-stale guard (Bug 3 fix)', () => {
                 countGuards(content),
                 0,
                 `live junction template должен иметь 0 guards`,
+            );
+        });
+    });
+
+    suite('Live template regression t115 (TASK-031, disk-dependent, optional)', () => {
+        // Если t115 template доступен на disk — сверяем что Bug 3 LWW guard
+        // patched идентично simplified (TASK-028 pattern). Скип если disk
+        // недоступен (CI без шаблонов). Junction (task_tag_map, manifest:
+        // manyToMany) — opt-out, без guard (parallel simplified invariant).
+
+        for (const [entity, filePath] of Object.entries(LIVE_T115_NON_JUNCTION_PATHS)) {
+            test(`t115/${entity}: live template содержит LWW guard (TASK-031 parity)`, function () {
+                if (!fs.existsSync(filePath)) {
+                    (this as Mocha.Context).skip();
+                    return;
+                }
+                const content = fs.readFileSync(filePath, 'utf-8');
+                assert.ok(
+                    hasLwwGuard(content),
+                    `live t115 ${path.basename(filePath)}: LWW guard отсутствует или сломан. ` +
+                    `Возможно регрессия TASK-031 patch?`,
+                );
+                assert.strictEqual(
+                    countGuards(content),
+                    1,
+                    `live t115 ${path.basename(filePath)}: expected exactly 1 guard, ` +
+                    `got ${countGuards(content)}. Дубль? Удалён?`,
+                );
+            });
+        }
+
+        test('t115/task_tag_map_local_apply.dart: live junction template НЕ содержит guard', function () {
+            if (!fs.existsSync(LIVE_T115_JUNCTION_PATH)) {
+                (this as Mocha.Context).skip();
+                return;
+            }
+            const content = fs.readFileSync(LIVE_T115_JUNCTION_PATH, 'utf-8');
+            assert.ok(
+                !hasLwwGuard(content),
+                `live t115 ${path.basename(LIVE_T115_JUNCTION_PATH)}: junction template ` +
+                `НЕ должен содержать guard (LWW неприменим). Случайный patch на junction?`,
+            );
+            assert.strictEqual(
+                countGuards(content),
+                0,
+                `live t115 junction template должен иметь 0 guards`,
             );
         });
     });

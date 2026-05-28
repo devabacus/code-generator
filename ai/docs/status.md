@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete. Все 5 фиксов + TASK-030 blocker merged через PRs #22/#23/#24/#25/#27/#28)
+**Обновлено:** 2026-05-27 (**TASK-031 implementation complete, awaiting User merge approval** — t115 LWW guard parity + scope expansion caret bump custom_lint + 5 new live regression tests + 2 CRITICAL adversarial findings fixed inline)
 
 ---
 
@@ -28,12 +28,13 @@
 
 ## Активные задачи
 
-**Нет активных задач** — pipeline 5/5 closed (2026-05-26). См. "Suggested follow-up TASKs" ниже для capacity-driven next steps.
+- **TASK-031 (in review)** — t115 LWW guard parity + scope expansion caret bump `custom_lint` в `t115_flutter/pubspec.yaml`. **Implementation complete:** 4 t115 `*_local_apply.dart` patched (byte-identical с simplified post-TASK-028) + 5 new live regression tests (mocha 258 passing, +5 vs 253) + verify t196 PASS errors=0. **3 adversarial reviewers fixed 2 CRITICAL inline** (Rev 2 C1 task.md scope amend, C2 pubspec comment falsified claim corrected). **Branch:** `feature/TASK-031-bug-3-t115-lww-guard-parity`. **Awaiting User "коммить".**
 
 ### Suggested follow-up TASKs (capacity-driven, не started)
 
-- **TASK-031** (suggested per TASK-028 adversarial R2 H-1): **t115 LWW guard parity** — apply identical 4-file LWW guard pattern к t115 template `category/task/tag/configuration_local_apply.dart`. Reasoning: ADR-0005 amendment 2026-05-04 — t115 = "supported template + bug-fix-as-needed". Bug 3 = bug fix. Закрывает weight TASK-018 migration risk. ~1-2 часа (identical pattern, copy-paste).
 - **TASK-032** (suggested per TASK-028 adversarial R2 C-1): **Configuration legacy paths consolidation** — `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` methods делают unconditional UPSERT bypass LocalApply guard. Либо удалить (если sync_core 0.3.0 заменил), либо добавить identical LWW guard. ~2-3 часа.
+- ~~**TASK-033** t115 generate-entity disk write bug~~ — **CANCELLED 2026-05-28.** Заявленный bug оказался CLI usage error (relative `--feature-path` вместо full absolute). Bisect (4 commits до pre-Phase B) + root cause confirmed: не баг генератора. VS Code adapter передаёт full path корректно. Entity-level guard validation получена напрямую (project_local_apply.dart preserves guard через substitution).
+- **TASK-034** (suggested per TASK-031 Rev 2 H3): **t115 pubspec rotted comments symmetry sweep** — apply TASK-030 simplified comment updates к t115 (build_runner / json_serializable / freezed). Mirror TASK-030 пакет. Minor scope, не блокирует pub get.
 - **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Capacity-driven** when User starts. Это работа в weight репо, не codegen.
 
 ### Закрыто в pipeline 5/5 (TASK-019 weight handoff package)
@@ -155,3 +156,4 @@ Sequence per Discussion #4 → #6:
 **Closed BUGs Phase 1.5:** BUG-002/003/004/005/006/008/009/011/012/013.
 
 См. [TASK-019 report](../tasks/done/TASK-019-re-acceptance-full-fk-alias-scenario-verify-phase-1-5-final-gate/report.md) для full closure evidence.
+| TASK-031 | Bug 3 t115 LWW guard parity | 🟡 In Progress | 2026-05-27 |

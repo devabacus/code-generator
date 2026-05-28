@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete: TASK-030/025/026/027/028/029 все merged через PRs #22/#23/#24/#25/#27/#28. **TASK-029 default OFF gotcha added** для `generate-entity --with-server`.)
+**Последнее обновление:** 2026-05-28 (**TASK-031 in review (PR #30)** — t115 LWW guard parity + scope expansion caret bump `custom_lint`. ⚠ Самокоррекция: заявленный "t115 generate-entity bug" оказался CLI usage error — `--feature-path` требует **full absolute path** (relative → files в CWD). TASK-033 CANCELLED. См. gotcha ниже.)
 
 ---
 
@@ -283,6 +283,24 @@ node out/adapters/cli/index.js generate-entity --yaml X.spy.yaml --feature-path 
 VS Code: после feature pickPath появляется `quickPick` с выбором scope (Client only / Client + Server). Esc = abort, default selection = client-only.
 
 ⚠ **При spawn новых проектов через `create-project` — server baseline всё ещё генерится автоматически** (startProject exempt). Filter применяется ТОЛЬКО к последующим `generate-entity` вызовам.
+
+### `generate-entity --feature-path` требует FULL ABSOLUTE path (CLI, TASK-031 lesson)
+
+⚠ **CLI `--feature-path` ожидает полный абсолютный путь к feature dir**, НЕ relative feature name. Передаётся напрямую как `config.targetFeaturePath` ([generate_entity.ts:128](../../src/adapters/cli/commands/generate_entity.ts)) → file writes резолвятся относительно него. Relative значение (`projects`) → `path.join(CWD, 'projects/...')` = файлы пишутся в **CWD** (например codegen repo root), молча, без ошибки.
+
+**Правильно:**
+```bash
+node out/adapters/cli/index.js generate-entity \
+  --yaml <X>.spy.yaml \
+  --feature-path "G:/Projects/Flutter/serverpod/<proj>/<proj>_flutter/lib/features/<feature>" \
+  --workspace "G:/Projects/Flutter/serverpod/<proj>" --template t115
+```
+
+**Неправильно:** `--feature-path projects` (relative) → файлы в CWD, target feature dir не создаётся.
+
+VS Code adapter проблемы не имеет — передаёт full path из `pickPath(config.featuresPath)` ([create_data_files_by_replacement.ts:80-83](../../src/adapters/vscode/commands/create_data_files_by_replacement.ts)).
+
+**TASK-031 lesson 2026-05-28:** изначально mislabeled этот usage error как "t115 generate-entity bug" + предложил TASK-033. Bisect (4 commits до pre-Phase B) показал воспроизводимость везде → не регрессия. Root cause = relative path. **Verify CLI usage перед заявлением "generator bug".** Optional UX fix (low-pri): CLI мог бы reject/resolve relative `--feature-path`.
 
 ### Reserved Serverpod class names
 
