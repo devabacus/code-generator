@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete: TASK-030/025/026/027/028/029 все merged через PRs #22/#23/#24/#25/#27/#28. **TASK-029 default OFF gotcha added** для `generate-entity --with-server`.)
+**Последнее обновление:** 2026-05-27 (**TASK-031 in review** — t115 LWW guard parity + scope expansion caret bump `custom_lint`. Discovery: t115 `generate-entity` disk write bug → TASK-033 suggested. Awaiting User "коммить".)
 
 ---
 
