@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-28 (**TASK-031 merged (master `c8ad1b5`)** — t115 LWW guard parity. **TASK-032 in review** — t115 ref.mounted guard parity (Bug 4), closes BUG-001 для t115. ⚠ Lesson из TASK-031: `--feature-path` требует **full absolute path** (relative → files в CWD); TASK-033 CANCELLED. См. gotcha ниже.)
+**Последнее обновление:** 2026-05-28 (**TASK-031 + TASK-032 merged** (`c8ad1b5` + `6b42bd4`). **TASK-033 in review** — session_manager ref.mounted guard оба templates (последний BUG-001 residual). 🎉 **BUG-001 fully closed** после TASK-033 merge. ⚠ Lesson TASK-031: `--feature-path` требует full absolute path. См. gotcha ниже.)
 
 ---
 
