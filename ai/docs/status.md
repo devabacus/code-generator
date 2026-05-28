@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-27 (**TASK-031 implementation complete, awaiting User merge approval** — t115 LWW guard parity + scope expansion caret bump custom_lint + 5 new live regression tests + 2 CRITICAL adversarial findings fixed inline)
+**Обновлено:** 2026-05-28 (**TASK-031 merged (PR #30, master `c8ad1b5`)** — t115 LWW guard parity. **TASK-032 implementation complete, awaiting User merge** — t115 ref.mounted guard parity (Bug 4) + 6 new tests, verify t198 PASS errors=0, Standard APPROVE + Adversarial REQUEST CHANGES (F1 CI-coverage + F2 report fixed inline))
 
 ---
 
@@ -14,11 +14,11 @@
 
 **⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state (2026-05-26 — post pipeline 5/5 closure)
+### Master state (2026-05-28 — post TASK-031 merge)
 
-- **Branch:** `master 5296ce3` (post TASK-029 PR #28 squash merge; до этого chore — post-merge state)
-- **Tests:** **253 passing**, 0 failing (mocha workaround `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"`)
-  - Baseline 218 post-TASK-027 + **15 TASK-028 LWW guard** + **20 TASK-029 with-server filter** = 253
+- **Branch:** `master c8ad1b5` (post TASK-031 PR #30 squash merge)
+- **Tests:** **258 passing** на master (253 + 5 TASK-031 live regression t115). На ветке TASK-032 — **264 passing** (+6).
+  - Baseline 253 (pipeline 5/5) + **5 TASK-031** = 258 master; +6 TASK-032 (4 live t115 + inline golden + post-substitution) = 264 on branch
 - **Compile:** clean (`tsc -p ./` EXIT=0)
 - **Lint:** 0 errors, 18 pre-existing warnings (curly rule на existing files)
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
@@ -28,14 +28,20 @@
 
 ## Активные задачи
 
-- **TASK-031 (in review)** — t115 LWW guard parity + scope expansion caret bump `custom_lint` в `t115_flutter/pubspec.yaml`. **Implementation complete:** 4 t115 `*_local_apply.dart` patched (byte-identical с simplified post-TASK-028) + 5 new live regression tests (mocha 258 passing, +5 vs 253) + verify t196 PASS errors=0. **3 adversarial reviewers fixed 2 CRITICAL inline** (Rev 2 C1 task.md scope amend, C2 pubspec comment falsified claim corrected). **Branch:** `feature/TASK-031-bug-3-t115-lww-guard-parity`. **Awaiting User "коммить".**
+- **TASK-032 (in review)** — **t115 ref.mounted guard parity (Bug 4)**. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для t115 (после TASK-025 для simplified). 4 t115 `*_state_providers.dart` patched (11 guards: category/task/tag = 3, junction = 2) + 6 new tests (4 live t115 + inline golden + post-substitution) → mocha 264 passing. verify t198 PASS errors=0. Standard APPROVE + Adversarial REQUEST CHANGES (F1 CI-coverage gap + F2 empty report — fixed inline; F3 session_manager residual → follow-up). **Branch:** `feature/TASK-032-bug-4-t115-ref-mounted-guard-parity`. **Awaiting User "коммить".**
+  - ⚠ **ID note:** auto-ID присвоил 032 (nominal handoff label был "TASK-035"). Ранее-suggested "TASK-032 Configuration legacy" / "TASK-034 pubspec comments" — nominal, получат реальные ID при создании через скрипт.
 
-### Suggested follow-up TASKs (capacity-driven, не started)
+### Закрыто недавно
 
-- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): **Configuration legacy paths consolidation** — `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` methods делают unconditional UPSERT bypass LocalApply guard. Либо удалить (если sync_core 0.3.0 заменил), либо добавить identical LWW guard. ~2-3 часа.
-- ~~**TASK-033** t115 generate-entity disk write bug~~ — **CANCELLED 2026-05-28.** Заявленный bug оказался CLI usage error (relative `--feature-path` вместо full absolute). Bisect (4 commits до pre-Phase B) + root cause confirmed: не баг генератора. VS Code adapter передаёт full path корректно. Entity-level guard validation получена напрямую (project_local_apply.dart preserves guard через substitution).
-- **TASK-034** (suggested per TASK-031 Rev 2 H3): **t115 pubspec rotted comments symmetry sweep** — apply TASK-030 simplified comment updates к t115 (build_runner / json_serializable / freezed). Mirror TASK-030 пакет. Minor scope, не блокирует pub get.
-- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Capacity-driven** when User starts. Это работа в weight репо, не codegen.
+- **TASK-031 ✅ merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity + caret bump custom_lint. Template changes в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" был CLI usage error (TASK-033 cancelled).
+
+### Suggested follow-up TASKs (capacity-driven, не started; ID = nominal, присваивается скриптом)
+
+- **Configuration legacy paths consolidation** (per TASK-028 adversarial R2 C-1): `configuration_local_data_source.dart` `handleSyncEvent` + `insertOrUpdateFromServer` делают unconditional UPSERT bypass LocalApply guard. Либо удалить, либо добавить LWW guard. ~2-3 часа.
+- **session_manager ref.mounted guard** (per TASK-032 adversarial F3, NEW): `core/providers/session_manager_provider.dart` `_fetchUserContext()` — unguarded `state = userContext` после await. В **обоих** templates (pre-existing, не TASK-025/032 introduced). ~1 час.
+- **t115 pubspec rotted comments symmetry sweep** (per TASK-031 Rev 2 H3): apply TASK-030 simplified comment updates к t115 (build_runner / json_serializable / freezed). Minor.
+- ~~t115 generate-entity disk write bug~~ — **CANCELLED 2026-05-28** (CLI usage error, не баг; bisect confirmed).
+- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Readiness → HIGH** после TASK-032 merge (Bug 4 gap закрыт). Остаётся `:base` overwrite git-diff procedure + session_manager follow-up. **Capacity-driven** when User starts.
 
 ### Закрыто в pipeline 5/5 (TASK-019 weight handoff package)
 
@@ -157,3 +163,4 @@ Sequence per Discussion #4 → #6:
 
 См. [TASK-019 report](../tasks/done/TASK-019-re-acceptance-full-fk-alias-scenario-verify-phase-1-5-final-gate/report.md) для full closure evidence.
 | TASK-031 | Bug 3 t115 LWW guard parity | 🟡 In Progress | 2026-05-27 |
+| TASK-032 | Bug 4 t115 ref.mounted guard parity | 🟡 In Progress | 2026-05-28 |

@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-28 (**TASK-031 in review (PR #30)** — t115 LWW guard parity + scope expansion caret bump `custom_lint`. ⚠ Самокоррекция: заявленный "t115 generate-entity bug" оказался CLI usage error — `--feature-path` требует **full absolute path** (relative → files в CWD). TASK-033 CANCELLED. См. gotcha ниже.)
+**Последнее обновление:** 2026-05-28 (**TASK-031 merged (master `c8ad1b5`)** — t115 LWW guard parity. **TASK-032 in review** — t115 ref.mounted guard parity (Bug 4), closes BUG-001 для t115. ⚠ Lesson из TASK-031: `--feature-path` требует **full absolute path** (relative → files в CWD); TASK-033 CANCELLED. См. gotcha ниже.)
 
 ---
 
