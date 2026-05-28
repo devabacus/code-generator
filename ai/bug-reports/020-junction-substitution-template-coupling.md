@@ -1,10 +1,29 @@
 # BUG-020: Junction substitution coupled с hardcoded `templEntity1`/`templEntity2` defaults — Session 2 landmine
 
-**Статус:** Open (Session 2 scope of TASK-023 / Phase B2)
+**Статус:** ⚠ **Likely MOOT / низкий риск** (re-classified 2026-05-28). Premise ("Session 2 добавит differently-named junction fixture в simplified") **не материализовался** — simplified template сохранил `task_tag_map` fixture (= t115). Defaults `task`/`tag` matchят on-disk literal обоих templates → не bite в практике. Custom-named junction (target-side) работает — см. Empirical update ниже.
 **Обнаружено:** 2026-05-04 (TASK-023 Session 1 / Adversarial review HIGH H-3)
 **Источник:** Multi-agent code review TASK-023 Session 1 (Adversarial)
-**Критичность:** Medium (Session 2 landmine — не блокирует Session 1 codegen-TS chunk; блокирует simplified junction generate-entity flow когда Session 2 + Phase C synthetic ландят concrete junction fixture)
-**Связан с:** [BUG-019](019-orchestrator-snippet-hardcoded-literals.md) (closes orchestrator-side, Session 1 ✅; junction-substitution-side остаётся открытым)
+**Критичность:** Medium → **Low** (re-classified — premise не материализовался)
+**Связан с:** [BUG-019](019-orchestrator-snippet-hardcoded-literals.md) (closed orchestrator-side, Session 1 ✅)
+
+## ⚠ Empirical update (2026-05-28 — t201 junction prove-out)
+
+Прогон junction-генерации на свежем t201 (t115) показал:
+
+- **Canonical junction** (`task_tag_map`, task+tag parents, tasks feature) → verify PASS errors=0
+- **Custom-named junction** (`author_book_map`, author+book parents, library feature — имена ОТЛИЧНЫ от task/tag) → verify PASS errors=0, **substitution чистая** (zero stray `task`/`tag`/`taskId`/`tagId` в generated code; DAO правильно использует `authorId`/`bookId`)
+
+**Ключевой вывод:** **target-side** substitution (`task_tag_map` template → `author_book_map` output) работает корректно. CLI ([generate_entity.ts](../../src/adapters/cli/commands/generate_entity.ts)) передаёт `targetEntity1`/`targetEntity2`/`targetJunctionClassName` из parsed YAML relations → substitution rename'ит правильно, независимо от template-side defaults.
+
+**Что BUG-020 РЕАЛЬНО про:** **template-side** literal — если бы on-disk junction fixture был переименован прочь от `task_tag_map` (для какого-то template), тогда `templEntity1`/`templEntity2='task'/'tag'` defaults не match'или бы on-disk literal. Но оба template (t115 + simplified) сохранили `task_tag_map` fixture → defaults корректны.
+
+**Cosmetic-only artifact:** generated `author_book_map_dao.dart` содержит Russian-comment leftover в debug-print ("связей для **задачи** $authorId") — слово "задачи" не substitut'ится (это comment, не code; переменная `$authorId` корректна). Harmless.
+
+**НЕ протестировано:** simplified template junction generate-entity (тестировал t115). Mechanism codegen-agnostic, но точное подтверждение simplified — остаётся.
+
+---
+
+## (Original report — historical context)
 
 ## Симптом
 
