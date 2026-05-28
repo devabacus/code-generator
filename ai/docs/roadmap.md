@@ -23,7 +23,7 @@
 
 - ~~**TASK-031**~~ ✅ **implementation complete 2026-05-27, awaiting User merge** — t115 LWW guard parity (4 `*_local_apply.dart` patched byte-identical с simplified) + scope expansion caret bump `custom_lint` в `t115_flutter/pubspec.yaml` (TASK-030 parity). verify t196 PASS errors=0, mocha 258 passing (+5). Adversarial 2 CRITICAL fixed inline.
 - **TASK-032** (suggested per TASK-028 adversarial R2 C-1): Configuration legacy paths consolidation. ~2-3 часа.
-- **TASK-033** (suggested per TASK-031 Rev 3 discovery 2026-05-27): t115 generate-entity disk write bug investigation.
+- ~~**TASK-033** t115 generate-entity disk write bug~~ — CANCELLED 2026-05-28 (CLI usage error, не баг; bisect + root cause confirmed).
 - **TASK-034** (suggested per TASK-031 Rev 2 H3): t115 pubspec rotted comments symmetry sweep с TASK-030.
 - **Post-pipeline weight backlog** (cross-repo): регенерировать 13 сущностей weight v1 под новые шаблоны.
 
