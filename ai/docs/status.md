@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-05-28 (**TASK-031 + TASK-032 merged** (PR #30 `c8ad1b5` + PR #31 `6b42bd4`). **TASK-033 implementation complete, awaiting User merge** — session_manager ref.mounted guard в **обоих** templates (последний BUG-001 residual), 8 guards + 7 tests (271 passing), verify t199+t200 PASS errors=0, Standard + Adversarial оба APPROVE)
+**Обновлено:** 2026-06-04 (**TASK-031/032/033 + chore все merged** — master `ccf69b4`, 271 tests). **🎉 BUG-001 fully closed** (оба templates). Junction prove-out completed (t201). Готовность к weight regen: **HIGH** (с caveats: BUG-005 `:base` overwrite procedure + BUG-015 cross-feature untested). Нет активных задач — ждёт User start weight regen или other follow-ups.
 
 ---
 
@@ -14,28 +14,36 @@
 
 **⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state (2026-05-28 — post TASK-032 merge)
+### Master state (2026-06-04 — post chore PR #33)
 
-- **Branch:** `master 6b42bd4` (post TASK-032 PR #31 squash merge)
-- **Tests:** **264 passing** на master (258 + 6 TASK-032). На ветке TASK-033 — **271 passing** (+7 session_manager: 3 inline golden + 4 live regression).
-  - 253 (pipeline 5/5) + 5 TASK-031 + 6 TASK-032 = 264 master; +7 TASK-033 = 271 on branch
-- **Compile:** clean (`tsc -p ./` EXIT=0)
-- **Lint:** 0 errors, 18 pre-existing warnings (curly rule на existing files)
+- **Branch:** `master ccf69b4` (post chore PR #33 — docs/handoff sync + C-1 closure + t115 pubspec hygiene). Working tree clean.
+- **Tests:** **271 passing** на master, 0 failing
+  - 253 (pipeline 5/5) + 5 TASK-031 + 6 TASK-032 + 7 TASK-033 = 271
+- **Compile:** clean (`tsc -p ./` EXIT=0, verified 2026-06-04)
+- **Lint:** 0 errors, 18 pre-existing warnings
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
-- **Total PRs merged:** **28** (Phase 1.5 9 + handoff + HOTFIX-001 + TASK-020 + TASK-021 + chore stack-lock + Phase B 3 + post-Phase-B 2 + TASK-030/025/026/027 + handoff sync + **TASK-028 + TASK-029** + this closure docs sync chore)
+- **Total PRs merged:** **33** (28 prior + TASK-030..033 + chore docs/handoff sync)
+- **Cross-repo state:**
+  - `devabacus/t115` master `13657d8` (TASK-031/032/033 templates + pubspec hygiene)
+  - `devabacus/simplified` — local-only git repo (нет remote), pre-existing User dirty state; TASK-033 session_manager changes на disk функциональны для create-project
+- **Highest test project:** **t201** (junction prove-out). Next → t202+. Sandbox блокирует delete (политика).
 
 ---
 
 ## Активные задачи
 
-- **TASK-033 (in review)** — **session_manager ref.mounted guard в обоих templates** (последний BUG-001 residual, выявлен TASK-032 adversarial F3). `core/providers/session_manager_provider.dart` `_fetchUserContext()` — `state = userContext`/`state = null` после await без guard. 4 файла (t115 + simplified, flutter + admin) × 2 guards = 8. + 7 tests (3 inline golden CI-safe + 4 live regression) → mocha 271 passing. verify t199 (t115) + t200 (simplified) PASS errors=0. **Standard + Adversarial оба APPROVE.** **Branch:** `feature/TASK-033-session-manager-ref-mounted-guard-both-templates`. **Awaiting User merge.**
+**Нет активных задач.** Все merged. Ждёт User explicit start следующего substantive item (weight regen или other follow-ups).
 
-### Закрыто недавно
+### Закрыто недавно (сессия 2026-05-28)
 
-- **TASK-032 ✅ merged** (PR #31, master `6b42bd4`, 2026-05-28) — t115 ref.mounted guard parity (Bug 4). 4 `*_state_providers.dart` (11 guards). Template в `devabacus/t115` (`1b2b683`). Adversarial F1 (t115 CI-coverage) fixed inline.
-- **TASK-031 ✅ merged** (PR #30, master `c8ad1b5`, 2026-05-28) — t115 LWW guard parity + caret bump custom_lint. Template в `devabacus/t115` (`fbffc4c`). Self-correction: "t115 generate-entity bug" был CLI usage error (TASK-033-nominal cancelled).
+- **chore docs/handoff sync** ✅ merged (PR #33, master `ccf69b4`) — C-1 closure variant A + t115 pubspec hygiene + junction prove-out docs + bug-reports re-classification (BUG-015/016/020) + handoff rewrite. t115 push `13657d8`.
+- **TASK-033** ✅ merged (PR #32, master `7b4be93`, 2026-05-28) — session_manager ref.mounted guard в **обоих** templates. 8 guards в 4 файлах. + 7 tests (3 inline golden + 4 live). t115 push `71da505`. Standard + Adversarial оба APPROVE.
+- **TASK-032** ✅ merged (PR #31, master `6b42bd4`) — t115 ref.mounted guard parity (Bug 4). 4 `*_state_providers.dart` (11 guards). t115 push `1b2b683`. Adversarial F1 (t115 CI-coverage) fixed inline.
+- **TASK-031** ✅ merged (PR #30, master `c8ad1b5`) — t115 LWW guard parity + caret bump custom_lint. t115 push `fbffc4c`. Self-correction: "t115 generate-entity bug" был CLI usage error (TASK-033-nominal cancelled).
 
-**🎉 BUG-001 полностью закрыт** (после TASK-033 merge): entity state_providers (TASK-025 simplified + TASK-032 t115) + core session_manager (TASK-033 оба). Anti-pattern истреблён в обоих templates.
+**🎉 BUG-001 полностью закрыт** — entity state_providers (TASK-025 simplified + TASK-032 t115) + core session_manager (TASK-033 оба templates). Anti-pattern истреблён.
+
+**🧪 Junction prove-out (t201, 2026-05-28):** canonical task_tag_map + custom-named author_book_map verify PASS errors=0. Same-feature junction generation подтверждено. **Cross-feature (BUG-015) — НЕ тестировался.**
 
 ### Suggested follow-up TASKs (capacity-driven, не started; ID присваивается скриптом)
 
