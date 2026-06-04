@@ -2,7 +2,7 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete)
+**Обновлено:** 2026-06-04 (post BUG-001 closure + junction prove-out 2026-05-28). master `ccf69b4`, 271 tests. **🎉 BUG-001 fully closed** оба templates. Готовность к weight regen: HIGH.
 
 ---
 

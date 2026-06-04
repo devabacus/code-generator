@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-05-26 (**🎉 Pipeline 5/5 CLOSED** — TASK-019 weight handoff package complete. Все 5 фиксов merged через PRs #22/#23/#24/#25/#27/#28)
+**Обновлено:** 2026-06-04 (post BUG-001 closure + junction prove-out). **master `ccf69b4`**, 271 tests. **🎉 BUG-001 fully closed** оба templates (TASK-031/032/033 merged 2026-05-28). Junction generation verified same-feature (t201 prove-out). Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
 
 ## Что это за проект
 

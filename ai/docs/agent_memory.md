@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-05-28 (**TASK-031 + TASK-032 merged** (`c8ad1b5` + `6b42bd4`). **TASK-033 in review** — session_manager ref.mounted guard оба templates (последний BUG-001 residual). 🎉 **BUG-001 fully closed** после TASK-033 merge. ⚠ Lesson TASK-031: `--feature-path` требует full absolute path. См. gotcha ниже.)
+**Последнее обновление:** 2026-06-04 (**TASK-031/032/033 + chore все merged** — master `ccf69b4`, 271 tests). 🎉 **BUG-001 fully closed** оба templates. **Junction prove-out** completed (t201: canonical + custom-named PASS). Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction generation works same-feature на t115 (t201 prove-out, см. gotcha).
 
 ---
 
