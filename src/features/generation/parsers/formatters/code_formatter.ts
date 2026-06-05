@@ -78,13 +78,15 @@ export class CodeFormatter implements ICodeFormatter {
 
         return fields.filter(field =>
             !exactExcludes.includes(field.name) &&
-            !field.name.includes('Map') &&
-            // BUG-027: collection back-relations (`<x>: List<Y>?, relation`) — server-side
-            // навигация, не flutter-данные. Парсер ставит `isRelation=false` на bare
-            // `relation` (regex требует `relation(`), поэтому relationType-проверки
-            // бесполезны — дискриминатор = тип `List<...>`. Симметрично drift-слою
-            // (`shouldSkipServerpodField`). Без этого regular one-to-many (`projectTasks`,
-            // нет `Map` в имени) протекает в freezed entity/model без импорта → InvalidType.
+            // BUG-027 / TASK-035: collection back-relations (`<x>: List<Y>?, relation`) —
+            // server-side навигация, не flutter-данные. Парсер ставит `isRelation=false`
+            // на bare `relation` (regex требует `relation(`), поэтому relationType-проверки
+            // бесполезны — дискриминатор = тип `List<...>`. Покрывает И junction back-relation
+            // (`List<XMap>`), И regular one-to-many (`projectTasks`). Симметрично drift-слою
+            // (`shouldSkipServerpodField`). Без этого поле протекает в freezed entity/model
+            // без импорта → InvalidType. Прежняя name-эвристика `!includes('Map')` убрана
+            // (TASK-035): substring-match молча дропал scalar-поля с `Map` в имени
+            // (`siteMapUrl`, `heatMapConfig`) — junction back-relations теперь ловятся типом.
             !field.type.startsWith('List<') &&
             !field.scope?.includes('serverOnly'));
     }
@@ -177,7 +179,9 @@ export class CodeFormatter implements ICodeFormatter {
     }
 
     shouldSkipServerpodField(field: ServerpodField): boolean {
-        const staticFields = ['id', 'userId', 'lastModified', 'syncStatus', 'isDeleted', 'Map', 'customerId', 'createdAt'];
+        // TASK-035: 'Map' убран — был exact-match (inert: ловил только поле, буквально
+        // названное `Map`), junction back-relations (`List<XMap>`) стрипаются ниже по типу.
+        const staticFields = ['id', 'userId', 'lastModified', 'syncStatus', 'isDeleted', 'customerId', 'createdAt'];
         if (staticFields.includes(field.name) || field.scope?.includes('serverOnly')) {
             return true;
         }

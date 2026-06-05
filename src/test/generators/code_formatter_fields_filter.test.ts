@@ -104,3 +104,54 @@ fields:
         assert.ok(names.includes('projectId'), 'FK projectId сохранена');
     });
 });
+
+/**
+ * TASK-035 — после BUG-027 (junction back-relation `List<XMap>` ловится через
+ * `startsWith('List<')`) name-эвристика `!field.name.includes('Map')` стала
+ * избыточной и несёт latent false-positive: scalar-поле с camelCase-сегментом
+ * `Map` (`siteMapUrl`, `heatMapConfig`, `roadMapId`) молча дропается из flutter
+ * entity И drift. Эвристика удалена; junction back-relation по-прежнему стрипается
+ * (через тип List<...>).
+ */
+suite('TASK-035 — Map-name-эвристика удалена, scalar-поля с `Map` в имени выживают', () => {
+
+    const formatter = new CodeFormatter();
+
+    const AUTHOR_WITH_MAPFIELD_YAML = `class: Author
+table: author
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  userId: int
+  customerId: UuidValue, relation(parent=customer, onDelete=Cascade)
+  createdAt: DateTime
+  lastModified: DateTime
+  isDeleted: bool, default=false
+  name: String
+  siteMapUrl: String
+  authorBookMaps: List<AuthorBookMap>?, relation`;
+
+    test('предусловие: имя содержит substring Map (закрепляем landmine)', () => {
+        assert.ok('siteMapUrl'.includes('Map'), 'siteMapUrl содержит "Map" → старая эвристика бы его дропнула');
+    });
+
+    test('scalar siteMapUrl выживает в fieldsFilter, junction back-relation стрипается', () => {
+        const model = ServerpodYamlParser.parse(AUTHOR_WITH_MAPFIELD_YAML);
+        const names = formatter.fieldsFilter(model.fields).map(f => f.name);
+        assert.ok(names.includes('siteMapUrl'), 'siteMapUrl НЕ дропнут (эвристика убрана)');
+        assert.ok(!names.includes('authorBookMaps'), 'junction back-relation стрипается через List<...>');
+    });
+
+    test('scalar siteMapUrl получает drift-колонку, authorBookMaps — нет', () => {
+        const model = ServerpodYamlParser.parse(AUTHOR_WITH_MAPFIELD_YAML);
+        const cols = formatter.generateDriftTableColumns(model.fields);
+        assert.ok(cols.includes('get siteMapUrl'), 'siteMapUrl эмитится как drift-колонка');
+        assert.ok(!cols.includes('authorBookMaps'), 'нет drift-колонки для junction back-relation');
+    });
+
+    test('siteMapUrl присутствует в freezed-конструкторе', () => {
+        const model = ServerpodYamlParser.parse(AUTHOR_WITH_MAPFIELD_YAML);
+        const emitted = formatter.formatRequiredTypeFields(model.fields);
+        assert.ok(emitted.includes('siteMapUrl'), 'siteMapUrl в freezed-конструкторе');
+        assert.ok(!emitted.includes('authorBookMaps'), 'нет authorBookMaps в freezed-конструкторе');
+    });
+});
