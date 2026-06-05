@@ -35,6 +35,8 @@ interface GenerateEntityOptions {
     withInterfaces?: boolean;
     /** TASK-029 Bug 5: opt-in server writes (default false, см. CLI flag docstring). */
     withServer?: boolean;
+    /** BUG-023: ceremony-профиль (`full` default | `minimal`). */
+    ceremony?: 'full' | 'minimal';
 }
 
 export function registerGenerateEntity(program: Command): void {
@@ -72,6 +74,16 @@ export function registerGenerateEntity(program: Command): void {
         // молча модифицировал 6 endpoint'ов + создал snake-дубли). startProject
         // manifest exempt — create-project продолжает генерить server baseline.
         .option('--with-server', 'Also write server-side endpoint/sync_event files (default: client-only). TASK-029: prevents silent scope creep.', false)
+        // BUG-023: ceremony-профиль. `full` (default) — исторический t115 layout
+        // (usecases + ds-интерфейсы + presentation через usecases). `minimal` —
+        // урезанный layout (как в weight): repository-интерфейс сохранён, usecases
+        // и ds-интерфейсы не эмитятся, repository_impl/data_providers/presentation
+        // ссылаются на конкретный datasource напрямую. Ортогонален --with-interfaces.
+        .addOption(
+            new Option('--ceremony <profile>', 'Ceremony layers: full (default, usecases+ds-interfaces) or minimal (concrete datasource, no usecases — weight layout)')
+                .choices(['full', 'minimal'])
+                .default('full'),
+        )
         .action(async (opts: GenerateEntityOptions) => {
             await handleGenerateEntity(opts);
         });
@@ -99,6 +111,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
 
         logger.info(`Entity: ${model.className} (${model.fields.length} fields, relation: ${model.isRelation})`);
         logger.info(`Scope: ${opts.withServer ? 'client + server' : 'client-only (TASK-029 default — use --with-server to also write server-side files)'}`);
+        logger.info(`Ceremony: ${opts.ceremony === 'minimal' ? 'minimal (BUG-023 — concrete datasource, no usecases/ds-interfaces)' : 'full (default)'}`);
 
         if (!opts.skipValidation) {
             const errors: ValidationError[] = [];
@@ -138,6 +151,7 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             templatesPath: opts.templatesPath,
             withInterfaces: opts.withInterfaces,
             withServer: opts.withServer,
+            ceremony: opts.ceremony,
         });
 
         const inner = new DefaultFileSystem();
