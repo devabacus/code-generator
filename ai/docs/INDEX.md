@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-06-04 (post BUG-001 closure + junction prove-out). **master `ccf69b4`**, 271 tests. **🎉 BUG-001 fully closed** оба templates (TASK-031/032/033 merged 2026-05-28). Junction generation verified same-feature (t201 prove-out). Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
+**Обновлено:** 2026-06-05 (BUG-023 ceremony flag + BUG-024/025 audit guards merged). **master `b26368a`**, 293 tests. Новое: **`--ceremony full|minimal`** (BUG-023 Design 1 — minimal вырезает usecases + usecase_providers, presentation→repository). Generator re-checked на t203 (create-project + full + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). BUG-026 (junction `customerId`) → DEFERRED/TASK-015. Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
 
 ## Что это за проект
 

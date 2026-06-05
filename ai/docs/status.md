@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-06-04 (**TASK-031/032/033 + chore все merged** — master `ccf69b4`, 271 tests). **🎉 BUG-001 fully closed** (оба templates). Junction prove-out completed (t201). Готовность к weight regen: **HIGH** (с caveats: BUG-005 `:base` overwrite procedure + BUG-015 cross-feature untested). Нет активных задач — ждёт User start weight regen или other follow-ups.
+**Обновлено:** 2026-06-05 (**BUG-023 + BUG-024 + BUG-025 merged**, BUG-026 deferred — master `b26368a`, 293 tests). Новое: **`--ceremony full|minimal`** (BUG-023). Generator re-checked на t203 (full + minimal + junction → verify errors=0). Audit-guards BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Нет активных задач.
 
 ---
 
@@ -14,25 +14,34 @@
 
 **⚠ CRITICAL Stack-lock decision (2026-05-03 — Discussion #11 + ADR-0005 amendment):** Стэк t115 baseline (Riverpod `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Версии всех packages update к latest stable (включая Serverpod). Simplified философия = ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation generation), всё остальное inherited from t115.
 
-### Master state (2026-06-04 — post chore PR #33)
+### Master state (2026-06-05 — post BUG-026 re-classification PR #38)
 
-- **Branch:** `master ccf69b4` (post chore PR #33 — docs/handoff sync + C-1 closure + t115 pubspec hygiene). Working tree clean.
-- **Tests:** **271 passing** на master, 0 failing
-  - 253 (pipeline 5/5) + 5 TASK-031 + 6 TASK-032 + 7 TASK-033 = 271
-- **Compile:** clean (`tsc -p ./` EXIT=0, verified 2026-06-04)
+- **Branch:** `master b26368a`. Working tree clean.
+- **Tests:** **293 passing** на master, 0 failing
+  - 271 (предыдущий baseline) + 14 BUG-023 ceremony + 5 BUG-024 + 3 BUG-025 = 293
+- **Compile:** clean (`tsc -p ./` EXIT=0, verified 2026-06-05)
 - **Lint:** 0 errors, 18 pre-existing warnings
 - **CI:** [.github/workflows/test.yml](../../.github/workflows/test.yml) — minimal gate (compile + lint + mocha)
-- **Total PRs merged:** **33** (28 prior + TASK-030..033 + chore docs/handoff sync)
+- **Total PRs merged:** **38** (33 prior + BUG-023 #35 + BUG-024 #36 + BUG-025 #37 + BUG-026 re-class #38)
 - **Cross-repo state:**
-  - `devabacus/t115` master `13657d8` (TASK-031/032/033 templates + pubspec hygiene)
-  - `devabacus/simplified` — local-only git repo (нет remote), pre-existing User dirty state; TASK-033 session_manager changes на disk функциональны для create-project
-- **Highest test project:** **t201** (junction prove-out). Next → t202+. Sandbox блокирует delete (политика).
+  - `devabacus/t115` master `fda1759` (BUG-023 ceremony minimal варианты для category)
+  - `devabacus/simplified` — local-only git repo (нет remote), pre-existing User dirty state
+- **Highest test project:** **t203** (generator re-check sweep: full+minimal+junction). Sandbox блокирует delete (политика). В t203 остался scratch `traps/` (BUG-024 repro).
 
 ---
 
 ## Активные задачи
 
 **Нет активных задач.** Все merged. Ждёт User explicit start следующего substantive item (weight regen или other follow-ups).
+
+### Закрыто (сессия 2026-06-05)
+
+- **BUG-023** ✅ merged (PR #35, master `02af21f`) — `generate-entity --ceremony full|minimal` (Design 1). `minimal` вырезает usecases + usecase_providers, presentation→repository через `.minc`-варианты (ref.mounted guards сохранены). Default `full` без изменений. Маркеры `flags: fullCeremony`/`minimalCeremony` + `matchesCeremonyFlag`. t115 push `fda1759`. Standard + Adversarial APPROVE.
+- **BUG-024** ✅ merged (PR #36, master `9f892a7`) — pre-flight guard на reserved Drift column-имена (`text`/`integer`/`dateTime`/`boolean`/`real` + forward-defense). Поймано на t203 (поле `text` → self-referential getter → drift_dev crash + build_runner exit 0 = silent broken build). `EntityYamlValidator.RESERVED_DRIFT_COLUMN_NAMES`. Adversarial APPROVE.
+- **BUG-025** ✅ merged (PR #37, master `af43107`) — orchestrator no-op fail-fast. Если `sync_orchestrator_provider.dart` существует, но marker-блоки отсутствуют → throw (раньше silent no-op = сущность не в sync, verify-blind). Adversarial APPROVE.
+- **BUG-026** ⏭ DEFERRED → TASK-015 (PR #38, master `b26368a`, docs-only). Blanket-fix (exclude `customerId`) **отклонён** — ломает CustomerUser junction (там `customerId` = настоящий родитель, структурно неотличим от tenant-scope). Mitigation: конвенция declare-parents-first (t115 соблюдает).
+
+**🧪 Generator re-check (t203, 2026-06-05):** create-project + single-entity full (Memo) + minimal (Label) + custom junction (AuthorBookMap) → verify errors=0 по всем путям.
 
 ### Закрыто недавно (сессия 2026-05-28)
 

@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-06-04 (**TASK-031/032/033 + chore все merged** — master `ccf69b4`, 271 tests). 🎉 **BUG-001 fully closed** оба templates. **Junction prove-out** completed (t201: canonical + custom-named PASS). Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction generation works same-feature на t115 (t201 prove-out, см. gotcha).
+**Последнее обновление:** 2026-06-05 (**BUG-023 + BUG-024 + BUG-025 merged**, BUG-026 deferred — master `b26368a`, 293 tests). Новое: `--ceremony full|minimal` (BUG-023 Design 1). Generator re-checked на t203 (full + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). См. новые gotchas ниже. Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201).
 
 ---
 
@@ -227,6 +227,22 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 ---
 
 ## Gotchas / Подводные камни (essential only)
+
+### `generate-entity --ceremony full|minimal` (BUG-023)
+
+⚠ Флаг `--ceremony` (default `full`), ортогонален `--with-interfaces`. `minimal` вырезает `usecases` + `usecase_providers` (Discussion #7: noise = только usecases) и переключает presentation (`state_providers`, `get_by_id_provider`) на прямой вызов repository через `.minc`-варианты шаблона. **ds-интерфейсы / repository_impl / data_providers НЕ трогаются** (by design — дублировать sync-критичный local_data_source = risk drift). Механизм: маркеры `flags: fullCeremony`/`minimalCeremony` + `MarkerAnalyzer.matchesCeremonyFlag`; sentinel `.minc` срезается в `_getDestinationPath`. **Known limitations:** minimal оставляет ds-интерфейсы (≠ weight HEAD на 2 файла); no-op для junction + sibling-шаблонов (помечен только `category`). Default `full` = исторический output без изменений.
+
+### Reserved Drift column-имена в полях — fail-fast (BUG-024)
+
+⚠ **Поле с именем Drift column-builder** (`text`/`integer`/`dateTime`/`boolean`/`real`; + forward-defense `int64`/`blob`/`customType`/`intEnum`/`textEnum`) генерирует `TextColumn get text => text()()` (self-referential) → drift_dev падает, **build_runner exit 0**, stale `database.g.dart` → каскад analyze-ошибок (silent broken build). `EntityYamlValidator` теперь reject'ит pre-flight (`RESERVED_DRIFT_COLUMN_NAMES`, error `RESERVED_FIELD_NAME`). Lesson: build_runner НЕ пробрасывает non-zero на drift errors — verify ловит только финальным `flutter analyze`. Родственно BUG-018 (reserved Serverpod class names) / BUG-010 (`Map` в имени).
+
+### Orchestrator marker fail-fast (BUG-025)
+
+⚠ `OrchestratorPatcher` раньше молча no-op'ил, если `sync_orchestrator_provider.dart` существует, но marker-блоки (`syncImports`/`syncEntityTypes`/`syncRegistrations`) отсутствуют → сущность не регистрировалась в sync (**verify-blind**: компилируется, но offline-sync не работает). Теперь `_assertMarkersPresent` бросает с именами отсутствующих маркеров. File-absent остаётся мягким skip (не-bootstrap'нутый проект). Класс «verify-blind»: verify ловит только то, что доходит до `.g.dart`; valid-but-wrong Dart (sync no-op, `:base` loss) проходит мимо.
+
+### Junction FK-пара: `customerId` неоднозначен (BUG-026 → TASK-015)
+
+⚠ `extractManyToManyEntities` / orchestrator берут первые 2 relation-поля по порядку объявления. `customerId: relation(parent=customer)` структурно **неотличим**: в `TaskTagMap` = tenant-scope (надо игнорировать), в `CustomerUser` = настоящий junction-родитель (надо включать). Blanket-exclude ломает CustomerUser → **не фиксится фильтром** (TASK-015 = explicit `junction: [parent, parent]`). **Mitigation (соблюдать!):** объявляй junction-родительские FK ПЕРЕД ownership `customerId` (шаблон t115 `task_tag_map` так и делает). Баг проявляется только при нарушении конвенции.
 
 ### Windows + sandbox
 
