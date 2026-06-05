@@ -2,13 +2,13 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-06-04 (post BUG-001 closure + junction prove-out 2026-05-28). master `ccf69b4`, 271 tests. **🎉 BUG-001 fully closed** оба templates. Готовность к weight regen: HIGH.
+**Обновлено:** 2026-06-05 (сессия BUG-023..027 + full pipeline t204). master `a61c9cb` (+ post-сессия sync), 293 tests. Новое: `--ceremony full|minimal` (BUG-023) + audit-guards BUG-024/025. Готовность к weight regen: HIGH.
 
 ---
 
 ## Текущий статус
 
-**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **🎉 Pipeline 5/5 CLOSED** (2026-05-26). master `5296ce3` (post TASK-029 PR #28 squash merge). **28 PRs merged** total. **253 tests** passing на master.
+**Phase 1.5 + Phase A + Phase B ✅ CLOSED.** Pipeline 5/5 closed (2026-05-26). Сессия 2026-06-05: BUG-023 ceremony + BUG-024/025 guards merged, BUG-026 deferred, BUG-027 filed. master `a61c9cb` (+ post-сессия sync). **39 PRs merged** total. **293 tests** passing на master.
 
 **🎉 Pipeline 5/5 closed:**
 
