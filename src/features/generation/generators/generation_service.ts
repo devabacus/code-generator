@@ -153,6 +153,15 @@ export class GenerationService {
                 // здесь. Файлы без flags-маркера всегда проходят (backward compat).
                 if (!MarkerAnalyzer.matchesInterfaceFlag(fileManifest, config.withInterfaces)) { continue; }
 
+                // BUG-023: ceremony-профиль (`--ceremony full|minimal`, Design 1).
+                // Файлы с `flags: fullCeremony` отсекаются при minimal (usecases +
+                // usecase-провайдеры + interface-вариант presentation), файлы с
+                // `flags: minimalCeremony` (`.minc` presentation, repository-direct)
+                // — при full. Файлы без ceremony-флага проходят всегда
+                // (datasource-интерфейсы, repository_impl, data_providers — общие для
+                // обоих режимов). Default `full` сохраняет исторический t115 output.
+                if (!MarkerAnalyzer.matchesCeremonyFlag(fileManifest, config.ceremony)) { continue; }
+
                 // Добавляем задачу обработки файла в очередь
                 const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
                 const destinationPath = path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config, model));
@@ -353,13 +362,14 @@ export class GenerationService {
 
         destinationRelativePath = destinationRelativePath.replaceAll(config.templProject, config.targetProject);
 
-        // Сентинел `.withif` в имени файла — маркер альтернативного шаблона для
-        // взаимоисключающего выбора по `--with-interfaces`. Срезаем его из
-        // destination, чтобы `<entity>_repository_impl.withif.dart` лёг в тот же
-        // путь, что и базовый `<entity>_repository_impl.dart`. Файл выбирается
-        // фильтром `MarkerAnalyzer.matchesInterfaceFlag` ещё до этого шага, так
-        // что коллизии destination между вариантами не возникает.
-        destinationRelativePath = destinationRelativePath.replace(/\.withif(\.[^.]+)$/, '$1');
+        // Сентинелы `.withif` (--with-interfaces) и `.minc` (BUG-023 ceremony
+        // minimal) в имени файла — маркеры альтернативных шаблонов для
+        // взаимоисключающего выбора. Срезаем их из destination, чтобы
+        // `<entity>_repository_impl.minc.dart` лёг в тот же путь, что и базовый
+        // `<entity>_repository_impl.dart`. Нужный вариант уже выбран фильтрами
+        // `matchesInterfaceFlag` / `matchesCeremonyFlag` до этого шага, так что
+        // коллизии destination между вариантами не возникает.
+        destinationRelativePath = destinationRelativePath.replace(/\.(?:withif|minc)(\.[^.]+)$/, '$1');
 
         return destinationRelativePath;
     }

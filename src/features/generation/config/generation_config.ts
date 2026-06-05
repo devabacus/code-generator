@@ -1,5 +1,6 @@
 import path from "path";
 import { manifestType as ManifestType } from "../generators/manifests";
+import { CeremonyProfile } from "../generators/marker_analyzer";
 import { TemplateConfig, t115TemplateConfig } from "./template_config";
 
 export interface IGenerationConfig {
@@ -62,6 +63,15 @@ export interface IGenerationConfig {
      * least-surprise default.
      */
     withServer?: boolean;
+    /**
+     * BUG-023: профиль ceremony-слоёв (`full` | `minimal`). Default `full` —
+     * исторический t115 output без изменений. `minimal` отсекает usecases +
+     * datasource-интерфейсы и выбирает конкретно-datasource варианты
+     * repository_impl / data_providers / presentation (layout weight). Селекция
+     * вариантов идёт через `flags: fullCeremony` / `flags: minimalCeremony`
+     * маркеры (`MarkerAnalyzer.matchesCeremonyFlag`). Ортогонален `withInterfaces`.
+     */
+    ceremony?: CeremonyProfile;
 }
 
 export class GenerationConfig {
@@ -98,6 +108,9 @@ export class GenerationConfig {
     /** TASK-029 Bug 5: opt-in server writes для entity/manyToMany (default false). */
     public withServer: boolean;
 
+    /** BUG-023: профиль ceremony-слоёв (default `full` — t115 output без изменений). */
+    public ceremony: CeremonyProfile;
+
 
     constructor(config: IGenerationConfig) {
         this.templProject = config.templProject || 't2';
@@ -125,6 +138,7 @@ export class GenerationConfig {
         this.templateConfig = config.templateConfig || t115TemplateConfig();
         this.withInterfaces = config.withInterfaces || false;
         this.withServer = config.withServer || false;
+        this.ceremony = config.ceremony || 'full';
     }
 
 

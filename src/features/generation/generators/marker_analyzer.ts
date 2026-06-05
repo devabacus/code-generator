@@ -2,6 +2,19 @@ import { DictionaryName } from "../replacement/replacement_util";
 
 export type ManifestType = 'ignore' | 'startProject' | 'entity' | 'manyToMany' | 'serverpod' | 'deploy' | 'pythonStart' | 'goStart' | 'nodeStart';
 
+/**
+ * BUG-023: профиль ceremony-слоёв генерируемой фичи.
+ * - `full` (default)   — полный Clean-stack: usecases + usecase-провайдеры +
+ *   datasource-интерфейсы + presentation через usecases (исторический t115).
+ * - `minimal`          — урезанный layout (как в weight): repository-интерфейс
+ *   сохранён, но usecases и datasource-интерфейсы НЕ эмитятся, repository_impl /
+ *   data_providers ссылаются на конкретный datasource, presentation ходит в
+ *   repository напрямую.
+ *
+ * Ортогонален `--with-interfaces` (тот управляет repository-интерфейсом отдельно).
+ */
+export type CeremonyProfile = 'full' | 'minimal';
+
 export interface FileManifest {
     types: ManifestType[];
     dictionaries: DictionaryName[];
@@ -62,6 +75,24 @@ export class MarkerAnalyzer {
     public static matchesInterfaceFlag(manifest: FileManifest, withInterfaces: boolean): boolean {
         if (manifest.flags.includes('withInterfaces')) { return withInterfaces; }
         if (manifest.flags.includes('withoutInterfaces')) { return !withInterfaces; }
+        return true;
+    }
+
+    /**
+     * BUG-023: проверяет, проходит ли файл по ceremony-профилю.
+     * - файл с `flags: fullCeremony`    → включается только при ceremony='full'
+     *   (полные ceremony-слои t115: usecases, ds-интерфейсы, interface-вариант
+     *   repository_impl/data_providers/presentation).
+     * - файл с `flags: minimalCeremony` → включается только при ceremony='minimal'
+     *   (конкретно-datasource варианты, presentation через repository).
+     * - файл без ceremony-флага         → включается всегда (backward compat).
+     *
+     * Default `full` сохраняет исторический output t115 байт-в-байт
+     * (файлы с `fullCeremony` проходят, `minimalCeremony` отсекаются).
+     */
+    public static matchesCeremonyFlag(manifest: FileManifest, ceremony: CeremonyProfile): boolean {
+        if (manifest.flags.includes('fullCeremony')) { return ceremony === 'full'; }
+        if (manifest.flags.includes('minimalCeremony')) { return ceremony === 'minimal'; }
         return true;
     }
 }
