@@ -78,7 +78,15 @@ export class CodeFormatter implements ICodeFormatter {
 
         return fields.filter(field =>
             !exactExcludes.includes(field.name) &&
-            !field.name.includes('Map') && !field.scope?.includes('serverOnly'));
+            !field.name.includes('Map') &&
+            // BUG-027: collection back-relations (`<x>: List<Y>?, relation`) — server-side
+            // навигация, не flutter-данные. Парсер ставит `isRelation=false` на bare
+            // `relation` (regex требует `relation(`), поэтому relationType-проверки
+            // бесполезны — дискриминатор = тип `List<...>`. Симметрично drift-слою
+            // (`shouldSkipServerpodField`). Без этого regular one-to-many (`projectTasks`,
+            // нет `Map` в имени) протекает в freezed entity/model без импорта → InvalidType.
+            !field.type.startsWith('List<') &&
+            !field.scope?.includes('serverOnly'));
     }
 
     formatSimpleFields(fields: Field[] | ServerpodField[]): string {
@@ -175,6 +183,12 @@ export class CodeFormatter implements ICodeFormatter {
         }
 
         if (field.isRelation && field.relationType === 'oneToMany') {
+            return true;
+        }
+        // BUG-027: collection back-relation (`List<X>`) — не drift-колонка. Bare `relation`
+        // даёт `isRelation=false`, поэтому oneToMany-проверка выше его не ловит → раньше
+        // эмитилась silent-wrong `TextColumn get <x> => text()`. Дискриминатор = тип List<>.
+        if (field.type.startsWith('List<')) {
             return true;
         }
         return false;
