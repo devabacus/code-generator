@@ -135,6 +135,43 @@ suite('EntityYamlValidator Test Suite', () => {
         }
     });
 
+    test('BUG-024: field "text" (Drift builder name) → RESERVED_FIELD_NAME error', () => {
+        const model = standardModel({ fields: [...standardModel().fields, field('text')] });
+        const errors = EntityYamlValidator.validate(model);
+        const reserved = errors.filter(e => e.code === 'RESERVED_FIELD_NAME');
+        assert.strictEqual(reserved.length, 1);
+        assert.ok(reserved[0].message.includes('text'));
+        assert.ok(reserved[0].message.includes('Drift'));
+    });
+
+    test('BUG-024: multiple reserved field names → one error each', () => {
+        const model = standardModel({
+            fields: [...standardModel().fields, field('text'), field('boolean'), field('dateTime')],
+        });
+        const reserved = EntityYamlValidator.validate(model).filter(e => e.code === 'RESERVED_FIELD_NAME');
+        assert.strictEqual(reserved.length, 3);
+    });
+
+    test('BUG-024: reserved name caught even in junction (pre-table-gen collision)', () => {
+        const model = standardModel({
+            className: 'TaskTagMap', tableName: 'task_tag_map', isRelation: true,
+            fields: [field('id'), fkField('taskId', 'Task'), fkField('tagId', 'Tag'), field('text')],
+        });
+        const reserved = EntityYamlValidator.validate(model).filter(e => e.code === 'RESERVED_FIELD_NAME');
+        assert.strictEqual(reserved.length, 1);
+    });
+
+    test('BUG-024: non-reserved field (body) → no reserved error', () => {
+        const model = standardModel({ fields: [...standardModel().fields, field('body')] });
+        const reserved = EntityYamlValidator.validate(model).filter(e => e.code === 'RESERVED_FIELD_NAME');
+        assert.strictEqual(reserved.length, 0);
+    });
+
+    test('BUG-024: standard 6-field entity stays clean (createdAt/lastModified не reserved)', () => {
+        const errors = EntityYamlValidator.validate(standardModel());
+        assert.strictEqual(errors.length, 0);
+    });
+
     test('formatErrors produces user-readable message', () => {
         const errors = EntityYamlValidator.validate(standardModel({
             fields: [field('id'), field('key'), field('value')],
