@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-06-05 (**BUG-023 + BUG-024 + BUG-025 merged**, BUG-026 deferred — master `b26368a`, 293 tests). Новое: `--ceremony full|minimal` (BUG-023 Design 1). Generator re-checked на t203 (full + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). См. новые gotchas ниже. Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201).
+**Последнее обновление:** 2026-06-05 (**BUG-023 + BUG-024 + BUG-025 merged**, BUG-026 deferred, BUG-027 filed — master `a61c9cb` + post-сессия sync, 293 tests). Новое: `--ceremony full|minimal` (BUG-023 Design 1). **Full pipeline re-checked на t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, fix готов 1 строка) + BUG-026→TASK-015 + BUG-005 + BUG-015. См. новые gotchas ниже. Готовность к weight regen: HIGH. Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201); one-to-many = child-FK-only, parent без flutter back-relation (BUG-027).
 
 ---
 
@@ -243,6 +243,10 @@ python ai/discussions/scripts/discuss.py close <N> # archive
 ### Junction FK-пара: `customerId` неоднозначен (BUG-026 → TASK-015)
 
 ⚠ `extractManyToManyEntities` / orchestrator берут первые 2 relation-поля по порядку объявления. `customerId: relation(parent=customer)` структурно **неотличим**: в `TaskTagMap` = tenant-scope (надо игнорировать), в `CustomerUser` = настоящий junction-родитель (надо включать). Blanket-exclude ломает CustomerUser → **не фиксится фильтром** (TASK-015 = explicit `junction: [parent, parent]`). **Mitigation (соблюдать!):** объявляй junction-родительские FK ПЕРЕД ownership `customerId` (шаблон t115 `task_tag_map` так и делает). Баг проявляется только при нарушении конвенции.
+
+### One-to-many back-relation на parent → InvalidType (BUG-027, Open, fix готов)
+
+⚠ Parent entity с `<children>: List<RegularChild>?, relation` (one-to-many back-relation на **regular** entity) → поле протекает в flutter `*_entity.dart` **без импорта** → `json_serializable InvalidType` → build_runner FAIL. Причина: `code_formatter.ts:76 fieldsFilter` стрипает back-relation по name-эвристике `!includes('Map')` (junction `*Map` дропается случайно), а `oneToMany` по `relationType` НЕ скипает (хотя drift-table слой через `shouldSkipServerpodField` — скипает; асимметрия). **Confirmed fix (1 строка):** добавить `!(field.isRelation && field.relationType === 'oneToMany')` в `fieldsFilter`. **Mitigation/correct modeling:** one-to-many = child FK only (`childId: relation(parent=X)` + `X?, scope=serverOnly`); parent НЕ держит flutter back-relation list (паттерн t115 `task`→`category`). Junction back-relation (`<j>Maps: List<JMap>`) — работает (стрипается). См. [BUG-027](../bug-reports/027-one-to-many-back-relation-regular-entity-leaks-into-flutter-entity.md).
 
 ### Windows + sandbox
 

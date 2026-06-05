@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-06-05 (BUG-023 ceremony flag + BUG-024/025 audit guards merged). **master `b26368a`**, 293 tests. Новое: **`--ceremony full|minimal`** (BUG-023 Design 1 — minimal вырезает usecases + usecase_providers, presentation→repository). Generator re-checked на t203 (create-project + full + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). BUG-026 (junction `customerId`) → DEFERRED/TASK-015. Готовность к weight regen: HIGH (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
+**Обновлено:** 2026-06-05 (сессия BUG-023..027 + full pipeline t204 + handoff). **master `a61c9cb`** (+ docs/handoff/BUG-027 sync), 293 tests. Новое: **`--ceremony full|minimal`** (BUG-023 Design 1 — minimal вырезает usecases + usecase_providers, presentation→repository). Full pipeline re-checked на t204 (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, one-line fix готов) + BUG-026/junction `customerId`→TASK-015 + BUG-005 `:base` + BUG-015 cross-feature. Готовность к weight regen: HIGH.
 
 ## Что это за проект
 
@@ -10,11 +10,12 @@
 
 ## Текущее состояние
 
-**Phase 1.5 + Phase A + Phase B ✅ EXECUTED** (2026-05-03 → 2026-05-04). **🎉 Pipeline 5/5 CLOSED** (2026-05-26).
+**Phase 1.5 + Phase A + Phase B ✅ CLOSED.** Pipeline 5/5 closed (2026-05-26). **Сессия 2026-06-05:** BUG-023 ceremony flag + BUG-024/025 audit guards merged, BUG-026 deferred→TASK-015, BUG-027 filed (one-to-many back-relation leak).
 
-- **253 unit tests passing** на master (218 baseline post-TASK-027 + 15 TASK-028 LWW guard + 20 TASK-029 with-server filter)
-- **28 PRs merged** total (Phase 1.5/A/B sequence + TASK-030 + TASK-025/026/027/028/029 + chore stack-lock + post-Phase-B opt-in + handoff sync + closure docs sync chore)
-- **master `5296ce3`** (post TASK-029 squash merge — PR #28; до этого chore — post-merge state)
+- **293 unit tests passing** на master (271 baseline + 14 BUG-023 ceremony + 5 BUG-024 + 3 BUG-025)
+- **39 PRs merged** total (последние: BUG-023 #35, BUG-024 #36, BUG-025 #37, BUG-026 re-class #38, docs #39)
+- **master `a61c9cb`** (+ post-сессия docs/handoff/BUG-027 sync)
+- Full pipeline re-checked на **t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0)
 - CI workflow active ([.github/workflows/test.yml](../../.github/workflows/test.yml))
 - t115 template (`devabacus/t115`) — supported path (per ADR-0005 amendment 2026-05-04, bug-fix-as-needed)
 - simplified template (`G:/Templates/flutter/simplified/`) — opt-in via `--template simplified` (Discussion #12 pivot 2026-05-04); **5 fixes applied в pipeline 5/5** (TASK-025 ref.mounted + TASK-026 quote-boundary snake + TASK-027 tryParseEnum + TASK-028 LWW guard + TASK-029 --with-server opt-in)

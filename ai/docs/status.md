@@ -88,6 +88,11 @@
 | ID | Severity | Description | Action |
 |---|---|---|---|
 | ~~BUG-001~~ | ~~High UI~~ | ~~Ref disposed в state_providers (Riverpod async)~~ | ✅ **CLOSED 2026-05-28** — TASK-025 (simplified state_providers) + TASK-032 (t115 state_providers) + TASK-033 (session_manager оба). Anti-pattern истреблён в обоих templates. |
+| ~~BUG-023~~ | ~~Medium~~ | ~~generate-entity игнорирует урезанную ceremony~~ | ✅ **CLOSED 2026-06-05** (PR #35) — `--ceremony full\|minimal` (Design 1). |
+| ~~BUG-024~~ | ~~High~~ | ~~Reserved Drift column-имя поля → silent broken build~~ | ✅ **CLOSED 2026-06-05** (PR #36) — pre-flight guard в EntityYamlValidator. |
+| ~~BUG-025~~ | ~~High~~ | ~~Orchestrator no-op при отсутствии маркеров (verify-blind)~~ | ✅ **CLOSED 2026-06-05** (PR #37) — fail-fast guard. |
+| BUG-026 | Medium (silent) | Junction FK-extraction не фильтрует `customerId` (wrong pair при нестандартном порядке) | ⏭ **DEFERRED → TASK-015** (2026-06-05). Blanket-fix ломает CustomerUser (customerId неоднозначен). Mitigation: declare-parents-first. |
+| **BUG-027** | **Medium** | **one-to-many back-relation на regular entity → InvalidType build fail** | 🔧 **Open, fix готов** (1 строка: `fieldsFilter` excl. `relationType==='oneToMany'`, [code_formatter.ts:76](../../src/features/generation/parsers/formatters/code_formatter.ts)). Confirmed adversarial review. Workaround: убрать parent back-relation. |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
 | BUG-015 | ⚠ High codegen → **untested** | Cross-feature junction (parents в **разных** features) generation broken | ⚠ **t201 prove-out (2026-05-28): same-feature junction PASS errors=0** (canonical task_tag_map + custom author_book_map). **Cross-feature (parents в разных features) НЕ тестировался** — остаётся открытым edge. Re-test перед weight regen если weight имеет cross-feature junction. |
 | ~~BUG-016~~ | ~~Medium~~ | ~~Junction MANY_TO_MANY substitution analog TASK-017~~ | ✅ **Appears RESOLVED (verified t201 2026-05-28)** — custom-named junction (author_book_map) substitution чистая errors=0, target names из YAML relations. Вероятно закрыт TASK-014/017. |
