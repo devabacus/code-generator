@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-06-05 (**BUG-027 fix — TASK-034**, ready for commit; 299 tests). type-based фикс collection back-relation leak в `code_formatter.ts` (`fieldsFilter` + `shouldSkipServerpodField`), root cause в bug-report был неверен (bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). verify t205 errors=0, Standard+Adversarial APPROVE. Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards merged, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
+**Обновлено:** 2026-06-05 (**BUG-027 merged — master `bfaebb5` PR #41**; **TASK-035 Map-cleanup ready for commit**; 303 tests). BUG-027: type-based фикс collection back-relation leak в `code_formatter.ts` (root cause в bug-report был неверен — bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). TASK-035: удалены избыточные `Map`-эвристики (substring-landmine для scalar `siteMapUrl`/`heatMapConfig`). verify t205 errors=0 (оба). Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards merged, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
 
 ---
 
@@ -32,11 +32,12 @@
 
 ## Активные задачи
 
-**TASK-034 (BUG-027) — ready for commit** (фикс + 6 tests + verify t205 errors=0 + 2× review APPROVE; не закоммичен). После коммита — нет активных задач, ждёт User explicit start следующего item (weight regen).
+**TASK-035 (Map-cleanup) — ready for commit** (фикс + 4 tests + verify t205 errors=0 + Adversarial APPROVE; не закоммичен). После коммита — нет активных задач, ждёт User explicit start следующего item (weight regen).
 
 ### Закрыто (сессия 2026-06-05)
 
-- **TASK-034 / BUG-027** ✅ fix готов (commit pending) — collection back-relation (`List<X>?, relation`) протекал в flutter entity (loud `InvalidType` build fail) + drift column (silent-wrong `TextColumn`). Type-based фикс `field.type.startsWith('List<')` в `fieldsFilter` + `shouldSkipServerpodField`. **Root cause в первичном bug-report был неверен** (предполагал `relationType='oneToMany'`; реально bare `relation` → `isRelation=false`). verify t205 PASS errors=0, warnings=1 (pre-existing), 299 tests (293+6), Standard+Adversarial APPROVE.
+- **TASK-035** ✅ fix готов (commit pending) — follow-up к BUG-027. Удалены избыточные `Map`-эвристики из `code_formatter.ts`: substring `!name.includes('Map')` в `fieldsFilter` (latent false-positive — scalar `siteMapUrl`/`heatMapConfig`/`roadMapId` молча дропались) + inert exact-match `'Map'` в `shouldSkipServerpodField.staticFields`. Junction back-relations покрыты type-check `startsWith('List<')` (BUG-027). verify t205 errors=0 (library junction + author.siteMapUrl survives), 303 tests (299+4), Adversarial APPROVE.
+- **TASK-034 / BUG-027** ✅ **merged** (PR #41, master `bfaebb5`) — collection back-relation (`List<X>?, relation`) протекал в flutter entity (loud `InvalidType` build fail) + drift column (silent-wrong `TextColumn`). Type-based фикс `field.type.startsWith('List<')` в `fieldsFilter` + `shouldSkipServerpodField`. **Root cause в первичном bug-report был неверен** (предполагал `relationType='oneToMany'`; реально bare `relation` → `isRelation=false`). verify t205 PASS errors=0, 299 tests, Standard+Adversarial APPROVE.
 
 - **BUG-023** ✅ merged (PR #35, master `02af21f`) — `generate-entity --ceremony full|minimal` (Design 1). `minimal` вырезает usecases + usecase_providers, presentation→repository через `.minc`-варианты (ref.mounted guards сохранены). Default `full` без изменений. Маркеры `flags: fullCeremony`/`minimalCeremony` + `matchesCeremonyFlag`. t115 push `fda1759`. Standard + Adversarial APPROVE.
 - **BUG-024** ✅ merged (PR #36, master `9f892a7`) — pre-flight guard на reserved Drift column-имена (`text`/`integer`/`dateTime`/`boolean`/`real` + forward-defense). Поймано на t203 (поле `text` → self-referential getter → drift_dev crash + build_runner exit 0 = silent broken build). `EntityYamlValidator.RESERVED_DRIFT_COLUMN_NAMES`. Adversarial APPROVE.
@@ -191,3 +192,4 @@ Sequence per Discussion #4 → #6:
 | TASK-032 | Bug 4 t115 ref.mounted guard parity | 🟡 In Progress | 2026-05-28 |
 | TASK-033 | session manager ref.mounted guard both templates | 🟡 In Progress | 2026-05-28 |
 | TASK-034 | BUG-027 fix one-to-many back-relation leak в flutter entity | 🟡 In Progress | 2026-06-05 |
+| TASK-035 | cleanup redundant Map-эвристики в fieldsFilter (latent false-positive) | 🟡 In Progress | 2026-06-05 |
