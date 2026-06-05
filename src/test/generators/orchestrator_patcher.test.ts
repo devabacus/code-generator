@@ -139,6 +139,46 @@ suite('OrchestratorPatcher Test Suite', () => {
         assert.strictEqual(exists, false, 'patcher must not create orchestrator file from scratch');
     });
 
+    test('BUG-025: orchestrator существует, но маркеры отсутствуют → throw (не silent no-op)', async () => {
+        // Файл есть (проект bootstrap'нут), но marker-пары удалены/отсутствуют.
+        const noMarkers = `// manifest: startProject
+import 'dart:async';
+import 'package:sync_core/sync_core.dart';
+
+const List<String> syncEntityTypes = <String>['configuration'];
+
+SyncOrchestrator syncOrchestrator(Ref ref) {
+  final orchestrator = SyncOrchestrator();
+  return orchestrator;
+}
+`;
+        mockFs.setFile(ORCHESTRATOR_PATH, noMarkers);
+        await assert.rejects(
+            () => patcher.patch(makeConfig(), makeModel('Expense')),
+            /BUG-025|marker/i,
+            'patch должен бросить, а не молча пропустить регистрацию',
+        );
+    });
+
+    test('BUG-025: частично отсутствующий маркер (нет syncRegistrations) → throw с именем', async () => {
+        // baseline без блока syncRegistrations.
+        const partial = ORCHESTRATOR_BASELINE.replace(
+            /\/\/ === generated_start:syncRegistrations ===[\s\S]*?\/\/ === generated_end:syncRegistrations ===/,
+            '// (registrations removed)',
+        );
+        mockFs.setFile(ORCHESTRATOR_PATH, partial);
+        await assert.rejects(
+            () => patcher.patch(makeConfig(), makeModel('Expense')),
+            /syncRegistrations/,
+            'сообщение должно называть отсутствующий маркер',
+        );
+    });
+
+    test('BUG-025: все 3 маркера на месте → patch проходит без throw (regression)', async () => {
+        mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
+        await assert.doesNotReject(() => patcher.patch(makeConfig(), makeModel('Expense')));
+    });
+
     test('single entity add: 3 marker блока обновлены + full import path correct (BUG-009 fix)', async () => {
         mockFs.setFile(ORCHESTRATOR_PATH, ORCHESTRATOR_BASELINE);
 
