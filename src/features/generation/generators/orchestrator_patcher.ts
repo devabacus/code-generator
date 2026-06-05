@@ -48,6 +48,9 @@ import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
  * Не патчит, если orchestrator файл не существует (свежий проект до Phase B).
  */
 export class OrchestratorPatcher {
+    /** BUG-025: marker-блоки, обязательные для регистрации entity в sync_core. */
+    private static readonly REQUIRED_MARKERS = ['syncImports', 'syncEntityTypes', 'syncRegistrations'];
+
     constructor(private fileSystem: IFileSystem) {}
 
     public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
@@ -64,6 +67,13 @@ export class OrchestratorPatcher {
         }
 
         let content = await this.fileSystem.readFile(orchestratorPath);
+
+        // BUG-025: orchestrator файл существует, но marker-блоки отсутствуют →
+        // `_patchMarkerBlock` стал бы silent no-op, и сущность НЕ зарегистрировалась
+        // бы в sync_core. Это verify-blind (код компилируется, offline-sync молча
+        // не работает). Fail-fast вместо тихого пропуска. File-absent остаётся
+        // мягким skip выше (свежий/не-bootstrap'нутый проект, легитимно).
+        this._assertMarkersPresent(content, model, orchestratorPath);
 
         // TASK-013: junction detection через shared JunctionDetector (Q3=A).
         // Replaces legacy `endsWith('Map')` (Q2=A — drop suffix entirely).
@@ -112,6 +122,32 @@ export class OrchestratorPatcher {
      * Marker pair preserves leading whitespace перед start marker (для list literal —
      * `  // === ... ===`, для top-level imports — без indent).
      */
+    /**
+     * BUG-025: проверяет, что в существующем orchestrator присутствуют все три
+     * required marker-блока. Если хотя бы один отсутствует — throw (fail-fast),
+     * т.к. иначе `_patchMarkerBlock` молча no-op'нет и сущность не попадёт в sync.
+     */
+    private _assertMarkersPresent(content: string, model: ServerpodModel, orchestratorPath: string): void {
+        const missing = OrchestratorPatcher.REQUIRED_MARKERS.filter(
+            name => !this._hasMarkerBlock(content, name),
+        );
+        if (missing.length > 0) {
+            throw new Error(
+                `OrchestratorPatcher: "${orchestratorPath}" существует, но отсутствуют marker-блоки [${missing.join(', ')}]. ` +
+                `Сущность "${model.className}" НЕ будет зарегистрирована в sync_core — это verify-blind ` +
+                `(код компилируется, но offline-sync молча не работает). BUG-025. ` +
+                `Восстанови пары "// === generated_start:<name> === / generated_end:<name> ===" в sync_orchestrator_provider.dart или регенерируй orchestrator.`,
+            );
+        }
+    }
+
+    /** Возвращает true, если в content есть хотя бы одна пара маркеров `markerName`. */
+    private _hasMarkerBlock(content: string, markerName: string): boolean {
+        const startEsc = this._escapeRegex(`// === generated_start:${markerName} ===`);
+        const endEsc = this._escapeRegex(`// === generated_end:${markerName} ===`);
+        return new RegExp(`${startEsc}[\\s\\S]*?${endEsc}`).test(content);
+    }
+
     private _patchMarkerBlock(
         content: string,
         markerName: string,
