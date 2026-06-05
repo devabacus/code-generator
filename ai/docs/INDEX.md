@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-06-05 (сессия BUG-023..027 + full pipeline t204 + handoff). **master `a61c9cb`** (+ docs/handoff/BUG-027 sync), 293 tests. Новое: **`--ceremony full|minimal`** (BUG-023 Design 1 — minimal вырезает usecases + usecase_providers, presentation→repository). Full pipeline re-checked на t204 (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, one-line fix готов) + BUG-026/junction `customerId`→TASK-015 + BUG-005 `:base` + BUG-015 cross-feature. Готовность к weight regen: HIGH.
+**Обновлено:** 2026-06-05 (**BUG-027 fix — TASK-034**, ready for commit, 299 tests). type-based фикс collection back-relation leak (`fieldsFilter` + `shouldSkipServerpodField`, дискриминатор `type.startsWith('List<')`); **root cause в первичном bug-report был неверен** (bare `relation` → `isRelation=false`, не relationType). verify t205 errors=0, Standard+Adversarial APPROVE. Ранее в сессии: **`--ceremony full|minimal`** (BUG-023) + audit-guards BUG-024/025 + BUG-026 deferred→TASK-015. **Open backlog:** BUG-026/junction `customerId`→TASK-015 + BUG-005 `:base` + BUG-015 cross-feature. Готовность к weight regen: HIGH.
 
 ## Что это за проект
 

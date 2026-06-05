@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-06-05 (**BUG-023 + BUG-024 + BUG-025 merged**, BUG-026 deferred — master `b26368a`, 293 tests). Новое: **`--ceremony full|minimal`** (BUG-023). Generator re-checked на t203 (full + minimal + junction → verify errors=0). Audit-guards BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Нет активных задач.
+**Обновлено:** 2026-06-05 (**BUG-027 fix — TASK-034**, ready for commit; 299 tests). type-based фикс collection back-relation leak в `code_formatter.ts` (`fieldsFilter` + `shouldSkipServerpodField`), root cause в bug-report был неверен (bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). verify t205 errors=0, Standard+Adversarial APPROVE. Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards merged, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
 
 ---
 
@@ -32,9 +32,11 @@
 
 ## Активные задачи
 
-**Нет активных задач.** Все merged. Ждёт User explicit start следующего substantive item (weight regen или other follow-ups).
+**TASK-034 (BUG-027) — ready for commit** (фикс + 6 tests + verify t205 errors=0 + 2× review APPROVE; не закоммичен). После коммита — нет активных задач, ждёт User explicit start следующего item (weight regen).
 
 ### Закрыто (сессия 2026-06-05)
+
+- **TASK-034 / BUG-027** ✅ fix готов (commit pending) — collection back-relation (`List<X>?, relation`) протекал в flutter entity (loud `InvalidType` build fail) + drift column (silent-wrong `TextColumn`). Type-based фикс `field.type.startsWith('List<')` в `fieldsFilter` + `shouldSkipServerpodField`. **Root cause в первичном bug-report был неверен** (предполагал `relationType='oneToMany'`; реально bare `relation` → `isRelation=false`). verify t205 PASS errors=0, warnings=1 (pre-existing), 299 tests (293+6), Standard+Adversarial APPROVE.
 
 - **BUG-023** ✅ merged (PR #35, master `02af21f`) — `generate-entity --ceremony full|minimal` (Design 1). `minimal` вырезает usecases + usecase_providers, presentation→repository через `.minc`-варианты (ref.mounted guards сохранены). Default `full` без изменений. Маркеры `flags: fullCeremony`/`minimalCeremony` + `matchesCeremonyFlag`. t115 push `fda1759`. Standard + Adversarial APPROVE.
 - **BUG-024** ✅ merged (PR #36, master `9f892a7`) — pre-flight guard на reserved Drift column-имена (`text`/`integer`/`dateTime`/`boolean`/`real` + forward-defense). Поймано на t203 (поле `text` → self-referential getter → drift_dev crash + build_runner exit 0 = silent broken build). `EntityYamlValidator.RESERVED_DRIFT_COLUMN_NAMES`. Adversarial APPROVE.
@@ -92,7 +94,7 @@
 | ~~BUG-024~~ | ~~High~~ | ~~Reserved Drift column-имя поля → silent broken build~~ | ✅ **CLOSED 2026-06-05** (PR #36) — pre-flight guard в EntityYamlValidator. |
 | ~~BUG-025~~ | ~~High~~ | ~~Orchestrator no-op при отсутствии маркеров (verify-blind)~~ | ✅ **CLOSED 2026-06-05** (PR #37) — fail-fast guard. |
 | BUG-026 | Medium (silent) | Junction FK-extraction не фильтрует `customerId` (wrong pair при нестандартном порядке) | ⏭ **DEFERRED → TASK-015** (2026-06-05). Blanket-fix ломает CustomerUser (customerId неоднозначен). Mitigation: declare-parents-first. |
-| **BUG-027** | **Medium** | **one-to-many back-relation на regular entity → InvalidType build fail** | 🔧 **Open, fix готов** (1 строка: `fieldsFilter` excl. `relationType==='oneToMany'`, [code_formatter.ts:76](../../src/features/generation/parsers/formatters/code_formatter.ts)). Confirmed adversarial review. Workaround: убрать parent back-relation. |
+| ~~BUG-027~~ | ~~Medium~~ | ~~one-to-many back-relation на regular entity → InvalidType build fail~~ | ✅ **CLOSED 2026-06-05** (TASK-034) — type-based фикс `field.type.startsWith('List<')` в `fieldsFilter` + `shouldSkipServerpodField` ([code_formatter.ts](../../src/features/generation/parsers/formatters/code_formatter.ts)). **Root cause был неверен в bug-report:** bare `relation` (без скобок) → `isRelation=false`, `relationType` не выставлен; дискриминатор = тип `List<...>`, не relationType. Текло в ОБА слоя (entity loud + drift silent-wrong). verify t205 errors=0, 6 tests, Standard+Adversarial APPROVE. |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative |
 | BUG-015 | ⚠ High codegen → **untested** | Cross-feature junction (parents в **разных** features) generation broken | ⚠ **t201 prove-out (2026-05-28): same-feature junction PASS errors=0** (canonical task_tag_map + custom author_book_map). **Cross-feature (parents в разных features) НЕ тестировался** — остаётся открытым edge. Re-test перед weight regen если weight имеет cross-feature junction. |
 | ~~BUG-016~~ | ~~Medium~~ | ~~Junction MANY_TO_MANY substitution analog TASK-017~~ | ✅ **Appears RESOLVED (verified t201 2026-05-28)** — custom-named junction (author_book_map) substitution чистая errors=0, target names из YAML relations. Вероятно закрыт TASK-014/017. |
@@ -188,3 +190,4 @@ Sequence per Discussion #4 → #6:
 | TASK-031 | Bug 3 t115 LWW guard parity | 🟡 In Progress | 2026-05-27 |
 | TASK-032 | Bug 4 t115 ref.mounted guard parity | 🟡 In Progress | 2026-05-28 |
 | TASK-033 | session manager ref.mounted guard both templates | 🟡 In Progress | 2026-05-28 |
+| TASK-034 | BUG-027 fix one-to-many back-relation leak в flutter entity | 🟡 In Progress | 2026-06-05 |
