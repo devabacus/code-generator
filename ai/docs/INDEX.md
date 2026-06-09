@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-06-05 (**BUG-027 fix — TASK-034**, ready for commit, 299 tests). type-based фикс collection back-relation leak (`fieldsFilter` + `shouldSkipServerpodField`, дискриминатор `type.startsWith('List<')`); **root cause в первичном bug-report был неверен** (bare `relation` → `isRelation=false`, не relationType). verify t205 errors=0, Standard+Adversarial APPROVE. Ранее в сессии: **`--ceremony full|minimal`** (BUG-023) + audit-guards BUG-024/025 + BUG-026 deferred→TASK-015. **Open backlog:** BUG-026/junction `customerId`→TASK-015 + BUG-005 `:base` + BUG-015 cross-feature. Готовность к weight regen: HIGH.
+**Обновлено:** 2026-06-05 (**BUG-027 + TASK-035 merged — master `80346ac`**, 303 tests; **первая runtime end-to-end валидация t205**). BUG-027: type-based фикс collection back-relation leak (`fieldsFilter` + `shouldSkipServerpodField`, дискриминатор `type.startsWith('List<')`); **root cause в первичном bug-report был неверен** (bare `relation` → `isRelation=false`). TASK-035: удалены избыточные `Map`-эвристики (substring-landmine `siteMapUrl`). Runtime smoke (local-setup + serve → HTTP 200, миграции, таблицы в Postgres). VS Code extension собран+установлен. Ранее в сессии: **`--ceremony full|minimal`** (BUG-023) + audit-guards BUG-024/025 + BUG-026 deferred→TASK-015. **Open backlog:** TASK-015 junction `customerId` + BUG-005 `:base` + BUG-015 cross-feature + мелкие runtime/extension follow-ups (см. [agent_memory.md](agent_memory.md)). Готовность к weight regen: HIGH.
 
 ## Что это за проект
 

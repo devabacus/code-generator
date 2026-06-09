@@ -1,6 +1,6 @@
 # Статус проекта
 
-**Обновлено:** 2026-06-05 (**BUG-027 merged — master `bfaebb5` PR #41**; **TASK-035 Map-cleanup ready for commit**; 303 tests). BUG-027: type-based фикс collection back-relation leak в `code_formatter.ts` (root cause в bug-report был неверен — bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). TASK-035: удалены избыточные `Map`-эвристики (substring-landmine для scalar `siteMapUrl`/`heatMapConfig`). verify t205 errors=0 (оба). Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards merged, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested).
+**Обновлено:** 2026-06-05 (**BUG-027 + TASK-035 merged — master `80346ac`**; 303 tests; **первая runtime end-to-end валидация t205**). BUG-027 (PR #41 `bfaebb5`): type-based фикс collection back-relation leak в `code_formatter.ts` (root cause в bug-report был неверен — bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). TASK-035 (PR #42 `80346ac`): удалены избыточные `Map`-эвристики (substring-landmine для scalar `siteMapUrl`/`heatMapConfig`). **Runtime smoke (t205):** local-setup + serverpod serve → миграции применены, HTTP 200, все сгенерённые таблицы в Postgres (доказывает generate→migrate→serve, не только compile). VS Code extension собран+установлен (`mrfrolk.code-generator@0.0.1`). Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Новые runtime-наблюдения см. [agent_memory.md](agent_memory.md): Serverpod phantom implicit FK (unnamed back-relation), UI createDataFiles = source-only.
 
 ---
 
@@ -32,11 +32,17 @@
 
 ## Активные задачи
 
-**TASK-035 (Map-cleanup) — ready for commit** (фикс + 4 tests + verify t205 errors=0 + Adversarial APPROVE; не закоммичен). После коммита — нет активных задач, ждёт User explicit start следующего item (weight regen).
+**Нет активных задач.** Все merged. Ждёт User explicit start следующего item (weight regen).
+
+**Новые мелкие follow-ups (capacity-driven, не started; см. [agent_memory.md](agent_memory.md) gotchas):**
+- `vs_code_menu.ts:30` UI self-rebuild захардкожен на голый `vsce` → заменить на `npx @vscode/vsce package` (митигация: vsce установлен глобально 2026-06-05).
+- `.vscodeignore` не исключает `ai/`/`tmp/`/`.claude/`/docs → `.vsix` раздут (1.71 MB, 571 файл).
+- Serverpod phantom implicit FK для unnamed parent back-relation → омитить из server YAML или генерить `relation(name=...)` (наблюдение runtime t205).
+- pre-flight reject для `List<scalar>` на synced-entity (loud вместо silent-strip; inert сегодня).
 
 ### Закрыто (сессия 2026-06-05)
 
-- **TASK-035** ✅ fix готов (commit pending) — follow-up к BUG-027. Удалены избыточные `Map`-эвристики из `code_formatter.ts`: substring `!name.includes('Map')` в `fieldsFilter` (latent false-positive — scalar `siteMapUrl`/`heatMapConfig`/`roadMapId` молча дропались) + inert exact-match `'Map'` в `shouldSkipServerpodField.staticFields`. Junction back-relations покрыты type-check `startsWith('List<')` (BUG-027). verify t205 errors=0 (library junction + author.siteMapUrl survives), 303 tests (299+4), Adversarial APPROVE.
+- **TASK-035** ✅ **merged** (PR #42, master `80346ac`) — follow-up к BUG-027. Удалены избыточные `Map`-эвристики из `code_formatter.ts`: substring `!name.includes('Map')` в `fieldsFilter` (latent false-positive — scalar `siteMapUrl`/`heatMapConfig`/`roadMapId` молча дропались) + inert exact-match `'Map'` в `shouldSkipServerpodField.staticFields`. Junction back-relations покрыты type-check `startsWith('List<')` (BUG-027). verify t205 errors=0 (library junction + author.siteMapUrl survives), 303 tests (299+4), Adversarial APPROVE.
 - **TASK-034 / BUG-027** ✅ **merged** (PR #41, master `bfaebb5`) — collection back-relation (`List<X>?, relation`) протекал в flutter entity (loud `InvalidType` build fail) + drift column (silent-wrong `TextColumn`). Type-based фикс `field.type.startsWith('List<')` в `fieldsFilter` + `shouldSkipServerpodField`. **Root cause в первичном bug-report был неверен** (предполагал `relationType='oneToMany'`; реально bare `relation` → `isRelation=false`). verify t205 PASS errors=0, 299 tests, Standard+Adversarial APPROVE.
 
 - **BUG-023** ✅ merged (PR #35, master `02af21f`) — `generate-entity --ceremony full|minimal` (Design 1). `minimal` вырезает usecases + usecase_providers, presentation→repository через `.minc`-варианты (ref.mounted guards сохранены). Default `full` без изменений. Маркеры `flags: fullCeremony`/`minimalCeremony` + `matchesCeremonyFlag`. t115 push `fda1759`. Standard + Adversarial APPROVE.

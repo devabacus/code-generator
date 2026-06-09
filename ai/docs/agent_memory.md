@@ -3,7 +3,7 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-06-05 (**BUG-027 merged — master `bfaebb5` PR #41**; **TASK-035 Map-cleanup ready for commit**, 303 tests; ранее BUG-023/024/025 merged, BUG-026 deferred). BUG-027 root cause в первичном bug-report был неверен (bare `relation` → `isRelation=false`) — см. gotcha ниже. TASK-035: удалены избыточные `Map`-эвристики. Новое: `--ceremony full|minimal` (BUG-023 Design 1). **Full pipeline re-checked на t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, fix готов 1 строка) + BUG-026→TASK-015 + BUG-005 + BUG-015. См. новые gotchas ниже. Готовность к weight regen: HIGH. Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201); one-to-many = child-FK-only, parent без flutter back-relation (BUG-027).
+**Последнее обновление:** 2026-06-05 (**BUG-027 + TASK-035 merged — master `80346ac`**, 303 tests; **первая runtime end-to-end валидация t205**; VS Code extension собран+установлен). BUG-027 root cause в первичном bug-report был неверен (bare `relation` → `isRelation=false`) — см. gotcha. TASK-035: удалены избыточные `Map`-эвристики. Новые gotchas: runtime smoke runbook + Serverpod phantom FK; extension install/update + UI `vsce` hardcode; UI createDataFiles = source-only. Новое: `--ceremony full|minimal` (BUG-023 Design 1). **Full pipeline re-checked на t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, fix готов 1 строка) + BUG-026→TASK-015 + BUG-005 + BUG-015. См. новые gotchas ниже. Готовность к weight regen: HIGH. Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201); one-to-many = child-FK-only, parent без flutter back-relation (BUG-027).
 
 ---
 
@@ -284,6 +284,40 @@ pwsh -NoProfile -Command "Get-NetTCPConnection -LocalPort 8082 -State Listen | F
 ### Postgres password mismatch
 
 `DatabaseQueryException: password authentication failed` — Docker volume rotation. Fix: `docker compose down -v && docker compose up -d`.
+
+### Runtime smoke (serverpod) — runbook + первая end-to-end валидация (2026-06-05)
+
+⚠ **`verify` НЕ покрывает runtime** (только compile + analyze). Для реального прогона сервера:
+
+1. `node out/adapters/cli/index.js local-setup --workspace G:/Projects/Flutter/serverpod/t<N> --human` — docker `down -v` + `up -d` (postgres+redis) + `create-migration --force` + `serverpod generate` + flutter `build_runner`. **БЕЗ `--run-server`** (он блокирует — сервер живёт вечно). ~26с.
+2. Сервер отдельно в фоне (run_in_background): `dart bin/main.dart --apply-migrations` в `t<N>_server` через pwsh wrapper → лог в файл.
+3. Probe: порты 8080(API)/8081(insights)/8082(web); `Invoke-WebRequest http://localhost:8080/` → **200 OK** `body=OK <ts>`; `docker compose exec -T postgres psql -U postgres -d t<N> -c "\dt"` для схемы.
+
+**Первая end-to-end runtime-валидация генератора (t205, 2026-06-05):** local-setup + serve → миграции применены (DB init 49 queries, seeding ролей/юзеров), HTTP 200, все сгенерённые таблицы в Postgres. Доказывает: generate→migrate→serve работает не только compile-clean.
+
+⚠ **Серверный артефакт (НЕ баг генератора): Serverpod phantom implicit FK.** Unnamed back-relation `<x>: List<Y>?, relation` на parent **без** `relation(name=...)` заставляет Serverpod создать ЛИШНюю implicit FK на ребёнке (`project_task._projectProjecttasksProjectId`, `author_book_map._authorAuthorbookmapsAuthorId`) вдобавок к явной `projectId`/`authorId`. Миграция применяется, сервер работает — но колонка-фантом. Усиливает рекомендацию [BUG-027]: one-to-many = **child FK only**, parent без back-relation. Кандидат на generator-follow-up (омитить parent back-relation из server YAML или генерить `relation(name=...)`). PSQL колонки = camelCase (`siteMapUrl`, не snake) — grep по snake не сматчит.
+
+### VS Code extension — install / update workflow + gotchas
+
+⚠ **Расширение работает из `out/*.js`** (`main: ./out/adapters/vscode/extension.js`), publisher `mrfrolk`, активация `onStartupFinished`. Установлено как `mrfrolk.code-generator@0.0.1`.
+
+**Сборка + установка (CLI, надёжно):**
+```bash
+npm run compile
+npx @vscode/vsce package --allow-missing-repository   # → code-generator-0.0.1.vsix
+code --install-extension code-generator-0.0.1.vsix --force
+```
+Затем в VS Code: `Ctrl+Shift+P` → "Developer: Reload Window" (без релоада команды не появятся).
+
+⚠ **Установленный .vsix НЕ обновляется при правке `src/`** — нужна пересборка + переустановка + reload. F5 (Extension Development Host, launch.json "Run Extension") — альтернатива для dev, но Dev Host тоже не hot-reload'ит `out/`: после `npm run compile` нужен `Ctrl+R` в окне Dev Host.
+
+⚠ **UI self-rebuild handler захардкожен на голый `vsce`** ([vs_code_menu.ts:30](../../src/adapters/vscode/utils/vs_code_menu.ts) `reinstallExtension`: `vsce package`). Падает `CommandNotFoundException` если `vsce` не глобальный. Fix-варианты: (a) `npm install -g @vscode/vsce` (сделано 2026-06-05, vsce 3.9.2), либо (b) **правильнее** — заменить на `npx @vscode/vsce package` в коде (follow-up). Открытый старый интегрированный терминал держит stale PATH — нужен новый терминал/reload после global install.
+
+⚠ **`.vsix` раздут** (1.71 MB, 571 файл — `ai/`, `tmp/`, `.claude/`, docs попадают внутрь): `.vscodeignore` их не исключает. Не мешает работе. Follow-up: дополнить `.vscodeignore`.
+
+### UI `Create Data Files from YAML` (createDataFiles) = ТОЛЬКО source emit
+
+⚠ UI-команда (`code-generator.createDataFiles`, она же generate-entity флоу) пишет **только `.dart`-исходники** — **НЕ** запускает `serverpod generate` / `build_runner`. Сразу после неё IDE показывает ошибки несгенерённых `*.freezed.dart` / `*.g.dart` / drift `database.g.dart` / serverpod-client частей. **Это не баг.** Чтобы ошибки ушли → прогнать кодоген (`verify` / `local-setup` / вручную serverpod generate + build_runner), затем при необходимости `Ctrl+Shift+P` → "Dart: Restart Analysis Server" чтобы сбросить stale-ошибки в IDE. Флоу: активный редактор `.spy.yaml` → валидация (диалог "Generate anyway") → quickPick scope (Client only / Client+Server, TASK-029) → pickPath feature (full path). Workspace = корень окна.
 
 ### Длительные команды
 
