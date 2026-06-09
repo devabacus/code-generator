@@ -9,3 +9,16 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+
+# TASK-036: исключить агентские/служебные деревья из .vsix (раздували пакет:
+# было 1.71 MB / 571 файл — основной вес в ai/ ~2.6 MB). Не нужны в runtime.
+ai/**
+docs-code-generator/**
+.claude/**
+.github/**
+tmp/**
+*.vsix
+CLAUDE.md
+AGENTS.md
+changelog.md
+code-generator.code-workspace
