@@ -311,9 +311,11 @@ code --install-extension code-generator-0.0.1.vsix --force
 
 ⚠ **Установленный .vsix НЕ обновляется при правке `src/`** — нужна пересборка + переустановка + reload. F5 (Extension Development Host, launch.json "Run Extension") — альтернатива для dev, но Dev Host тоже не hot-reload'ит `out/`: после `npm run compile` нужен `Ctrl+R` в окне Dev Host.
 
-⚠ **UI self-rebuild handler захардкожен на голый `vsce`** ([vs_code_menu.ts:30](../../src/adapters/vscode/utils/vs_code_menu.ts) `reinstallExtension`: `vsce package`). Падает `CommandNotFoundException` если `vsce` не глобальный. Fix-варианты: (a) `npm install -g @vscode/vsce` (сделано 2026-06-05, vsce 3.9.2), либо (b) **правильнее** — заменить на `npx @vscode/vsce package` в коде (follow-up). Открытый старый интегрированный терминал держит stale PATH — нужен новый терминал/reload после global install.
+✅ **UI self-rebuild handler — ПОЧИНЕН (TASK-036).** Раньше `reinstallExtension` был захардкожен на голый `vsce package` (`CommandNotFoundException` без global vsce). Теперь: `npm version patch --no-git-tag-version` (видимый инкремент версии — раньше всегда 0.0.1) → имя `.vsix` из `package.json` version ([vsix_name.ts](../../src/adapters/vscode/utils/vsix_name.ts)) → `npx @vscode/vsce package --allow-missing-repository` (без global-зависимости) → install + reload. `terminalCommands` awaited (execCommand), race нет. vsce также стоит глобально (3.9.2) как fallback.
 
-⚠ **`.vsix` раздут** (1.71 MB, 571 файл — `ai/`, `tmp/`, `.claude/`, docs попадают внутрь): `.vscodeignore` их не исключает. Не мешает работе. Follow-up: дополнить `.vscodeignore`.
+✅ **`.vsix` ужат (TASK-036):** 571 файл / 1.71 MB → **368 файлов / 699.59 KB** (~59%). `.vscodeignore` теперь исключает `ai/`/`docs-code-generator/`/`.claude/`/`.github/`/`tmp/`/`*.vsix`/`CLAUDE.md`/`AGENTS.md`. Дальше — только bundling (esbuild/webpack), отдельная задача.
+
+⚠ **Версионирование = авто-bump на каждый UI reinstall** (Вариант A, User 2026-06-05): `package.json` version растёт сама → понятно что обновилось. Мелкий tracked-диф, коммитится когда удобно. Публичная публикация (Marketplace) НЕ делается — расширение не самодостаточно (внешние t115-шаблоны, Windows-only powershell, toolchain-deps).
 
 ### UI `Create Data Files from YAML` (createDataFiles) = ТОЛЬКО source emit
 
