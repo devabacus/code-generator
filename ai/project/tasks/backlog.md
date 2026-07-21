@@ -91,3 +91,9 @@ Generated будет `deleteCustomerUserByCustomerAndRole` (берёт `customer
    элементов директивы (`[Task, Tag]` → внятный throw, ожидается lowerCamel/snake_case) —
    в доке шаблона и/или `sync-core-integration.md`, когда форма становится публичной.
 3. Проверка: `codegen verify` на свежем test-проекте `t<N+1>` (DoD-гейт).
+
+## Кандидат: triage остальных легаси-доков docs-code-generator/
+
+**Source:** TASK-038 report.md (побочные флаги, 2026-07-21). Без заведения задачи — флаг,
+чтобы не потерять: `implementation-plan.md`, `progress.md` (датированы 2025-12, явно стухли),
+`task refactor.md` — сверить/заархивировать по образцу TASK-038 (`bugs-and-tasks.md`).
