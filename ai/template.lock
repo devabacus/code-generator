@@ -1,6 +1,6 @@
 {
   "template_version": "2.0.0",
-  "source_revision": "30a73fd",
+  "source_revision": "0d8a59e",
   "source_dirty": false,
   "schema_version": 2,
   "core_hashes": {
@@ -17,7 +17,8 @@
     "core/docs/INDEX.md": "3d2f542ac167cec946e2a6681c66d830c51d042e16fefe20164dbfa85c9a1fdd",
     "core/docs/profiles.md": "0fe10917b021eea68b4a098ae4ae26a894c8d02c8f90f97eb2a21f45b0d69490",
     "core/docs/task-schema.md": "ac9f5eda7db66310c456e48783f64065d89778bbb01bc78b20f57a6fbfb18f5f",
-    "core/docs/workflow.md": "e3502288170dce562e9220136ce230fe03b60441568764fa626188921a97db11",
+    "core/docs/workflow.md": "85d8ee8002b8fb742a75db569b1ebc0af93e468f53ac1cfe2920a9d965a37848",
+    "core/examples/model-policy.example.md": "181922dc8ded54affcc3b20fc7aede5cbc73d8d718a1f9316fa9ae06bf7f20d0",
     "core/examples/profile.example.yaml": "00b80f8bf073133f372ca86240ce544341883869955a0c58e43f070e40c9e4a7",
     "core/examples/profiles/b24-readonly.yaml": "ee863ca3a546546e9a6ea9867d4f31af4452b648e10e501c86b645ad3189923c",
     "core/examples/profiles/ble-hardware.yaml": "86cc0d060f36f1fa4c75aea2d2a5080f729aa92323dfc7bb4e2548e5df6cab48",
@@ -32,7 +33,7 @@
     "core/prompts/executor.prompt.md": "0d3f51b93084c3e48ecb559f3d44cfa411781eddf71b998ebe116a67fbd9cd91",
     "core/prompts/finalize.prompt.md": "3864e7667bb86821f8770fbfc3a624427d2dab2701d272121cb8932070820780",
     "core/prompts/reviewer.prompt.md": "d4adbdc00d2aad95f4a9e72e9990abb3546ab274fc35e775fda720f78fc2d203",
-    "core/prompts/teamlead.prompt.md": "e6eb6f2bc3f4e1a45e29546ce9a90fab8bf449779c0974aa9b90efd34e4147f6",
+    "core/prompts/teamlead.prompt.md": "56ec4d695a1dd3fb38da949a44184ca124277b3fb9241eeaee4e62393bc8a540",
     "core/README.md": "5a79f00cdc29868d7d6d04c9ff7ced6c4595666f976eb13ae36b254ccad26ffd",
     "core/scripts/new_task.py": "d8e98d4b0d425c91be970847ff374b86796d48b059441dbda6b718d2a8333372",
     "core/scripts/profile.py": "537821ab3cbe91b2e1e4023d0069ae6dfb288c502f599ffc514ff339a7d717e2",
