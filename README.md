@@ -20,3 +20,7 @@ VS Code extension for generating Serverpod/Flutter projects and entities.
 
 - Serverpod CLI installed
 - Flutter SDK installed
+
+## AI workflow (`ai/`)
+
+AI-агентам — входная точка: [`ai/core/docs/INDEX.md`](ai/core/docs/INDEX.md) (upstream-фреймворк) и проектный индекс [`ai/project/docs/INDEX.md`](ai/project/docs/INDEX.md) (состояние проекта, onboarding). Граница `core/` (upstream, синхронизируется через `sync.py`) и `project/` (проектный контент) описана в гайде миграции `ai/core/guides/migration-v1-to-v2.md`.

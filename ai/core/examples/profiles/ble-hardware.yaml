@@ -1,0 +1,14 @@
+# Verification-профиль: BLE-зона weight-system (класс II, офисный ПК с железом).
+# frozen-контракт nordic-uart-protocol сравнивается с golden; изменение эталона —
+# только через human approval (см. profiles.md).
+name: ble-hardware
+checks:
+  analyze:
+    cmd: "flutter analyze"
+    timeout: 300
+  unit:
+    cmd: "flutter test"
+    timeout: 900
+  golden_nordic:
+    cmd: "python tools/ble_golden_check.py --contract nordic-uart-protocol"
+    timeout: 600

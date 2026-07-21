@@ -11,18 +11,18 @@
 - Код: `src/` (TypeScript)
 - Шаблоны: `G:/Templates/flutter/t115/` — **вне репозитория**, **deprecated path** (frozen, removal 6-12 месяцев). Future simplified template = `G:/Templates/flutter/simplified/` (Phase B-D will create).
 - Сгенерированные проекты: `G:/Projects/Flutter/serverpod/<name>/`
-- Документация процесса: `ai/docs/`, задачи: `ai/tasks/`, баги: `ai/bug-reports/`
-- **Начинай с**: [ai/prompts/handoff.prompt.md](ai/prompts/handoff.prompt.md) → [ai/docs/INDEX.md](ai/docs/INDEX.md) → [ai/docs/agent_memory.md](ai/docs/agent_memory.md)
+- Документация процесса: `ai/project/docs/`, задачи: `ai/project/tasks/`, баги: `ai/project/bug-reports/`
+- **Начинай с**: [ai/project/prompts/handoff.prompt.md](ai/project/prompts/handoff.prompt.md) → [ai/project/docs/INDEX.md](ai/project/docs/INDEX.md) → [ai/project/docs/agent_memory.md](ai/project/docs/agent_memory.md)
 
 **⚠ CRITICAL Stack-lock decision (User 2026-05-03 Discussion #11):** стэк t115 baseline (Riverpod через `@riverpod` annotations + Drift conventions + Clean directory layout + sync_core 0.3.0 + Serverpod) **НЕ меняется без явного User approval**. Package versions update к latest stable (включая Serverpod). Simplified философия меняет ТОЛЬКО architecture ceremony reduction (NO usecases / business notifiers / validation / repository interfaces по умолчанию / app services / mappers separate class / Either-Result / datasource interfaces).
 
 **Не пропусти:**
 - [AGENTS.md](AGENTS.md) — глобальные правила процесса (запреты, block-rules, PR/merge flow, коммиты)
-- [ai/docs/agent_memory.md](ai/docs/agent_memory.md) — обязателен к прочтению каждой сессии
-- [ai/docs/decisions/adr-0005-multi-template-plurality.md](ai/docs/decisions/adr-0005-multi-template-plurality.md) — canonical architectural contract
-- [ai/bug-reports/](ai/bug-reports/) — статус известных багов
-- [ai/prompts/{teamlead,executor,finalize}.prompt.md](ai/prompts/) — промпты для ролей
-- [ai/scripts/{new_task.py, task.py}](ai/scripts/) — task management CLI: создать TASK-XXX, feature branch → PR → merge
+- [ai/project/docs/agent_memory.md](ai/project/docs/agent_memory.md) — обязателен к прочтению каждой сессии
+- [ai/project/docs/decisions/adr-0005-multi-template-plurality.md](ai/project/docs/decisions/adr-0005-multi-template-plurality.md) — canonical architectural contract
+- [ai/project/bug-reports/](ai/project/bug-reports/) — статус известных багов
+- [ai/project/prompts/{teamlead,executor}.prompt.md](ai/project/prompts/) + [ai/core/prompts/finalize.prompt.md](ai/core/prompts/) — промпты для ролей
+- [ai/core/scripts/{new_task.py, task.py}](ai/core/scripts/) — task management CLI: создать TASK-XXX, feature branch → PR → merge
 
 ---
 
@@ -39,7 +39,7 @@ adapters/vscode┘    + core services
 - **`src/adapters/vscode/*`** — 11 команд, регистрируются в `extension.ts`.
 - **`src/features/generation/*`** — entity-генерация. Парсер YAML → модель → словарные замены + section-генераторы → файлы.
 
-Подробно: [ai/docs/architecture.md](ai/docs/architecture.md).
+Подробно: [ai/project/docs/architecture.md](ai/project/docs/architecture.md).
 
 ---
 
@@ -120,7 +120,7 @@ G:/Projects/Flutter/serverpod/<name>/
 
 - **Layer 1 — interface (`<entity>_repository.dart`):** patcher через markers `:oneToManyMethods` ✅
 - **Layers 2-4 — dao, local_data_source, remote_data_source:** через **hardcoded inheritance** в template + MANY_TO_MANY substitution (Task→TodoItem, Category→Project automatically). Markers отсутствуют, regen работает через template substitution.
-- **Layers 5-6 — repository_impl, usecases:** ❌ **полностью broken** в t115 template. Нет ни markers, ни hardcoded methods. Каждый fresh project с FK relations получит `non_abstract_class_inherits_abstract_member` + `undefined_identifier` errors. См. [BUG-013](ai/bug-reports/013-template-markers-gap-repository-impl-usecases.md).
+- **Layers 5-6 — repository_impl, usecases:** ❌ **полностью broken** в t115 template. Нет ни markers, ни hardcoded methods. Каждый fresh project с FK relations получит `non_abstract_class_inherits_abstract_member` + `undefined_identifier` errors. См. [BUG-013](ai/project/bug-reports/013-template-markers-gap-repository-impl-usecases.md).
 - **Layer 7-8 — endpoint, local_datasource_service:** через hardcoded inheritance (предположительно).
 
 **Markers properties (где работают, layer 1):**
@@ -129,7 +129,7 @@ G:/Projects/Flutter/serverpod/<name>/
 - **Идемпотентный** на interface layer.
 - **Recovery от legacy-дубликатов.** Если в файле несколько marker-пар → схлопываются в одну.
 
-**Дополнительно:** parser игнорирует `relation(parent=X)` directive — derives `relatedModel` через `name.replace(/(.*)Id/, '$1')`, что ломает FK alias case (`assigneeId, parent=member` → broken). См. [BUG-012](ai/bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
+**Дополнительно:** parser игнорирует `relation(parent=X)` directive — derives `relatedModel` через `name.replace(/(.*)Id/, '$1')`, что ломает FK alias case (`assigneeId, parent=member` → broken). См. [BUG-012](ai/project/bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
 
 - НЕ ТРОГАЕТ `:base` секции — это отдельная проблема (см. BUG-005 в backlog).
 
@@ -224,35 +224,35 @@ G:/Projects/Flutter/serverpod/<name>/
 
 ### ⚠ HARD RULE — tasks/discussions ТОЛЬКО через python скрипты
 
-User decision 2026-05-02: **создание новых TASK-XXX и discussions — ТОЛЬКО через python скрипты в `ai/scripts/` и `ai/discussions/scripts/`. Запрещено создавать `ai/tasks/active/*/task.md` или `ai/discussions/active/N-*.md` через `Write` tool вручную.**
+User decision 2026-05-02: **создание новых TASK-XXX и discussions — ТОЛЬКО через python скрипты в `ai/core/scripts/` и `ai/core/discussions/scripts/`. Запрещено создавать `ai/project/tasks/active/*/task.md` или `ai/project/discussions/active/N-*.md` через `Write` tool вручную.**
 
 **Почему:** scripts обеспечивают auto-ID (без conflicts), копируют свежий template, обновляют `STATUS.md`, применяют naming conventions. Manual creation breaks все эти invariants. Конкретный случай: 2026-05-02 manually-created TASK-011 conflict'нул с auto-ID 011 от new_task.py — пришлось переименовывать руками.
 
 **Скрипты в codegen:**
-- `ai/scripts/new_task.py "название"` — новая TASK-XXX (auto-ID)
-- `ai/scripts/task.py start|pr|merge|finish` — workflow feature branch → PR → squash merge
-- `ai/discussions/scripts/discuss.py new|list|continue|close` — discussions
+- `ai/core/scripts/new_task.py "название"` — новая TASK-XXX (auto-ID)
+- `ai/core/scripts/task.py start|pr|merge|finish` — workflow feature branch → PR → squash merge
+- `ai/core/discussions/scripts/discuss.py new|list|continue|close` — discussions
 
 ### Создание задачи
 ```bash
-python ai/scripts/new_task.py "Краткое название"
-# → создаёт ai/tasks/active/TASK-XXX-краткое-название/{task.md, report.md}
+python ai/core/scripts/new_task.py "Краткое название"
+# → создаёт ai/project/tasks/active/TASK-XXX-краткое-название/{task.md, report.md}
 ```
 
 ### Workflow feature branch → PR → merge
 ```bash
-python ai/scripts/task.py start TASK-XXX-краткое-название   # feature branch от свежего master
+python ai/core/scripts/task.py start TASK-XXX-краткое-название   # feature branch от свежего master
 # ... работа executor'а: коммиты, тесты ...
-python ai/scripts/task.py pr        # push + gh pr create с body=report.md
-python ai/scripts/task.py merge     # дождаться CI, squash-merge, обратно на master
+python ai/core/scripts/task.py pr        # push + gh pr create с body=report.md
+python ai/core/scripts/task.py merge     # дождаться CI, squash-merge, обратно на master
 # или одной командой:
-python ai/scripts/task.py finish    # pr + merge
+python ai/core/scripts/task.py finish    # pr + merge
 ```
 
 Требования: `gh` CLI авторизован (`gh auth status`), запуск из корня репо.
 
-### Структура `ai/tasks/`
-- `_template/` — шаблон task.md/report.md (копируется new_task.py)
+### Структура `ai/project/tasks/`
+- `ai/core/tasks/_template/` — шаблон task.md/report.md (в core, копируется new_task.py)
 - `active/TASK-XXX-*/` — текущие задачи
 - `done/TASK-XXX-*/` — завершённые
 
@@ -261,7 +261,7 @@ python ai/scripts/task.py finish    # pr + merge
 ## Порядок работы для типичных задач
 
 ### "Добавь поле X в существующую сущность"
-1. Прочитать [ai/docs/agent_memory.md](ai/docs/agent_memory.md) и этот файл.
+1. Прочитать [ai/project/docs/agent_memory.md](ai/project/docs/agent_memory.md) и этот файл.
 2. Отредактировать `<entity>.spy.yaml` в `<name>_server/lib/src/models/<entity>/`.
 3. `codegen generate-entity --yaml ... --feature-path ... --workspace ...` — относительно безопасно для добавления полей и relations (см. инварианты выше).
 4. **ВНИМАНИЕ:** `:base` секции (handleSyncEvent, createX, mappers) **перезапишутся**. Если в них есть кастомный код — забэкапить через `git diff` ПЕРЕД regen. `:syncImports` / `:syncEntityTypes` / `:syncRegistrations` marker блоки в orchestrator — патчатся идемпотентно (existing entries сохраняются + новый append'ится).
@@ -276,20 +276,20 @@ python ai/scripts/task.py finish    # pr + merge
 4. Если что-то не так — это **баг генератора**, не патчить руками. Завести bug-report.
 
 ### "Почини баг генератора"
-1. Завести TASK в `ai/tasks/active/TASK-NNN-...`.
+1. Завести TASK в `ai/project/tasks/active/TASK-NNN-...`.
 2. Воспроизвести: создать минимальный YAML/scenario, сгенерировать, увидеть проблему.
 3. Найти источник в `src/features/generation/`.
 4. Написать unit-тест на MockFileSystem **СНАЧАЛА** (TDD).
 5. Починить.
 6. Проверить на реальном проекте через CLI (можно использовать существующий test-проект, не пересоздавать).
 7. **`codegen verify --name <test_project>` (DoD гейт).** Цитировать результат в report.md.
-8. Обновить bug-report до Resolved, написать report.md в TASK папке, обновить `ai/docs/status.md`.
+8. Обновить bug-report до Resolved, написать report.md в TASK папке, обновить `ai/project/docs/status.md`.
 
 ---
 
 ## Известные ограничения / backlog
 
-- **BUG-001 (Open, High):** Ref disposed в state_providers — повторяется в каждой новой сущности. См. [ai/bug-reports/001-state-provider-ref-disposed.md](ai/bug-reports/001-state-provider-ref-disposed.md).
+- **BUG-001 (Open, High):** Ref disposed в state_providers — повторяется в каждой новой сущности. См. [ai/project/bug-reports/001-state-provider-ref-disposed.md](ai/project/bug-reports/001-state-provider-ref-disposed.md).
 - **BUG-005 (backlog):** перезапись `:base` секций при regen теряет custom code. Требует архитектурного решения (per-method markers или patch-only mode). Сейчас workaround — `git diff` перед regen.
 - **MCP сервер для генератора** — отдельная задача (стек: Python stdio как `webcam` сервер, обёртки над JSON-режимом CLI). Делать после стабилизации основных багов.
 
@@ -299,12 +299,14 @@ python ai/scripts/task.py finish    # pr + merge
 
 ```
 AGENTS.md                                                       # глобальные правила процесса
-ai/scripts/{new_task.py, task.py}                               # task management CLI
-ai/prompts/{teamlead,executor,finalize}.prompt.md               # промпты для ролей
-ai/tasks/{_template,active/,done/}                              # задачи
-ai/bug-reports/                                                 # известные баги (001-006)
-ai/discussions/{active/,done/}                                  # multi-agent дискуссии
-ai/docs/{INDEX,agent_memory,architecture,status,roadmap}.md     # документация процесса
+ai/core/scripts/{new_task.py, task.py}                          # task management CLI (upstream core)
+ai/project/prompts/{teamlead,executor}.prompt.md                # промпты ролей (проектные)
+ai/core/prompts/finalize.prompt.md                              # finalize промпт (core)
+ai/core/tasks/_template/                                        # шаблон task.md/report.md (core)
+ai/project/tasks/{active/,done/,blocked/}                       # задачи проекта
+ai/project/bug-reports/                                         # известные баги (001-027)
+ai/project/discussions/{archive/,prompts/}                      # multi-agent дискуссии
+ai/project/docs/{INDEX,agent_memory,architecture,status,roadmap}.md  # документация процесса
 
 src/features/generation/parsers/server_yaml_parser.ts          # YAML → модель
 src/features/generation/parsers/entity_yaml_validator.ts       # 6-field + sync-event валидация
@@ -316,12 +318,12 @@ src/features/generation/replacement/replacement_util.ts        # словари 
 src/adapters/cli/commands/create_project.ts                    # full project bootstrap
 src/adapters/cli/commands/generate_entity.ts                   # entity feature gen
 
-ai/docs/INDEX.md               # старт
-ai/docs/agent_memory.md        # факты, gotchas
-ai/docs/architecture.md        # детали
-ai/docs/status.md              # текущее состояние
-ai/bug-reports/                # известные баги
-ai/tasks/active/               # текущие задачи
+ai/project/docs/INDEX.md               # старт
+ai/project/docs/agent_memory.md        # факты, gotchas
+ai/project/docs/architecture.md        # детали
+ai/project/docs/status.md              # текущее состояние
+ai/project/bug-reports/                # известные баги
+ai/project/tasks/active/               # текущие задачи
 ```
 
 ---
@@ -333,4 +335,4 @@ ai/tasks/active/               # текущие задачи
 - **Discussion #9 + clean-slate amendment 2026-05-03** — weight v1 НЕ в production, fresh build, no dual-running concerns
 - **Discussion #11 + ⚠ CRITICAL stack-lock 2026-05-03** — стэк t115 baseline locked; package versions update к latest stable; simplified философия = ТОЛЬКО architecture ceremony reduction
 
-Для handoff onboarding читай [handoff.prompt.md](ai/prompts/handoff.prompt.md) → [INDEX.md](ai/docs/INDEX.md) → [agent_memory.md](ai/docs/agent_memory.md) → [ADR-0005](ai/docs/decisions/adr-0005-multi-template-plurality.md) → [roadmap.md](ai/docs/roadmap.md) → [status.md](ai/docs/status.md).
+Для handoff onboarding читай [handoff.prompt.md](ai/project/prompts/handoff.prompt.md) → [INDEX.md](ai/project/docs/INDEX.md) → [agent_memory.md](ai/project/docs/agent_memory.md) → [ADR-0005](ai/project/docs/decisions/adr-0005-multi-template-plurality.md) → [roadmap.md](ai/project/docs/roadmap.md) → [status.md](ai/project/docs/status.md).

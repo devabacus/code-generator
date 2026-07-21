@@ -1,0 +1,9 @@
+# Verification-профиль: чистый Dart/Flutter-код (weight-system, класс I).
+name: flutter-core
+checks:
+  analyze:
+    cmd: "flutter analyze"
+    timeout: 300
+  unit:
+    cmd: "flutter test"
+    timeout: 900

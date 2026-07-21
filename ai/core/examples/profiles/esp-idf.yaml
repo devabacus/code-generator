@@ -1,0 +1,9 @@
+# Verification-профиль: прошивки ESP32 (класс II, офисный ПК).
+name: esp-idf
+checks:
+  build:
+    cmd: "idf.py build"
+    timeout: 900
+  size:
+    cmd: "idf.py size"
+    timeout: 120

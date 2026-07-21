@@ -1,0 +1,26 @@
+# ai/project/profile.yaml — рабочий профиль проекта code-generator (ADR-0002 п.3).
+#
+# Профиль объявляется на ЗОНУ. Класс I–IV — человеческая метка; решение о запуске
+# драйвер принимает по capability policy (execution/runner/network/side_effects/...).
+# Референс формата всех полей — ai/core/examples/profile.example.yaml.
+#
+# code-generator — VS Code extension + CLI `codegen` (TypeScript). Одна зона:
+# детерминированный харнесс, полный self-check в облаке (compile + lint + unit).
+#
+# Проверить: python ai/core/scripts/profile.py lint
+
+project: code-generator
+
+zones:
+  # ── Класс I: детерминированный TS-харнесс, полный self-check в облаке ──────
+  - name: generator-core
+    class: I
+    execution: apply
+    runner: cloud
+    network: none
+    side_effects: none
+    secrets: []
+    hardware: []
+    protected_paths: []
+    frozen_contracts: []
+    verification_profile: ts-generator
