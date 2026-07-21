@@ -134,6 +134,22 @@ fields:
         );
     });
 
+    test('validation: junction:[task, task] (дубликат/self-junction) → внятная ошибка, не silent пара task+task', () => {
+        const yamlContent = `class: TaskTagMap
+table: task_tag_map
+junction: [task, task]
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  taskId: UuidValue, relation(parent=task, onDelete=Cascade)
+  tagId: UuidValue, relation(parent=tag, onDelete=Cascade)
+`;
+        assert.throws(
+            () => ServerpodYamlParser.parse(yamlContent),
+            /junction.*distinct.*task.*twice/i,
+            'дубликат родителя в директиве → fail-fast, не entity1=entity2',
+        );
+    });
+
     // ── snake_case parent маппинг: директива по entity-имени, поле alias ──────
 
     test('mapping: директива по parent-имени (snake→camel) резолвит FK alias', () => {

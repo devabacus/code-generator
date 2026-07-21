@@ -114,3 +114,25 @@ exit=0
 ## Статус
 
 Ready for review.
+
+---
+
+## Аддендум (2026-07-21) — pre-merge fix по итогам review
+
+По решению владельца (вариант 2) на этой же ветке до мержа закрыт **MINOR-1** из
+review-report: дубликат/self-junction в директиве (`junction: [task, task]`) теперь
+даёт fail-fast ошибку валидации (`...parents must be distinct: "task" is specified twice...`)
+вместо silent-пары `entity1=entity2`. Изменения:
+
+- `src/features/generation/parsers/server_yaml_parser.ts` — guard в `parseJunctionDirective`.
+- `src/test/parsers/junction_directive.test.ts` — +1 тест на дубликат.
+
+**MINOR-2** (регистрочувствительность) — по решению владельца НЕ чинится/не документируется
+сейчас; занесён follow-up-пунктом в `ai/project/tasks/backlog.md` → «Миграция шаблонов
+t115/simplified на директиву».
+
+Checks после фикса (прогон teamlead, из корня репо):
+
+- compile: exit 0
+- lint: exit 0 — 18 problems (0 errors, 18 warnings), все pre-existing
+- unit: **315 passing** (314 + 1 новый), 0 failing

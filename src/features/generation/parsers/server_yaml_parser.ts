@@ -121,7 +121,17 @@ export class ServerpodYamlParser {
                 + `got [${JSON.stringify(a)}, ${JSON.stringify(b)}].`,
             );
         }
-        return [a.trim(), b.trim()];
+        const aTrimmed = a.trim();
+        const bTrimmed = b.trim();
+        // Дубликат/self-junction: пара entity1=entity2 коррумпирует downstream
+        // substitution (DAO/adapters привязываются к одной сущности дважды).
+        if (aTrimmed === bTrimmed) {
+            throw new Error(
+                `Entity "${className}" junction directive parents must be distinct: `
+                + `"${aTrimmed}" is specified twice (junction: [a, b] requires two different parents).`,
+            );
+        }
+        return [aTrimmed, bTrimmed];
     }
 
     /**
