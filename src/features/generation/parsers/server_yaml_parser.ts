@@ -19,8 +19,23 @@ export class ServerpodYamlParser {
         // false-negatives для junction'ов без `Map` суффикса (RolePermission, CustomerUser
         // в weight). См. ai/bug-reports/junction-detection-audit.md.
         const fields = this.parseFields(parsed.fields || {});
+
+        // TASK-037: YAML top-level `junction` поддерживает две формы:
+        //   1. boolean `junction: true`  → explicit junction override (существующее
+        //      поведение — принудительная классификация как junction, пара
+        //      entity1/entity2 всё ещё выводится эвристикой «первые 2 relation-поля»).
+        //   2. array  `junction: [a, b]` → explicit-parents directive (BUG-026).
+        //      Массив авторитетно задаёт junction-родителей: entity1=a, entity2=b.
+        //      Array-форма ТАКЖЕ подразумевает junction (как `true`) — иначе
+        //      директива без структурного junction была бы бессмысленна.
+        const junctionDirective: [string, string] | undefined =
+            this.parseJunctionDirective(parsed.junction, parsed.class || '');
         const explicitJunction: boolean | undefined =
-            typeof parsed.junction === 'boolean' ? parsed.junction : undefined;
+            typeof parsed.junction === 'boolean'
+                ? parsed.junction
+                : junctionDirective !== undefined
+                    ? true
+                    : undefined;
 
         const model: ServerpodModel = {
             className: parsed.class || '',
@@ -33,7 +48,13 @@ export class ServerpodYamlParser {
         model.isRelation = JunctionDetector.isJunctionEntity(model, explicitJunction);
 
         if (model.isRelation) {
-            const entities = this.extractManyToManyEntities(model);
+            // TASK-037: единый источник пары entity1/entity2 для ВСЕХ трёх junction-
+            // кодопутей (parser → orchestrator читает model.entity1/entity2). С
+            // директивой — пара берётся из неё; без директивы — текущая эвристика
+            // (первые 2 relation-поля) байт-в-байт как раньше.
+            const entities = junctionDirective !== undefined
+                ? this.resolveJunctionDirective(model, junctionDirective)
+                : this.extractManyToManyEntities(model);
             if (entities) {
                 model.entity1 = entities.entity1;
                 model.entity2 = entities.entity2;
@@ -57,6 +78,112 @@ export class ServerpodYamlParser {
         }
 
         return { entity1, entity2 };
+    }
+
+    /**
+     * TASK-037: парсит top-level `junction` directive в форме массива `[a, b]`.
+     *
+     * Возвращает:
+     *   - `[a, b]` если `junction` — массив ровно из 2 непустых строк.
+     *   - `undefined` если `junction` отсутствует или является boolean
+     *     (boolean-форма обрабатывается отдельно как explicit override).
+     *
+     * @throws Error если `junction` — массив, но некорректной формы (не 2 элемента,
+     *         не строки, пустые) — fail-fast, чтобы malformed директива не
+     *         деградировала silently до эвристики.
+     */
+    private static parseJunctionDirective(
+        junctionValue: unknown,
+        className: string,
+    ): [string, string] | undefined {
+        if (junctionValue === undefined || junctionValue === null) {
+            return undefined;
+        }
+        if (typeof junctionValue === 'boolean') {
+            return undefined;
+        }
+        if (!Array.isArray(junctionValue)) {
+            throw new Error(
+                `Entity "${className}" has invalid junction directive: expected boolean (junction: true) `
+                + `or a 2-element array (junction: [a, b]), got ${typeof junctionValue}.`,
+            );
+        }
+        if (junctionValue.length !== 2) {
+            throw new Error(
+                `Entity "${className}" junction directive must have exactly 2 elements `
+                + `(junction: [entity1, entity2]), got ${junctionValue.length}.`,
+            );
+        }
+        const [a, b] = junctionValue;
+        if (typeof a !== 'string' || typeof b !== 'string' || a.trim() === '' || b.trim() === '') {
+            throw new Error(
+                `Entity "${className}" junction directive elements must be non-empty strings, `
+                + `got [${JSON.stringify(a)}, ${JSON.stringify(b)}].`,
+            );
+        }
+        return [a.trim(), b.trim()];
+    }
+
+    /**
+     * TASK-037: резолвит junction directive `[a, b]` в пару entity1/entity2.
+     *
+     * Каждый элемент директивы (entity/parent-имя, напр. `task`, `terminal_set`)
+     * сопоставляется с relation-полем модели одним из двух способов:
+     *   1. По имени поля `<element>Id` (напр. `task` → поле `taskId`).
+     *   2. По `relatedModel` поля (напр. `terminal_set` → поле с
+     *      relatedModel `terminalSet`, покрывает FK-alias случай parent=X).
+     *
+     * Порядок `[a, b]` авторитетен: entity1 = resolved(a), entity2 = resolved(b).
+     * Возвращаемое значение — `relatedModel` найденного поля (canonical lowerCamel),
+     * консистентно с `extractEntityNameFromField` (тот же downstream contract).
+     *
+     * @throws Error если элемент директивы не сопоставляется ни с одним relation-полем.
+     */
+    private static resolveJunctionDirective(
+        model: ServerpodModel,
+        directive: [string, string],
+    ): { entity1: string; entity2: string } {
+        const entity1 = this.resolveJunctionElement(model, directive[0]);
+        const entity2 = this.resolveJunctionElement(model, directive[1]);
+        return { entity1, entity2 };
+    }
+
+    /**
+     * TASK-037: сопоставляет один элемент директивы с relation-полем и возвращает
+     * его canonical entity-имя (`relatedModel` / strip-Id fallback).
+     */
+    private static resolveJunctionElement(model: ServerpodModel, element: string): string {
+        const relationFields = model.fields.filter(f => f.isRelation);
+
+        // Кандидат в lowerCamel для сравнения с relatedModel (директива может быть
+        // в snake_case: `terminal_set`). Не throw'аем на невалидный snake — просто
+        // используем element как есть для второго способа сопоставления.
+        let elementCamel = element;
+        try {
+            elementCamel = snakeToLowerCamelCase(element);
+        } catch {
+            elementCamel = element;
+        }
+        const expectedFieldName = `${elementCamel}Id`;
+
+        for (const field of relationFields) {
+            // Способ 1: имя поля = `<element>Id`.
+            if (field.name === expectedFieldName || field.name === `${element}Id`) {
+                return this.extractEntityNameFromField(field) ?? elementCamel;
+            }
+            // Способ 2: relatedModel поля совпадает с элементом (FK-alias / parent=X).
+            const related = this.extractEntityNameFromField(field);
+            if (related && (related === elementCamel || related === element)) {
+                return related;
+            }
+        }
+
+        const available = relationFields.map(f => f.name).join(', ') || '(нет relation-полей)';
+        throw new Error(
+            `Entity "${model.className}" junction directive references "${element}", `
+            + `but no relation field matches it (expected field "${expectedFieldName}" or a `
+            + `relation with parent="${element}"). Available relation fields: [${available}].`,
+        );
     }
 
     private static extractEntityNameFromField(field: ServerpodField): string | null {
