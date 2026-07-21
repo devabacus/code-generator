@@ -72,3 +72,22 @@ Generated будет `deleteCustomerUserByCustomerAndRole` (берёт `customer
 - `src/features/generation/generators/orchestrator_patcher.ts:260-323` — use shared utility (remove `_extractEntityNameFromField` duplicate)
 - `src/features/generation/parsers/junction_detector.ts` или новый `junction_fk_extractor.ts` — host shared utility
 - `src/test/generators/cross_component_integration.test.ts` (new) — verifies parser ↔ patcher alignment
+
+> **Update 2026-07-21:** ядро этой записи закрыто **TASK-037** (`junction: [a, b]` explicit-parents
+> директива, PR #47): пункты 3 (explicit override) и частично 2 (единый источник пары
+> `model.entity1/entity2` parser → orchestrator) реализованы. Остаточные идеи (suspect-pattern
+> warning, cross-component integration test) — при необходимости отдельной задачей.
+
+## Миграция шаблонов t115/simplified на директиву `junction: [a, b]`
+
+**Priority:** Medium. **Source:** TASK-037 (не-цель «шаблоны в этой задаче не трогаем»), reviewer MINOR-2.
+
+Директива реализована в генераторе (TASK-037, PR #47), но шаблонные junction-YAML
+(`task_tag_map.spy.yaml` и т.п.) её ещё не несут — работают на mitigation-конвенции
+«parents-first». Задача:
+
+1. Добавить `junction: [a, b]` во все junction-YAML шаблонов t115 и simplified.
+2. **Follow-up MINOR-2 (TASK-037 review):** задокументировать регистрочувствительность
+   элементов директивы (`[Task, Tag]` → внятный throw, ожидается lowerCamel/snake_case) —
+   в доке шаблона и/или `sync-core-integration.md`, когда форма становится публичной.
+3. Проверка: `codegen verify` на свежем test-проекте `t<N+1>` (DoD-гейт).

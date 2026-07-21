@@ -200,3 +200,4 @@ Sequence per Discussion #4 → #6:
 | TASK-034 | BUG-027 fix one-to-many back-relation leak в flutter entity | 🟡 In Progress | 2026-06-05 |
 | TASK-035 | cleanup redundant Map-эвристики в fieldsFilter (latent false-positive) | 🟡 In Progress | 2026-06-05 |
 | TASK-036 | версионирование расширения + фикс reinstall handler (npx, auto-bump, vscodeignore) | 🟡 In Progress | 2026-06-09 |
+| TASK-037 | junction FK extraction не фильтрует customerId (экс-BUG-026) | 🟡 In Progress | 2026-07-21 |

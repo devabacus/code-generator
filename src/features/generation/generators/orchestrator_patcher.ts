@@ -324,14 +324,22 @@ export class OrchestratorPatcher {
         const targetEntitySnake = toSnakeCase(targetEntityCamel);
 
         if (isJunction) {
-            // TASK-014: extract FK names из model для junction docstring substitution.
-            // Берём первые 2 FK fields в порядке declaration (per task.md Option A).
-            // TASK-023 (BUG-019 fix): defensive fallbacks приходят из config (pre-TASK-023 hardcoded 'task'/'tag').
+            // TASK-037: единый источник junction-пары — `model.entity1`/`model.entity2`,
+            // populated парсером (`ServerpodYamlParser.parse`). С директивой
+            // `junction: [a, b]` парсер кладёт туда авторитетную пара; без директивы —
+            // ту же пару что даёт эвристика «первые 2 relation-поля» (byte-identical).
+            // Это устраняет рассинхрон трёх junction-кодопутей (BUG-026): раньше
+            // orchestrator независимо re-derive'ил FK из model.fields, игнорируя
+            // директиву. Fallback на field-derivation сохранён для моделей,
+            // построенных напрямую в тестах без entity1/entity2.
+            // TASK-023 (BUG-019 fix): defensive fallbacks приходят из config.
             const fkFields = model.fields.filter((f: ServerpodField) => f.isRelation === true);
             const fk1Fallback = config.templateConfig.orchestrator.junctionFkFallbacks.fk1;
             const fk2Fallback = config.templateConfig.orchestrator.junctionFkFallbacks.fk2;
-            const fk1Name = fkFields.length >= 1 ? this._extractEntityNameFromField(fkFields[0]) : fk1Fallback;
-            const fk2Name = fkFields.length >= 2 ? this._extractEntityNameFromField(fkFields[1]) : fk2Fallback;
+            const fk1Name = model.entity1
+                ?? (fkFields.length >= 1 ? this._extractEntityNameFromField(fkFields[0]) : fk1Fallback);
+            const fk2Name = model.entity2
+                ?? (fkFields.length >= 2 ? this._extractEntityNameFromField(fkFields[1]) : fk2Fallback);
 
             // Substitute с FK literals + entity tokens. FK substitutions делаем через
             // `_substituteJunctionFKs` (специализированный — заменяет только в docstring

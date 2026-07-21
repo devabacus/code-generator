@@ -85,34 +85,78 @@ fields:
 - Routing через `manifest: manyToMany` словарь
 - Server endpoints: `createX`, `deleteXByBusinessKey` (НЕ `updateX` / `deleteX`)
 
-#### Junction FK extraction — known limitation
+#### Junction FK extraction — explicit-parents directive (TASK-037) + heuristic fallback
 
-Generator extracts junction `entity1`/`entity2` names из **первых 2 FK fields** в YAML declaration order (Option A). Это правильно для clean junctions (`RolePermission(roleId, permissionId)`, `TaskTagMap(taskId, tagId)`).
+**Explicit directive (рекомендуется, TASK-037 / BUG-026 fix):** junction `*_map.spy.yaml` может
+объявить junction-родителей явно через файловую директиву `junction: [a, b]`. Порядок
+авторитетен: `entity1 = a`, `entity2 = b`. Директива читается **всеми тремя** junction-кодопутями
+(`JunctionDetector` классификация, `ServerpodYamlParser.extractManyToManyEntities`,
+`OrchestratorPatcher` FK-выбор) из **единого источника** — `model.entity1`/`model.entity2`,
+populated парсером. Это устраняет silent misgeneration (BUG-026), когда ownership-поле
+`customerId` объявлено раньше настоящих junction-FK.
 
-**Known limitation для junctions с non-FK pseudo-keys:**
+```yaml
+class: TaskTagMap
+table: task_tag_map
+junction: [task, tag]                                     # ← explicit parents (авторитетно)
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  customerId: UuidValue, relation(parent=customer)        # ownership, НЕ junction-родитель
+  taskId: UuidValue, relation(parent=task)                # junction FK
+  tagId: UuidValue, relation(parent=tag)                  # junction FK
+```
 
-Если junction имеет business key включающий non-FK поле (e.g. `userId: int` без `relation(parent=user)`) — generator пропустит non-FK поле и возьмёт следующее FK declaration. Example из weight repo (`weight_server/lib/src/models/user/customer_user.spy.yaml`):
+Маппинг элемента директивы на relation-поле: по имени поля `<element>Id` (`task` → `taskId`)
+**или** по `relatedModel` (`terminal_set` → поле с `parent=terminal_set`, покрывает FK-alias).
+Резолвнутое имя = `relatedModel` найденного поля (canonical lowerCamel, консистентно с
+downstream substitution). Array-форма также подразумевает junction-классификацию (как
+`junction: true`).
+
+**Валидация:** элемент директивы, не сопоставимый ни с одним relation-полем, →
+внятная ошибка (`... references "X", but no relation field matches it ...`), не silent.
+Массив не из 2 непустых строк → ошибка формы (fail-fast).
+
+**Heuristic fallback (без директивы — поведение байт-в-байт как раньше):** generator берёт
+`entity1`/`entity2` из **первых 2 FK fields** в YAML declaration order (Option A). Это правильно
+для clean junctions (`RolePermission(roleId, permissionId)`, `TaskTagMap(taskId, tagId)`), где
+junction-FK объявлены до ownership `customerId`.
+
+**Ограничение эвристики (когда директива не задана):**
+
+Если junction имеет business key включающий non-FK поле (e.g. `userId: int` без
+`relation(parent=user)`) или ownership `customerId: relation(parent=customer)` объявлен раньше
+настоящих junction-FK — эвристика выберет неверную пару. Example из weight repo
+(`weight_server/lib/src/models/user/customer_user.spy.yaml`):
 
 ```yaml
 class: CustomerUser
 fields:
-  customerId: UuidValue, relation(parent=customer)        # FK
+  customerId: UuidValue, relation(parent=customer)        # FK (здесь — настоящий родитель)
   userId: int                                              # NOT a relation declaration
   roleId: UuidValue, relation(parent=role)                 # FK
   defaultTerminalSetId: UuidValue?, relation(parent=terminal_set)  # FK nullable
 ```
 
-Generated method будет `deleteCustomerUserByCustomerAndRole` (берёт `customerId`+`roleId`) instead of `deleteCustomerUserByCustomerAndUser` если business key fact'ically `customer+user`. Docstring аналогично — `junction FK→customer+role`.
+Без директивы generated method будет `deleteCustomerUserByCustomerAndRole` (берёт
+`customerId`+`roleId`) — это корректно для CustomerUser (customer — настоящий junction-родитель),
+но неверно для TaskTagMap с customerId-first ordering. `serverpod generate` PASS,
+`flutter analyze` PASS, `verify` PASS (syntactically valid); ломается только на runtime
+soft-delete by-key path.
 
-`serverpod generate` PASS, `flutter analyze` PASS, `verify` PASS (syntactically valid). Сломается на runtime когда orchestrator попытается `delete()` через soft-delete by-key path — server вернёт 404 или resurrect неправильную row → silent data corruption.
+**Workaround / рекомендация:**
 
-**Workaround options:**
+1. **Задать `junction: [a, b]` директиву** — авторитетный, self-documenting сигнал (предпочтительно).
+2. Соблюдать mitigation-конвенцию «объявляй junction-родительские FK ПЕРЕД ownership `customerId`»
+   (эвристика тогда даёт корректную пару). Её соблюдает шаблон t115 (`task_tag_map`).
 
-1. Объявить FK через `relation(parent=user)` если actual FK relationship существует в schema.
-2. Manually adjust generated adapter после `generate-entity` для custom business key logic.
-3. Future: parser warning when FK count выглядит off (3+ FK + non-FK fields со суффиксом `Id`) — см. **TASK-015 backlog** для robust improvement (extract shared `extractEntity1Entity2` utility + parser warning + optional `junctionKeyFields` YAML override).
+**⚠ Взаимодействие с BUG-012 (FK-alias):** маппинг директивы использует `relatedModel`
+(уже резолвленный парсером из `parent=X`). Если `parent=` directive присутствует — маппинг по
+alias работает (`terminal_set` → `terminalSet`). Директива **не** чинит и **не** ломает BUG-012 —
+она полагается на уже-исправленный (TASK-016/017) `relatedModel`.
 
-Pre-existing `server_yaml_parser` limitation (`relationFields[0]/[1]` для entity1/entity2), expanded blast radius via TASK-014 FK extraction в `orchestrator_patcher._substituteJunctionFKs` (identical algorithm в двух местах). Documented 2026-05-02 (TASK-014 round 1 adversarial review Bomb #1).
+Pre-existing `server_yaml_parser` limitation (`relationFields[0]/[1]` для entity1/entity2),
+expanded blast radius via TASK-014 FK extraction в `orchestrator_patcher._substituteJunctionFKs`.
+TASK-037 unified оба места на `model.entity1`/`model.entity2` single source (2026-07-21).
 
 References:
 - t115/TASK-001 Phase 2d TaskTagMap pattern (multi-entity validated)
