@@ -1,0 +1,18 @@
+# Verification-профиль: VS Code extension + CLI codegen (TypeScript).
+# Именованные проверки → команда, таймаут (сек). task.md ссылается:
+#   verification_profile: ts-generator, checks: [compile, lint, unit]
+# Команды взяты 1:1 из CI (.github/workflows/test.yml).
+name: ts-generator
+checks:
+  compile:
+    cmd: "npm run compile"
+    timeout: 300
+  lint:
+    cmd: "npm run lint"
+    timeout: 300
+  # Unit: явный путь к mocha (не `npx mocha`) — mocha = transitive dep через
+  # @vscode/test-cli, npx fallback'нул бы на latest из реестра при prune.
+  # Исключаем extension.test.js (требует vscode runtime, headless не работает в облаке).
+  unit:
+    cmd: 'node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"'
+    timeout: 600

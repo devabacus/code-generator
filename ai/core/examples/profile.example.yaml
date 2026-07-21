@@ -1,0 +1,80 @@
+# ai/project/profile.yaml — РЕФЕРЕНС-ПРИМЕР формата (ADR-0002 п.3).
+#
+# Этот файл в core/ — только документация формата. Рабочий профиль проекта живёт в
+# ai/project/profile.yaml. Профиль объявляется на ЗОНУ. Класс I–IV — человеческая метка;
+# решение о запуске драйвер принимает по capability policy (execution/runner/network/...).
+#
+# Ниже — 4 архетипа из портфеля (по одному на каждый класс):
+#   weight-system (I flutter-core, II ble, IV prod-k8s) — Flutter+Serverpod
+#   esp32         (II, office, hardware)                — прошивки
+#   b24           (III, prepare_only)                   — внешний API без staging
+#   vscode-ext    (I, cloud)                            — детерминированный харнесс
+#
+# Проверить: python ai/core/scripts/profile.py lint \
+#              --profile ai/core/examples/profile.example.yaml \
+#              --profiles-dir ai/core/examples/profiles
+
+project: portfolio-reference
+
+zones:
+  # ── Класс I: полный self-check в облаке ──────────────────────────────────
+  - name: flutter-core            # weight-system, чистый Dart-код
+    class: I
+    execution: apply
+    runner: cloud
+    network: none
+    side_effects: none
+    secrets: []
+    hardware: []
+    protected_paths: []
+    frozen_contracts: []
+    verification_profile: flutter-core
+
+  - name: vscode-ext              # VS Code extension (пилот #8)
+    class: I
+    execution: apply
+    runner: cloud
+    network: none
+    side_effects: none
+    verification_profile: ts-generator
+
+  # ── Класс II: железо-зависимая верификация на офисном ПК ─────────────────
+  - name: ble                     # weight-system, BLE к контроллерам
+    class: II
+    execution: apply
+    runner: office
+    network: none
+    side_effects: read_only
+    hardware: [ble-nrf52832, ble-nrf52840]
+    frozen_contracts: [nordic-uart-protocol]
+    protected_paths: ["legacy_fixtures/**"]
+    verification_profile: ble-hardware
+
+  - name: esp32-gateway           # прошивки ESP32
+    class: II
+    execution: apply
+    runner: office
+    network: none
+    side_effects: read_only
+    hardware: [esp32-gateway, rigol-ds1104z]
+    verification_profile: esp-idf
+
+  # ── Класс III: внешний API без своего окружения → prepare_only ───────────
+  - name: b24-integration         # Битрикс24 REST, staging отсутствует
+    class: III
+    execution: prepare_only       # «ночь готовит — человек применяет»
+    runner: cloud
+    network: allowlist
+    allowlist: [test-portal.bitrix24.ru]
+    side_effects: read_only
+    secrets: [B24_WEBHOOK_TEST]
+    verification_profile: b24-readonly
+
+  # ── Класс IV: прод-запрещённая зона → execution:never (guardrail) ────────
+  - name: prod-k8s                # weight-system прод-кластер
+    class: IV
+    execution: never
+    runner: cloud
+    network: none
+    side_effects: none
+    protected_paths: ["**"]

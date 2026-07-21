@@ -1,0 +1,10 @@
+# Verification-профиль: Битрикс24 (класс III, prepare_only).
+# Ночью — только read-only проверки к тестовому порталу; никаких вызовов, меняющих данные.
+name: b24-readonly
+checks:
+  lint:
+    cmd: "composer lint"
+    timeout: 300
+  readonly_api:
+    cmd: "php tests/b24_readonly_probe.php"
+    timeout: 300

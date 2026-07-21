@@ -36,7 +36,7 @@
 
 ### Прогресс через task.md
 
-Executor ведёт прогресс в **трёх секциях самого task.md**: "План работы" (чек-лист от teamlead'а), "STOP-gates" (деструктивные операции, подтверждение user'а перед каждой), "Журнал исполнения" (решения/блокеры от executor). Отдельного journal-файла нет. Детали — в `ai/prompts/executor.prompt.md` и `ai/tasks/_template/task.md`.
+Executor ведёт прогресс в **трёх секциях самого task.md**: "План работы" (чек-лист от teamlead'а), "STOP-gates" (деструктивные операции, подтверждение user'а перед каждой), "Журнал исполнения" (решения/блокеры от executor). Отдельного journal-файла нет. Детали — в `ai/project/prompts/executor.prompt.md` и `ai/core/tasks/_template/task.md`.
 
 **Teamlead обязан:** декомпозировать задачу в "План работы" и перечислить ожидаемые destructive ops в "STOP-gates" при создании task.md. Абстрактные "реализовать X" недопустимы.
 
@@ -49,7 +49,7 @@ Executor ведёт прогресс в **трёх секциях самого t
 - **После работы субагента** — teamlead читает его результат (report / diff / CLI вывод), не доверяет слепо. Субагент не видит контекст user'а, может принять неверное решение.
 - **Multi-agent code review:** после implementation сложной задачи — diff отдать двум независимым агентам для review до commit'а. Validated в weight-system (TASK-009/013, нашли 4-5 багов на каждой задаче). Применимо и в этом проекте.
 
-Альтернатива (если нужно изолированное окружение): user запускает executor'а в новом чате с `ai/prompts/executor.prompt.md`. Оба пути валидны, выбор по контексту.
+Альтернатива (если нужно изолированное окружение): user запускает executor'а в новом чате с `ai/project/prompts/executor.prompt.md`. Оба пути валидны, выбор по контексту.
 
 ### MCP инструменты — частично blacklist
 
@@ -70,21 +70,21 @@ node out/adapters/cli/index.js verify --name <test_project> --human   # DoD-ге
 ### ⚠ HARD RULE (User decision 2026-05-02): tasks/discussions ТОЛЬКО через python скрипты
 
 **Запрещено создавать вручную через `Write`:**
-- `ai/tasks/active/TASK-XXX-*/task.md` или `report.md`
-- `ai/discussions/active/N-*.md`
+- `ai/project/tasks/active/TASK-XXX-*/task.md` или `report.md`
+- `ai/project/discussions/active/N-*.md`
 
 **Обязательно через скрипты:**
-- `python ai/scripts/new_task.py "название"` — auto-ID, copy template, update STATUS.md
-- `python ai/discussions/scripts/discuss.py new "тема"` — auto-нумерация, header, status
+- `python ai/core/scripts/new_task.py "название"` — auto-ID, copy template, update STATUS.md
+- `python ai/core/discussions/scripts/discuss.py new "тема"` — auto-нумерация, header, status
 
 Manual creation breaks: auto-ID (conflicts с merged tasks в done/), template freshness, naming conventions, status tracking.
 
-Для автоматизации используется `ai/scripts/task.py` с subcommands `start / pr / merge / finish`.
+Для автоматизации используется `ai/core/scripts/task.py` с subcommands `start / pr / merge / finish`.
 
 ### 1. Teamlead: создать ветку перед запуском executor
 
 ```bash
-python ai/scripts/task.py start TASK-XXX-short-name
+python ai/core/scripts/task.py start TASK-XXX-short-name
 ```
 
 Эквивалент ручных команд:
@@ -108,13 +108,13 @@ git checkout -b feature/TASK-XXX-short-name
 
 Сначала прочитать 3 секции task.md + report.md:
 ```bash
-cat ai/tasks/active/TASK-XXX-*/task.md
-cat ai/tasks/active/TASK-XXX-*/report.md
+cat ai/project/tasks/active/TASK-XXX-*/task.md
+cat ai/project/tasks/active/TASK-XXX-*/report.md
 ```
 
 Если ок — автоматизация:
 ```bash
-python ai/scripts/task.py pr
+python ai/core/scripts/task.py pr
 ```
 
 Что делает:
@@ -125,8 +125,8 @@ python ai/scripts/task.py pr
 ### 4. User: approve + squash merge
 
 ```bash
-python ai/scripts/task.py merge       # интерактивный confirm
-python ai/scripts/task.py merge -y    # без prompt (для скриптов)
+python ai/core/scripts/task.py merge       # интерактивный confirm
+python ai/core/scripts/task.py merge -y    # без prompt (для скриптов)
 ```
 
 **ВАЖНО ДЛЯ АГЕНТОВ:** НЕ передавать `--yes` / `-y` без явного одобрения пользователя — это касается **обеих** команд: `task.py merge -y` **и** `task.py finish -y` (finish внутри вызывает merge, флаг опасен одинаково). По умолчанию (без TTY + без `--yes`) скрипт откажется мержить.
@@ -153,14 +153,14 @@ python ai/scripts/task.py merge -y    # без prompt (для скриптов)
 
 С флагом `--force` мержит даже если CI не зелёный (для hotfix):
 ```bash
-python ai/scripts/task.py merge --force
+python ai/core/scripts/task.py merge --force
 ```
 
 ### 5. Одной командой (pr + merge)
 
 Если задача простая и CI точно пройдёт:
 ```bash
-python ai/scripts/task.py finish
+python ai/core/scripts/task.py finish
 ```
 
 Запускает `pr`, затем сразу `merge`.
@@ -229,7 +229,7 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 ### Правила тестирования
 
-Полная политика по слоям пирамиды — [`ai/docs/conventions.md → Testing`](ai/docs/conventions.md#testing).
+Полная политика по слоям пирамиды — [`ai/project/docs/conventions.md → Testing`](ai/project/docs/conventions.md#testing).
 
 1. **Executor ОБЯЗАН тестировать** в одном PR с кодом:
    - **Unit-тесты на новый чистый код** (helpers, parsers, generators, mappers, валидаторы) — ~100% публичного API на MockFileSystem. **Без исключений.**
@@ -313,19 +313,19 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 Для критичных багов:
 
-1. `python ai/scripts/task.py start hotfix/<short>`
+1. `python ai/core/scripts/task.py start hotfix/<short>`
 2. Минимальный diff
 3. PR с меткой `hotfix`
 4. Быстрый review → squash merge
 
 ## Что хранится в репо
 
-- `ai/tasks/active/` — задачи в работе (`task.md` → `report.md` во время работы)
-- `ai/tasks/done/` — завершённые задачи
-- `ai/tasks/blocked/` — заблокированные
-- `ai/docs/decisions/` — ADR (не редактировать закрытые)
-- `ai/discussions/active/` — активные обсуждения
-- `ai/discussions/archive/` — завершённые
+- `ai/project/tasks/active/` — задачи в работе (`task.md` → `report.md` во время работы)
+- `ai/project/tasks/done/` — завершённые задачи
+- `ai/project/tasks/blocked/` — заблокированные
+- `ai/project/docs/decisions/` — ADR (не редактировать закрытые)
+- `ai/project/discussions/active/` — активные обсуждения
+- `ai/project/discussions/archive/` — завершённые
 
 ## Code-generator → потребители (weight-system, других проектов)
 

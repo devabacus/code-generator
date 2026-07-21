@@ -1,0 +1,14 @@
+# Verification-профиль: VS Code extension (кодогенератор по Serverpod YAML).
+# Именованные проверки → команда, таймаут (сек), опционально рабочая директория.
+# task.md ссылается на них: verification_profile: ts-generator, checks: [compile, unit, snapshots]
+name: ts-generator
+checks:
+  compile:
+    cmd: "npm run compile"
+    timeout: 300
+  unit:
+    cmd: "npm test"
+    timeout: 600
+  snapshots:
+    cmd: "npm run test:snapshots"
+    timeout: 300

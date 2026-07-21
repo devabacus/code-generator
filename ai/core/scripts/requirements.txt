@@ -1,0 +1,4 @@
+# Зависимости скриптов ai/core/scripts (устанавливать: pip install -r requirements.txt)
+# PyYAML обязателен для profile.py и полноценного frontmatter-парсинга task.py.
+# sync.py работает на stdlib (lock — JSON), PyYAML нужен ему только для миграции старых YAML-lock.
+PyYAML>=6.0
