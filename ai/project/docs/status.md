@@ -202,3 +202,4 @@ Sequence per Discussion #4 → #6:
 | TASK-036 | версионирование расширения + фикс reinstall handler (npx, auto-bump, vscodeignore) | 🟡 In Progress | 2026-06-09 |
 | TASK-037 | junction FK extraction не фильтрует customerId (экс-BUG-026) | 🟡 In Progress | 2026-07-21 |
 | TASK-038 | triage docs-code-generator/bugs-and-tasks.md — сверка с актуальным состоянием | 🟡 In Progress | 2026-07-21 |
+| TASK-039 | BUG-015 cross-feature junction prove-out + фикс при провале | 🟡 In Progress | 2026-07-21 |
