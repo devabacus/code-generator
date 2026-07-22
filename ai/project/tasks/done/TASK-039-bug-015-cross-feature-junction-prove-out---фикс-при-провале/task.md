@@ -1,7 +1,7 @@
 ---
 id: TASK-039
 schema_version: 2
-status: active            # active | blocked | done
+status: done
 mode: interactive         # interactive | auto
 zone: "generator-core"
 verification_profile: "ts-generator"
