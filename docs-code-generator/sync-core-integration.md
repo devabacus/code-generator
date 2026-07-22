@@ -53,8 +53,14 @@ Junction (many-to-many) entities определяются через **`Junction
 **Detection rules** (per [Discussion #2](../ai/discussions/archive/2-task-013-junction-detection-robust-yaml/) Q1=C / Q2=A / Q3=A unanimous consensus):
 
 - **Structural (default):** entity = junction если **2+ FK relations** (поля с `relation(parent=...)` syntax) + 0 non-FK fields outside base whitelist (`id, userId, customerId, createdAt, lastModified, isDeleted`). Nullable FK = FK.
-- **Explicit override:** YAML top-level `junction: true` field принудительно классифицирует entity как junction независимо от extra fields. Use case: junction с metadata (e.g. `UserPermission(userId, permissionId, assignedAt)`). Negative override (`junction: false`) НЕ supported — risk скрыть structural junction.
-- **Validation:** `junction: true` + FK<2 → throws `JunctionValidationError` (fail-fast).
+- **Explicit override:** маркер-комментарий `# codegen:junction: true` принудительно классифицирует entity как junction независимо от extra fields. Use case: junction с metadata (e.g. `UserPermission(userId, permissionId, assignedAt)`). Negative override (`false`) НЕ supported — risk скрыть structural junction.
+- **Validation:** `# codegen:junction: true` + FK<2 → throws `JunctionValidationError` (fail-fast).
+
+> ⚠ **TASK-040 (ADR-0006):** носитель директивы — YAML-**комментарий**, не YAML-ключ.
+> Старый ключ `junction:` отвергается Serverpod'ом (`The "junction" property is not allowed
+> for class type`) — `serverpod generate` падал на таком файле. Парсер теперь падает с
+> migration-сообщением, если видит настоящий YAML-ключ `junction`. См. раздел
+> «Носитель директивы» ниже.
 
 **Examples:**
 
@@ -70,9 +76,9 @@ fields:
 
 ```yaml
 # Junction with metadata — requires explicit override
+# codegen:junction: true                                             # explicit override (комментарий!)
 class: UserPermission
 table: user_permission
-junction: true                                                       # explicit override
 fields:
   id: UuidValue?, defaultPersist=random_v7
   userId: UuidValue, relation(parent=user, onDelete=Cascade)
@@ -88,7 +94,8 @@ fields:
 #### Junction FK extraction — explicit-parents directive (TASK-037) + heuristic fallback
 
 **Explicit directive (рекомендуется, TASK-037 / BUG-026 fix):** junction `*_map.spy.yaml` может
-объявить junction-родителей явно через файловую директиву `junction: [a, b]`. Порядок
+объявить junction-родителей явно через файловую директиву-комментарий
+`# codegen:junction: [a, b]` (носитель — TASK-040 / ADR-0006). Порядок
 авторитетен: `entity1 = a`, `entity2 = b`. Директива читается **всеми тремя** junction-кодопутями
 (`JunctionDetector` классификация, `ServerpodYamlParser.extractManyToManyEntities`,
 `OrchestratorPatcher` FK-выбор) из **единого источника** — `model.entity1`/`model.entity2`,
@@ -96,9 +103,9 @@ populated парсером. Это устраняет silent misgeneration (BUG-
 `customerId` объявлено раньше настоящих junction-FK.
 
 ```yaml
+# codegen:junction: [task, tag]                           # ← explicit parents (авторитетно)
 class: TaskTagMap
 table: task_tag_map
-junction: [task, tag]                                     # ← explicit parents (авторитетно)
 fields:
   id: UuidValue?, defaultPersist=random_v7
   customerId: UuidValue, relation(parent=customer)        # ownership, НЕ junction-родитель
@@ -110,11 +117,45 @@ fields:
 **или** по `relatedModel` (`terminal_set` → поле с `parent=terminal_set`, покрывает FK-alias).
 Резолвнутое имя = `relatedModel` найденного поля (canonical lowerCamel, консистентно с
 downstream substitution). Array-форма также подразумевает junction-классификацию (как
-`junction: true`).
+`# codegen:junction: true`).
 
 **Валидация:** элемент директивы, не сопоставимый ни с одним relation-полем, →
 внятная ошибка (`... references "X", but no relation field matches it ...`), не silent.
-Массив не из 2 непустых строк → ошибка формы (fail-fast).
+Массив не из 2 непустых строк → ошибка формы (fail-fast). Дубликат родителей
+(`[task, task]`) → ошибка (пара обязана быть различной).
+
+##### Носитель директивы: YAML-комментарий (TASK-040 / ADR-0006)
+
+Директива живёт в **комментарии** того же `*_map.spy.yaml`, а не в YAML-ключе. Причина:
+`serverpod generate` читает ТОТ ЖЕ физический файл строгим валидатором и отвергает
+неизвестный top-level ключ:
+
+```text
+Error on line 2 of author_book_map.spy.yaml:
+  The "junction" property is not allowed for class type.
+  Valid keys are {class, sealed, extends, immutable, table, managedMigration,
+  serverOnly, fields, indexes}.
+```
+
+Комментарий Serverpod физически не видит → файл на диске **в покое** валиден для
+`serverpod generate` без всякой предобработки, во всех точках вызова (CLI codegen,
+пользователь вручную, IDE-плагин, CI). Носитель уже обкатан в репозитории — маркеры
+`# manifest:` живут в 16 шаблонных `.spy.yaml`.
+
+**Контракт парсера** (`ServerpodYamlParser.parseJunctionMarker`):
+
+- маркер читается по сырому содержимому файла **до `yaml.load`**;
+- якорь на **колонку 0**: `^# codegen:junction:` без отступа. Это снимает ложное
+  срабатывание внутри block scalar / строкового default'а — их содержимое обязано быть
+  с отступом. Тот же приём применён в `parseField` (BUG-012 side-fix);
+- разрешён **ровно один** маркер; дубликат → ошибка;
+- RHS: `true` или flow-массив `[a, b]`; пустой RHS, `false`, произвольный текст →
+  fail-fast, НЕ тихая деградация к эвристике;
+- **migration-guard:** настоящий YAML-ключ `junction` (любой формы) → ошибка с
+  инструкцией переноса в комментарий.
+
+Общая конвенция codegen-директив — плоский namespaced-маркер `# codegen:<key>: <value>`
+(общая с `// codegen:ownership:` из дискуссии #14).
 
 **Heuristic fallback (без директивы — поведение байт-в-байт как раньше):** generator берёт
 `entity1`/`entity2` из **первых 2 FK fields** в YAML declaration order (Option A). Это правильно
