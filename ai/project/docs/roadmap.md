@@ -147,7 +147,7 @@ Decision matrix v1 maintenance moot. Track 1 deleted. All ресурсы flow в
 |---|---|---|---|
 | BUG-001 | High UI | Ref disposed в state_providers (Riverpod async) | Capacity-driven post-Initiative |
 | BUG-014 | Low | `relation_patcher.ts` regex без word boundary anchoring | Defer until Initiative refactors |
-| BUG-015 | High codegen | Cross-feature junction generation broken | Phase A-D или `<weight-build TASK>`-driven (если weight v2 имеет cross-feature junctions) |
+| BUG-015 | High codegen (CONFIRMED, partial fix, BLOCKED-остаток) | Cross-feature junction generation broken | 🔴 **CONFIRMED + partial fix (TASK-039, 2026-07-21):** cross-feature junction сломан (repro t206, дельта vs same-feature control). Drift-table слой исправлен (маркер `:driftTableImports`, t115+simplified, +3 теста). Остаток (repository/data-providers/domain/presentation, 8 broken импортов) — **BLOCKED**, требует архитектурного решения (3 варианта в [bug-report 015](../bug-reports/015-cross-feature-junction.md)). Решение за владельцем перед weight regen, если у weight есть cross-feature junctions. |
 | BUG-016 | Medium | Junction MANY_TO_MANY substitution analog TASK-017 | `<weight-build TASK>`-driven |
 | BUG-017 | Low → Medium* | `onDelete=Cascade` для FK alias generates as `setNull` | `<weight-build TASK>`-driven (data integrity) |
 | BUG-018 | Low | `entity_yaml_validator` should warn on Serverpod reserved names | Defer |

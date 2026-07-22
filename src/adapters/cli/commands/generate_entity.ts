@@ -154,6 +154,19 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
             ceremony: opts.ceremony,
         });
 
+        // BUG-015 (TASK-039) loud-guard: junction с parent'ами в разных features
+        // резолвится только когда известен featuresPath (нужен config). Проверяем
+        // после сборки config, до генерации — громкий отказ вместо broken output.
+        if (!opts.skipValidation) {
+            const colocationErrors = EntityYamlValidator.validateJunctionColocation(model, config.featuresPath);
+            if (colocationErrors.length > 0) {
+                logger.error(EntityYamlValidator.formatErrors(colocationErrors));
+                logger.error(`Use --skip-validation to bypass at your own risk.`);
+                logger.emitResult('generate-entity', false, startTime);
+                process.exit(1);
+            }
+        }
+
         const inner = new DefaultFileSystem();
         const fileSystem = new TrackingFileSystem(inner, logger);
 
