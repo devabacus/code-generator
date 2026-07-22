@@ -204,3 +204,5 @@ Sequence per Discussion #4 → #6:
 | TASK-038 | triage docs-code-generator/bugs-and-tasks.md — сверка с актуальным состоянием | 🟡 In Progress | 2026-07-21 |
 | TASK-039 | BUG-015 cross-feature junction prove-out + фикс при провале | 🟡 In Progress | 2026-07-21 |
 | TASK-040 | директива junction не проходит serverpod generate (property not allowed) | 🟡 In Progress | 2026-07-22 |
+| TASK-041 | ужесточение junction fallback до fail-fast при структурной неоднозначности | 🟡 In Progress | 2026-07-22 |
+| TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 In Progress | 2026-07-22 |

@@ -131,7 +131,7 @@ G:/Projects/Flutter/serverpod/<name>/
 
 **Дополнительно:** parser игнорирует `relation(parent=X)` directive — derives `relatedModel` через `name.replace(/(.*)Id/, '$1')`, что ломает FK alias case (`assigneeId, parent=member` → broken). См. [BUG-012](ai/project/bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
 
-- НЕ ТРОГАЕТ `:base` секции — это отдельная проблема (см. BUG-005 в backlog).
+- НЕ ТРОГАЕТ `:base` секции — это отдельная проблема (см. [BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md) в backlog).
 
 ### 2. Файловые имена — snake_case (TASK / BUG-002)
 
@@ -290,7 +290,7 @@ python ai/core/scripts/task.py finish    # pr + merge
 ## Известные ограничения / backlog
 
 - **BUG-001 (Open, High):** Ref disposed в state_providers — повторяется в каждой новой сущности. См. [ai/project/bug-reports/001-state-provider-ref-disposed.md](ai/project/bug-reports/001-state-provider-ref-disposed.md).
-- **BUG-005 (backlog):** перезапись `:base` секций при regen теряет custom code. Требует архитектурного решения (per-method markers или patch-only mode). Сейчас workaround — `git diff` перед regen.
+- **[BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md) (backlog):** перезапись `:base` секций при regen теряет custom code. Требует архитектурного решения (per-method markers или patch-only mode). Сейчас workaround — `git diff` перед regen. (Ранее числился как «BUG-005» — номер разведён, 005 занят закрытым AppDatabaseGenerator-багом.)
 - **MCP сервер для генератора** — отдельная задача (стек: Python stdio как `webcam` сервер, обёртки над JSON-режимом CLI). Делать после стабилизации основных багов.
 
 ---
