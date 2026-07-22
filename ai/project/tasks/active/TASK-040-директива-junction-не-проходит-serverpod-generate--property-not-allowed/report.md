@@ -192,4 +192,6 @@ Serverpod отвергает этот ключ ("The \"junction\" property is no
 
 ## Статус
 
-Ready for review.
+Reviewed: **APPROVE WITH MINOR**. Единственное замечание (строгая форма маркера с
+ровно одним пробелом после `#`) зафиксировано в user-facing документации; блокеров нет.
+Ready for PR.
