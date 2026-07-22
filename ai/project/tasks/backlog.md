@@ -97,3 +97,16 @@ Generated будет `deleteCustomerUserByCustomerAndRole` (берёт `customer
 **Source:** TASK-038 report.md (побочные флаги, 2026-07-21). Без заведения задачи — флаг,
 чтобы не потерять: `implementation-plan.md`, `progress.md` (датированы 2025-12, явно стухли),
 `task refactor.md` — сверить/заархивировать по образцу TASK-038 (`bugs-and-tasks.md`).
+
+## Cross-feature junction: полный feature-aware резолвер (вариант 1)
+
+**Priority:** Low (спроса нет — проверено по weight 2026-07-22: cross-feature junction'ов
+нет ни в одном проекте, все держат parents в одной feature). **Source:** BUG-015 / TASK-039.
+
+Сейчас cross-feature junction (оба parent в разных features) **отклоняется** loud-guard'ом
+(`validateJunctionColocation`, ошибка `CROSS_FEATURE_JUNCTION`). Полная ПОДДЕРЖКА
+(генерация корректных cross-feature импортов в 5 слоях: repository_impl / data_providers /
+domain repositories+usecases / presentation filter+state providers) — обобщить
+`findTableInFeatures` на entity/repository/providers-пути в шаблоне junction'а. Table-слой
+уже переведён на маркер `:driftTableImports` как референс-механизм. Делать ТОЛЬКО под
+реальный спрос (появится cross-feature junction в живом проекте).

@@ -172,6 +172,94 @@ suite('EntityYamlValidator Test Suite', () => {
         assert.strictEqual(errors.length, 0);
     });
 
+    // ── BUG-015: cross-feature junction guard (TASK-039 loud-guard) ──────────
+    //
+    // Junction, у которого оба parent-entity живут в РАЗНЫХ features, генерит
+    // broken cross-feature импорты (repository/providers/domain/presentation — 5
+    // подсистем без reuse-резолвера). Пока полный feature-aware резолвер не сделан
+    // (backlog), pre-flight guard превращает silent misgeneration в громкий отказ.
+    // Проверенный рабочий сценарий (t201/t206 control) — оба parent в ОДНОЙ feature.
+
+    /** Создаёт feature-tree с entity-файлами по указанным (feature → [entity]) парам. */
+    function makeFeaturesTree(spec: Record<string, string[]>): string {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codegen-feat-'));
+        for (const [feature, entities] of Object.entries(spec)) {
+            for (const entity of entities) {
+                const dir = path.join(root, feature, 'domain', 'entities', entity);
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(path.join(dir, `${entity}_entity.dart`), '// stub');
+            }
+        }
+        return root;
+    }
+
+    function junctionModel(entity1: string, entity2: string): ServerpodModel {
+        return standardModel({
+            className: 'AuthorBookMap',
+            tableName: 'author_book_map',
+            isRelation: true,
+            entity1,
+            entity2,
+            fields: [
+                field('id'),
+                fkField(`${entity1}Id`, entity1.charAt(0).toUpperCase() + entity1.slice(1)),
+                fkField(`${entity2}Id`, entity2.charAt(0).toUpperCase() + entity2.slice(1)),
+            ],
+        });
+    }
+
+    test('BUG-015: junction parents в РАЗНЫХ features → CROSS_FEATURE_JUNCTION error', () => {
+        const featuresRoot = makeFeaturesTree({ authors: ['author'], books: ['book'] });
+        try {
+            const errors = EntityYamlValidator.validateJunctionColocation(
+                junctionModel('author', 'book'), featuresRoot,
+            );
+            assert.strictEqual(errors.length, 1);
+            assert.strictEqual(errors[0].code, 'CROSS_FEATURE_JUNCTION');
+            assert.ok(errors[0].message.includes('author'), 'сообщение называет parent author');
+            assert.ok(errors[0].message.includes('book'), 'сообщение называет parent book');
+            assert.ok(/feature/i.test(errors[0].message), 'сообщение объясняет про feature');
+        } finally {
+            fs.rmSync(featuresRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('BUG-015: junction parents в ОДНОЙ feature → no error (доказанный t201 сценарий)', () => {
+        const featuresRoot = makeFeaturesTree({ catalog: ['product', 'vendor'] });
+        try {
+            const errors = EntityYamlValidator.validateJunctionColocation(
+                junctionModel('product', 'vendor'), featuresRoot,
+            );
+            assert.strictEqual(errors.length, 0);
+        } finally {
+            fs.rmSync(featuresRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('BUG-015: non-junction entity → guard пропускает (no error)', () => {
+        const featuresRoot = makeFeaturesTree({ catalog: ['weighing'] });
+        try {
+            const errors = EntityYamlValidator.validateJunctionColocation(standardModel(), featuresRoot);
+            assert.strictEqual(errors.length, 0);
+        } finally {
+            fs.rmSync(featuresRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('BUG-015: parent entity не найден ни в одной feature → guard не падает (не его зона)', () => {
+        // Отсутствие entity-файла — забота других проверок/генерации, не co-location
+        // guard'а. Guard срабатывает только когда ОБА parent найдены в РАЗНЫХ features.
+        const featuresRoot = makeFeaturesTree({ authors: ['author'] });
+        try {
+            const errors = EntityYamlValidator.validateJunctionColocation(
+                junctionModel('author', 'book'), featuresRoot,
+            );
+            assert.strictEqual(errors.length, 0, 'book не найден → co-location недоказуема → guard молчит');
+        } finally {
+            fs.rmSync(featuresRoot, { recursive: true, force: true });
+        }
+    });
+
     test('formatErrors produces user-readable message', () => {
         const errors = EntityYamlValidator.validate(standardModel({
             fields: [field('id'), field('key'), field('value')],

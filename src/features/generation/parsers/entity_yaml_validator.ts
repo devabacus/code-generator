@@ -3,7 +3,11 @@ import * as path from 'path';
 import { ServerpodModel } from './formatters/types';
 import { JunctionDetector } from './junction_detector';
 
-export type ValidationErrorCode = 'MISSING_FIELD' | 'MISSING_SYNC_EVENT' | 'RESERVED_FIELD_NAME';
+export type ValidationErrorCode =
+    | 'MISSING_FIELD'
+    | 'MISSING_SYNC_EVENT'
+    | 'RESERVED_FIELD_NAME'
+    | 'CROSS_FEATURE_JUNCTION';
 
 export interface ValidationError {
     code: ValidationErrorCode;
@@ -72,6 +76,69 @@ export class EntityYamlValidator {
         return errors;
     }
 
+    /**
+     * BUG-015 (TASK-039) — loud-guard: junction, у которого оба parent-entity лежат
+     * в РАЗНЫХ features, генерит broken cross-feature импорты в 5 подсистемах
+     * (repository/data-providers/domain/usecases/presentation) — эти слои резолвят
+     * путь второго parent'а same-feature-relative, файла там нет → build_runner FAIL.
+     *
+     * Пока полный feature-aware резолвер не сделан (backlog, спроса нет — проверено по
+     * weight 2026-07-22), guard превращает silent misgeneration в громкий pre-flight
+     * отказ. Проверенный рабочий сценарий (t201/t206 control) — оба parent в ОДНОЙ
+     * feature; только этот layout поддержан end-to-end.
+     *
+     * Feature определяется поиском `<entity>_entity.dart` в
+     * `<featuresPath>/*\/domain/entities/<entity>/`. Guard срабатывает ТОЛЬКО когда
+     * ОБА parent найдены в РАЗНЫХ features — это доказуемо broken. Если parent не
+     * найден (ещё не сгенерён / другой layout) — co-location недоказуема, guard молчит
+     * (это не его зона: отсутствие файла ловят генерация / другие проверки).
+     */
+    static validateJunctionColocation(model: ServerpodModel, featuresPath: string): ValidationError[] {
+        if (!JunctionDetector.isJunctionEntity(model)) { return []; }
+        if (!model.entity1 || !model.entity2) { return []; }
+        if (!featuresPath || !fs.existsSync(featuresPath)) { return []; }
+
+        const feat1 = this.findEntityFeature(featuresPath, model.entity1);
+        const feat2 = this.findEntityFeature(featuresPath, model.entity2);
+
+        // Оба parent найдены и в разных features → доказуемо broken cross-feature.
+        if (feat1 && feat2 && feat1 !== feat2) {
+            return [{
+                code: 'CROSS_FEATURE_JUNCTION',
+                message: `Junction "${model.className}" links parents in DIFFERENT features: `
+                    + `"${model.entity1}" is in feature "${feat1}", "${model.entity2}" is in feature "${feat2}". `
+                    + `Cross-feature junction generation is not supported end-to-end (BUG-015): the junction's `
+                    + `repository/providers/domain/presentation layers hardcode same-feature-relative imports for `
+                    + `the second parent, producing a broken build. Move both parent entities into one feature `
+                    + `(the junction's feature), or move the junction beside its parents. `
+                    + `Only the co-located layout (both parents in one feature) is verified.`,
+            }];
+        }
+        return [];
+    }
+
+    /**
+     * Ищет feature-имя, в котором объявлена entity: наличие
+     * `<featuresPath>/<feature>/domain/entities/<entity>/<entity>_entity.dart`.
+     * `entity` — lowerCamel (`terminalSet`); file layout использует его же как папку.
+     * Возвращает первое совпадение или null.
+     */
+    private static findEntityFeature(featuresPath: string, entity: string): string | null {
+        let features: string[];
+        try {
+            features = fs.readdirSync(featuresPath);
+        } catch {
+            return null;
+        }
+        for (const feature of features) {
+            const entityFile = path.join(
+                featuresPath, feature, 'domain', 'entities', entity, `${entity}_entity.dart`,
+            );
+            if (fs.existsSync(entityFile)) { return feature; }
+        }
+        return null;
+    }
+
     static validateSyncEvent(yamlPath: string, model: ServerpodModel): ValidationError[] {
         // TASK-013: junction skip через shared JunctionDetector (Q3=A).
         if (JunctionDetector.isJunctionEntity(model)) { return []; }
@@ -91,7 +158,13 @@ export class EntityYamlValidator {
     }
 
     static formatErrors(errors: ValidationError[]): string {
-        const header = `Non-standard entity detected. Codegen aborted to prevent broken Dart output (see BUG-004).`;
+        // Header про BUG-004 (non-standard entity) релевантен для field-ошибок. Для
+        // чистого cross-feature junction (BUG-015) это другая природа — свой header.
+        const onlyColocation = errors.length > 0
+            && errors.every(e => e.code === 'CROSS_FEATURE_JUNCTION');
+        const header = onlyColocation
+            ? `Cross-feature junction detected. Codegen aborted to prevent a broken build (see BUG-015).`
+            : `Non-standard entity detected. Codegen aborted to prevent broken Dart output (see BUG-004).`;
         const list = errors.map(e => `  - ${e.message}`).join('\n');
         // 6-field hint релевантен только для MISSING_FIELD ошибок. Для чистых
         // RESERVED_FIELD_NAME (BUG-024) сообщение самодостаточно — userId/customerId
