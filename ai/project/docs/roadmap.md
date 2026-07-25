@@ -2,7 +2,7 @@
 
 Высокоуровневый план развития code-generator.
 
-**Обновлено:** 2026-06-05 (сессия BUG-023..027 + full pipeline t204). master `a61c9cb` (+ post-сессия sync), 293 tests. Новое: `--ceremony full|minimal` (BUG-023) + audit-guards BUG-024/025. Готовность к weight regen: HIGH.
+**Обновлено:** 2026-07-22 (**AI-workflow v2 migration + TASK-037…040**). master `c7227e9`, **345 tests**. Репо мигрирован на v2-фреймворк (ai/core + ai/project). Junction-контур: носитель = YAML-комментарий (**ADR-0006**), cross-feature заграждён (BUG-015 CONFIRMED). BUG-029 → preflight+ledger (**ADR-0007**). Активно: TASK-042 (готова), TASK-041 (ждёт миграции шаблонов). Детали — [status.md](status.md) секция «Сессия 2026-07-22». Готовность к weight regen: HIGH (junction same-feature + noситель директивы verified).
 
 ---
 

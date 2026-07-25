@@ -3,7 +3,28 @@
 Операционные факты для AI-агентов.
 **Агенты ОБЯЗАНЫ читать этот файл при каждой сессии.**
 
-**Последнее обновление:** 2026-06-05 (**BUG-027 + TASK-035 merged — master `80346ac`**, 303 tests; **первая runtime end-to-end валидация t205**; VS Code extension собран+установлен). BUG-027 root cause в первичном bug-report был неверен (bare `relation` → `isRelation=false`) — см. gotcha. TASK-035: удалены избыточные `Map`-эвристики. Новые gotchas: runtime smoke runbook + Serverpod phantom FK; extension install/update + UI `vsce` hardcode; UI createDataFiles = source-only. Новое: `--ceremony full|minimal` (BUG-023 Design 1). **Full pipeline re-checked на t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0). Audit-guards: BUG-024 (reserved Drift column-имена) + BUG-025 (orchestrator no-op fail-fast). **Open backlog:** BUG-027 (one-to-many back-relation→InvalidType, fix готов 1 строка) + BUG-026→TASK-015 + BUG-005 + BUG-015. См. новые gotchas ниже. Готовность к weight regen: HIGH. Lessons: `--feature-path` full absolute path (TASK-031); `--with-server` opt-in (TASK-029); junction same-feature works (t201); one-to-many = child-FK-only, parent без flutter back-relation (BUG-027).
+**Последнее обновление:** 2026-07-22 (**AI-workflow v2 migration + TASK-037…040 merged — master `c7227e9`**, 345 tests). См. блок «Сессия 2026-07-22» ниже — он ПЕРВЫЙ по актуальности.
+
+---
+
+## Сессия 2026-07-22 — самое актуальное (читать первым)
+
+**⚠ Репо на AI-workflow v2.** Структура `ai/core` (upstream-owned, НЕ редактировать в проекте — sync заблокирует) + `ai/project` (project-owned). Задачи — ТОЛЬКО через `python ai/core/scripts/task.py` (start/pr/merge/move) и `new_task.py`; статус задачи двигает только `task.py move`, руками папки не таскать. Дискуссии — `ai/core/discussions/scripts/discuss.py`. Фиксы core — сначала в шаблон-репо `G:\Templates\ai`, потом `sync.py --apply`, НИКОГДА наоборот. Модель субагентам назначать явно по `ai/project/docs/model-policy.md` (opus/sonnet, никогда флагман).
+
+**Junction-контур (важно для любых junction-правок):**
+- Носитель директивы — YAML-**комментарий** `# codegen:junction: [a, b]` / `# codegen:junction: true` (**ADR-0006**, TASK-040). НЕ YAML-ключ: Serverpod валидирует ключи класса и падает `The "junction" property is not allowed`. Парсер читает маркер по сырому контенту ДО `yaml.load`, якорь `^#[ \t]*codegen:junction:` (колонка 0; отступ → игнор → fallback). Есть migration-guard: старый ключ `junction:` → громкая ошибка с инструкцией переноса.
+- **Fallback-эвристика** («первые 2 relation-поля по порядку») ЖИВА и НЕ тронута — при неоднозначной паре (ownership-FK `customerId` объявлен раньше настоящих родителей) даёт silent-неверную пару. Её ужесточение до fail-fast — **TASK-041** (ждёт миграции шаблонов). Каскад-эвристика (nullability) **отклонена владельцем** — оставляет silent-путь (контрпример: required attribute-FK).
+- **Cross-feature junction (parents в разных features) НЕ работает end-to-end** (BUG-015 CONFIRMED). Сейчас отклоняется loud-guard `EntityYamlValidator.validateJunctionColocation` (`CROSS_FEATURE_JUNCTION`). Поддержанный layout — оба parent в ОДНОЙ feature. Полный резолвер — в backlog (спроса нет, weight проверен 2026-07-22).
+
+**BUG-029 (регенерация затирает пользовательский код) — переформулирован (ADR-0007):** не «`:base` перезаписывается», а «**65 из 81 entity-шаблона идут через `createFile()` без проверки существования**». `:base` — как раз защищённая часть (merge работает). Решение — **TASK-042**: двухфазный fail-closed preflight (plan/apply, НЕ внутри `_processFile` — там `Promise.all`, конкурентные записи) + ledger хешей (`.codegen/ledger.json`, в git) как неделимая единица. Инварианты: merge-файлы хешируют регионы, не файл; legacy НЕ «усыновляется» как generated.
+
+**Grep-факт (воспроизводимо):** entity-шаблонов в t115 = `grep -rl "manifest: entity"` → 81; с `:base` → +`xargs grep -l "generated_start:base"` → 16; без → 65.
+
+**Процессные уроки сессии:**
+- `git commit -m` с кавычками в PowerShell 5.1 рвёт сообщение → всегда `git commit -F <файл>` (глобальный Known Issue владельца).
+- Субагент не может писать `report.md`/`review-report.md` (harness блокирует запись файлов отчётов) → он возвращает текст в финальном ответе, teamlead пишет файл из основного цикла.
+- Устаревшие t-worktree в `tmp/worktrees/` ломают локальный `npm run compile` (tsc через `**/*`), но gitignored → CI чист. Осиротевшие worktree убирать `git worktree remove --force` только с согласия владельца.
+- Номера коллизий: BUG-005 разведён (005 = AppDatabaseGenerator RESOLVED; `:base` overwrite → **BUG-029**). Bug-report 011-dx → **028**.
 
 ---
 
