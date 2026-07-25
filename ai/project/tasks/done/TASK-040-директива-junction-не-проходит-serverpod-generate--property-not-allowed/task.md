@@ -1,7 +1,7 @@
 ---
 id: TASK-040
 schema_version: 2
-status: active
+status: done
 mode: interactive         # interactive | auto
 zone: "generator-core"
 verification_profile: "ts-generator"
