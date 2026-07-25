@@ -1,6 +1,33 @@
 # Статус проекта
 
-**Обновлено:** 2026-06-05 (**BUG-027 + TASK-035 merged — master `80346ac`**; 303 tests; **первая runtime end-to-end валидация t205**). BUG-027 (PR #41 `bfaebb5`): type-based фикс collection back-relation leak в `code_formatter.ts` (root cause в bug-report был неверен — bare `relation` → `isRelation=false`, дискриминатор = тип `List<...>`). TASK-035 (PR #42 `80346ac`): удалены избыточные `Map`-эвристики (substring-landmine для scalar `siteMapUrl`/`heatMapConfig`). **Runtime smoke (t205):** local-setup + serverpod serve → миграции применены, HTTP 200, все сгенерённые таблицы в Postgres (доказывает generate→migrate→serve, не только compile). VS Code extension собран+установлен (`mrfrolk.code-generator@0.0.1`). Ранее в сессии: BUG-023 `--ceremony full|minimal` + BUG-024/025 audit-guards, BUG-026 deferred→TASK-015. Готовность к weight regen: **HIGH** (caveats: BUG-005 `:base` overwrite + BUG-015 cross-feature untested). Новые runtime-наблюдения см. [agent_memory.md](agent_memory.md): Serverpod phantom implicit FK (unnamed back-relation), UI createDataFiles = source-only.
+**Обновлено:** 2026-07-22 (**AI-workflow v2 migration + TASK-037…040 merged — master `c7227e9`**, **345 tests**). Репо мигрирован на v2-фреймворк (`ai/core` + `ai/project`, задачи через `task.py`). За сессию 7 PR (#45–51). Junction-контур закрыт по noсителю (comment-directive, ADR-0006), BUG-015 подтверждён и заграждён, BUG-029 переформулирован с архитектурным решением (ADR-0007). См. секцию «Сессия 2026-07-22» ниже.
+
+---
+
+## Сессия 2026-07-22 (AI-workflow v2 pilot — шаг 1 раскатки)
+
+**Контекст:** этот репо — пилот раскатки шаблона AI-workflow v2 (`G:\Templates\ai`). Сессия = миграция v1→v2 + первые задачи через v2-процесс.
+
+**Master:** `c7227e9`. Working tree clean. **Tests: 345 passing** (было 322 baseline старта сессии → +8 loud-guard cross-feature +4 junction colocation +21 comment-directive и т.д.), 0 failing. Lint 0 errors / 18 pre-existing warnings. Compile clean.
+
+**Merged PR сессии:**
+- **PR #45** — миграция ai/ v1→v2 (граница core/project, profile.yaml зона `generator-core` class I cloud, verification-профиль `ts-generator`). Bug-report 011-dx → 028 (разведён номер).
+- **PR #46** — sync шаблона + `ai/project/docs/model-policy.md` (frontier=Fable 5 только главная сессия; standard=Opus 4.8; mechanical=Sonnet 5; independent_reviewer=GPT).
+- **PR #47 — TASK-037** — junction `# codegen:junction: [a,b]` explicit-parents директива (экс-BUG-026) + loud-guard дубликата родителей.
+- **PR #48 — TASK-038** — triage `docs-code-generator/bugs-and-tasks.md` (14 записей → архивный документ, живых хвостов нет).
+- **PR #49 — TASK-039** — BUG-015 cross-feature junction: prove-out на t206 (CONFIRMED, дельта cross vs same), drift-table слой пофикшен (маркер `:driftTableImports`), + **loud-guard** `validateJunctionColocation` (cross-feature junction отклоняется pre-flight). Остаток (5 слоёв) — полный резолвер в backlog (спроса нет — weight проверен).
+- **PR #50** — дискуссии #13/#14 (Claude×2 / GPT×2) → **ADR-0006** (носитель junction-метадаты) + **ADR-0007** (BUG-029). Заведены TASK-041, TASK-042.
+- **PR #51 — TASK-040** — директива junction переехала из YAML-**ключа** в YAML-**комментарий** (`# codegen:junction:`) — Serverpod больше не падает `property not allowed`. E2E на t207: `serverpod generate` exit 0. Migration-guard на старый ключ. Reviewer APPROVE WITH MINOR, minor #1 (пробел в regex) закрыт inline.
+
+**Ключевые решения (ADR):**
+- **ADR-0006** — junction codegen-метадата живёт в YAML-**комментарии**, не в ключе (Serverpod валидирует ключи). Обе формы (`[a,b]` и `true`). Fallback-эвристика ужесточается отдельно (TASK-041).
+- **ADR-0007** — BUG-029 переформулирован: не «`:base` перезаписывается», а «65 из 81 шаблона идут через `createFile()` без проверки существования». Решение: preflight (двухфазный plan/apply) + ledger хешей как **неделимая единица** (TASK-042).
+
+---
+
+## Прошлые фазы (история до сессии 2026-07-22)
+
+> Ниже — состояние на 2026-06-05 (до v2-миграции), сохранено как история.
 
 ---
 
@@ -30,9 +57,14 @@
 
 ---
 
-## Активные задачи
+## Активные задачи (на 2026-07-22)
 
-**Нет активных задач.** Все merged. Ждёт User explicit start следующего item (weight regen).
+- **TASK-042** (`active`) — BUG-029 preflight + ledger (fail-closed guard против потери пользовательского кода). Контракт готов (3 инварианта, 11 критериев), ждёт старта. Следующая по порядку 040→042.
+- **TASK-041** (`active`, `depends_on: TASK-040`) — ужесточение junction fallback до fail-fast. **Ждёт подтверждения владельца, что шаблоны t115/simplified мигрированы** на `# codegen:junction:` (иначе fail-fast ломает `create-project` из коробки). Условие старта зафиксировано в контракте.
+
+**Зона владельца (вне репо кодогенератора):** миграция junction-YAML шаблонов t115/simplified на `# codegen:junction:` + строка в weight `customer_user.spy.yaml`. От неё зависит старт TASK-041.
+
+### Прошлое (до v2): «Нет активных задач» (2026-06-05)
 
 **Новые мелкие follow-ups (capacity-driven, не started; см. [agent_memory.md](agent_memory.md) gotchas):**
 - `vs_code_menu.ts:30` UI self-rebuild захардкожен на голый `vsce` → заменить на `npx @vscode/vsce package` (митигация: vsce установлен глобально 2026-06-05).
@@ -200,9 +232,9 @@ Sequence per Discussion #4 → #6:
 | TASK-034 | BUG-027 fix one-to-many back-relation leak в flutter entity | 🟡 In Progress | 2026-06-05 |
 | TASK-035 | cleanup redundant Map-эвристики в fieldsFilter (latent false-positive) | 🟡 In Progress | 2026-06-05 |
 | TASK-036 | версионирование расширения + фикс reinstall handler (npx, auto-bump, vscodeignore) | 🟡 In Progress | 2026-06-09 |
-| TASK-037 | junction FK extraction не фильтрует customerId (экс-BUG-026) | 🟡 In Progress | 2026-07-21 |
-| TASK-038 | triage docs-code-generator/bugs-and-tasks.md — сверка с актуальным состоянием | 🟡 In Progress | 2026-07-21 |
-| TASK-039 | BUG-015 cross-feature junction prove-out + фикс при провале | 🟡 In Progress | 2026-07-21 |
-| TASK-040 | директива junction не проходит serverpod generate (property not allowed) | 🟡 In Progress | 2026-07-22 |
-| TASK-041 | ужесточение junction fallback до fail-fast при структурной неоднозначности | 🟡 In Progress | 2026-07-22 |
-| TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 In Progress | 2026-07-22 |
+| TASK-037 | junction FK extraction не фильтрует customerId (экс-BUG-026) | ✅ Merged (PR #47) | 2026-07-21 |
+| TASK-038 | triage docs-code-generator/bugs-and-tasks.md — сверка с актуальным состоянием | ✅ Merged (PR #48) | 2026-07-21 |
+| TASK-039 | BUG-015 cross-feature junction prove-out + фикс при провале | ✅ Merged (PR #49) | 2026-07-21 |
+| TASK-040 | директива junction не проходит serverpod generate (property not allowed) | ✅ Merged (PR #51) | 2026-07-22 |
+| TASK-041 | ужесточение junction fallback до fail-fast при структурной неоднозначности | ⛔ Active/BLOCKED (ждёт миграции шаблонов) | 2026-07-22 |
+| TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 Active (готова к старту) | 2026-07-22 |
