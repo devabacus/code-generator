@@ -320,7 +320,7 @@ fields:
         const yamlContent = `
 class: UserPermission
 table: user_permission
-junction: true
+# codegen:junction: true
 fields:
   id: UuidValue?, defaultPersist=random_v7
   userId: UuidValue, relation(parent=user, onDelete=Cascade)
@@ -335,7 +335,7 @@ fields:
         const yamlContent = `
 class: BadJunction
 table: bad_junction
-junction: true
+# codegen:junction: true
 fields:
   id: UuidValue?
   onlyOneFk: UuidValue, relation(parent=other, onDelete=Cascade)

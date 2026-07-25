@@ -5,14 +5,16 @@ import { ServerpodYamlParser } from '../../features/generation/parsers/server_ya
 import { MockFileSystem } from '../mocks/mock_file_system';
 
 /**
- * TASK-037 — `junction: [a, b]` explicit-parents directive.
+ * TASK-037 — `[a, b]` explicit-parents directive.
+ * TASK-040 — носитель директивы: YAML-комментарий `# codegen:junction: [a, b]`
+ * (был YAML-ключ `junction:`, отвергаемый Serverpod'ом). Фикстуры ниже мигрированы.
  *
  * BUG-026 regression: junction FK-extraction эвристика «первые 2 relation-поля по
  * порядку объявления» ломается когда `customerId: relation(parent=customer)`
  * объявлен ПЕРВЫМ (ownership marker, не junction-родитель) → silent misgeneration
  * пары entity1/entity2.
  *
- * Fix: опциональная файловая директива `junction: [task, tag]` в `*_map.spy.yaml`
+ * Fix: опциональная файловая директива `# codegen:junction: [task, tag]` в `*_map.spy.yaml`
  * даёт явный сигнал junction-родителей. Порядок `[a, b]` авторитетен
  * (entity1=a, entity2=b). Директива читается ВСЕМИ тремя junction-кодопутями
  * из единого источника (`model.entity1`/`model.entity2`, populated парсером).
@@ -29,7 +31,7 @@ suite('TASK-037: junction explicit-parents directive', () => {
         // С директивой — авторитетно task+tag.
         const yamlContent = `class: TaskTagMap
 table: task_tag_map
-junction: [task, tag]
+# codegen:junction: [task, tag]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   customerId: UuidValue, relation(parent=customer, onDelete=Cascade)
@@ -50,7 +52,7 @@ fields:
     test('CustomerUser: junction:[customer,role] → entity1=customer entity2=role', () => {
         const yamlContent = `class: CustomerUser
 table: customer_user
-junction: [customer, role]
+# codegen:junction: [customer, role]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   customerId: UuidValue, relation(parent=customer)
@@ -104,7 +106,7 @@ fields:
     test('validation: junction:[task, missing] → внятная ошибка с именем отсутствующего поля', () => {
         const yamlContent = `class: TaskTagMap
 table: task_tag_map
-junction: [task, missing]
+# codegen:junction: [task, missing]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   taskId: UuidValue, relation(parent=task, onDelete=Cascade)
@@ -120,7 +122,7 @@ fields:
     test('validation: junction:[foo, bar] с не-relation полем → ошибка (не silent)', () => {
         const yamlContent = `class: TaskTagMap
 table: task_tag_map
-junction: [task, note]
+# codegen:junction: [task, note]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   taskId: UuidValue, relation(parent=task, onDelete=Cascade)
@@ -137,7 +139,7 @@ fields:
     test('validation: junction:[task, task] (дубликат/self-junction) → внятная ошибка, не silent пара task+task', () => {
         const yamlContent = `class: TaskTagMap
 table: task_tag_map
-junction: [task, task]
+# codegen:junction: [task, task]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   taskId: UuidValue, relation(parent=task, onDelete=Cascade)
@@ -157,7 +159,7 @@ fields:
         // ссылается на entity-имя `terminal_set`, должна смапиться через relatedModel.
         const yamlContent = `class: SetRoleMap
 table: set_role_map
-junction: [terminal_set, role]
+# codegen:junction: [terminal_set, role]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   defaultTerminalSetId: UuidValue, relation(parent=terminal_set)
@@ -211,7 +213,7 @@ SyncOrchestrator syncOrchestrator(Ref ref) {
 
         const yamlContent = `class: TaskTagMap
 table: task_tag_map
-junction: [task, tag]
+# codegen:junction: [task, tag]
 fields:
   id: UuidValue?, defaultPersist=random_v7
   customerId: UuidValue, relation(parent=customer, onDelete=Cascade)

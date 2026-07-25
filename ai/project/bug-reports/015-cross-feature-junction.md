@@ -59,6 +59,20 @@ bookId — до userId/customerId), результат от эвристики B
 край для будущей задачи (директива должна быть в codegen-only слое или стрипаться
 перед serverpod generate).
 
+> **Доп. находка #1 — RESOLVED (TASK-040, 2026-07-22).** Носитель директивы сменён:
+> YAML-**ключ** `junction:` → YAML-**комментарий** `# codegen:junction: [a, b]`
+> (решение владельца, [ADR-0006](../docs/decisions/adr-0006-где-должна-жить-codegen-метадата-junctio.md) /
+> дискуссия #13, вариант C). Комментарий Serverpod физически не видит, поэтому файл
+> с директивой проходит `serverpod generate` без предобработки и без ручного снятия
+> ключа. Обе формы (`[a, b]` и `true`) мигрированы; настоящий YAML-ключ `junction`
+> теперь ловится migration-guard'ом парсера с инструкцией переноса.
+>
+> Доказано E2E на **t207** (junction `author_book_map` с `# codegen:junction: [author, book]`,
+> `customerId` объявлен первым): `serverpod generate` exit 0, `codegen verify --name t207`
+> → `success: true`, serverpodGenerate ok, flutter analyze **0 errors / 1 warning / 67 infos**.
+> Контр-тест на том же файле со старым ключом: `serverpod generate` exit 1 с исходной
+> ошибкой `The "junction" property is not allowed for class type`.
+
 ---
 
 ## Root cause — многослойный, не единая точка

@@ -17,11 +17,12 @@ import { ServerpodModel, ServerpodField } from './formatters/types';
  *   - **Default (structural):** entity = junction если 2+ FK relations + НЕТ business
  *     полей кроме базовых (id, userId, customerId, createdAt, lastModified, isDeleted).
  *     Nullable FK тоже считается FK (CustomerUser case).
- *   - **Explicit override:** YAML top-level `junction: true` field → junction независимо
+ *   - **Explicit override:** маркер-комментарий `# codegen:junction: true` (TASK-040 —
+ *     раньше YAML-ключ `junction: true`, отвергаемый Serverpod'ом) → junction независимо
  *     от field analysis (для junction'ов с metadata типа `assignedAt`, `weight`,
- *     `sortOrder`). **Negative override `junction: false` НЕ поддерживается** — risk
+ *     `sortOrder`). **Negative override `false` НЕ поддерживается** — risk
  *     скрыть structural junction.
- *   - **Validation:** если `junction: true` но FK<2 → throw `JunctionValidationError`
+ *   - **Validation:** если override выставлен но FK<2 → throw `JunctionValidationError`
  *     с сообщением "junction requires 2+ relations".
  *
  * Public API: `isJunctionEntity(model): boolean`. Internal debug shape (для тестов
@@ -57,7 +58,7 @@ export interface JunctionAnalysis {
     isJunction: boolean;
     /**
      * Reason for classification. `undefined` если `isJunction === false`.
-     *   - `explicitOverride` — `junction: true` flag set AND FK count >= 2.
+     *   - `explicitOverride` — `# codegen:junction: true` marker set AND FK count >= 2.
      *   - `structural` — field analysis matched (2+ FK + no extra business fields).
      */
     reason?: JunctionReason;
@@ -71,7 +72,7 @@ export interface JunctionAnalysis {
 }
 
 /**
- * Validation error thrown when `junction: true` set но FK count < 2.
+ * Validation error thrown when `# codegen:junction: true` set но FK count < 2.
  *
  * Throw происходит в `JunctionDetector.analyze()` — это fail-fast pattern, чтобы
  * malformed YAML не пропустился silently.
@@ -119,7 +120,7 @@ export class JunctionDetector {
         // минимум 2 FK relation. Иначе — malformed YAML, fail-fast.
         if (explicitFlag === true && fkFields.length < 2) {
             throw new JunctionValidationError(
-                `Entity "${model.className}" has junction:true but only ${fkFields.length} `
+                `Entity "${model.className}" has \`# codegen:junction: true\` but only ${fkFields.length} `
                 + `relation field(s). Junction requires 2+ relations.`,
             );
         }

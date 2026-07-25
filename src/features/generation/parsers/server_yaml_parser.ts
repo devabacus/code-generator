@@ -20,25 +20,39 @@ export class ServerpodYamlParser {
         // в weight). См. ai/bug-reports/junction-detection-audit.md.
         const fields = this.parseFields(parsed.fields || {});
 
-        // TASK-037: YAML top-level `junction` поддерживает две формы:
-        //   1. boolean `junction: true`  → explicit junction override (существующее
-        //      поведение — принудительная классификация как junction, пара
-        //      entity1/entity2 всё ещё выводится эвристикой «первые 2 relation-поля»).
-        //   2. array  `junction: [a, b]` → explicit-parents directive (BUG-026).
+        const className: string = parsed.class || '';
+
+        // TASK-040 (ADR-0006 / дискуссия #13): migration-guard. Старый носитель —
+        // YAML-**ключ** `junction` — отвергается Serverpod'ом (`The "junction"
+        // property is not allowed for class type`). Файл с таким ключом нерабочий
+        // end-to-end, поэтому падаем громко с инструкцией переноса, а не молча
+        // продолжаем парсить.
+        this.assertNoLegacyJunctionKey(parsed, className);
+
+        // TASK-040: директива читается из YAML-**комментария** `# codegen:junction:`
+        // (см. `parseJunctionMarker`). Комментарий Serverpod физически не видит →
+        // файл на диске в покое валиден для `serverpod generate` без предобработки.
+        //
+        // Обе формы (TASK-013 / TASK-037) живут на новом носителе:
+        //   1. `# codegen:junction: true`   → explicit junction override (принудительная
+        //      классификация как junction; пара entity1/entity2 всё ещё выводится
+        //      эвристикой «первые 2 relation-поля»).
+        //   2. `# codegen:junction: [a, b]` → explicit-parents directive (BUG-026).
         //      Массив авторитетно задаёт junction-родителей: entity1=a, entity2=b.
         //      Array-форма ТАКЖЕ подразумевает junction (как `true`) — иначе
         //      директива без структурного junction была бы бессмысленна.
+        const markerValue = this.parseJunctionMarker(yamlContent, className);
         const junctionDirective: [string, string] | undefined =
-            this.parseJunctionDirective(parsed.junction, parsed.class || '');
+            this.parseJunctionDirective(markerValue, className);
         const explicitJunction: boolean | undefined =
-            typeof parsed.junction === 'boolean'
-                ? parsed.junction
+            typeof markerValue === 'boolean'
+                ? markerValue
                 : junctionDirective !== undefined
                     ? true
                     : undefined;
 
         const model: ServerpodModel = {
-            className: parsed.class || '',
+            className,
             tableName: parsed.table || '',
             isRelation: false, // populated below через JunctionDetector
             fields,
@@ -81,14 +95,140 @@ export class ServerpodYamlParser {
     }
 
     /**
-     * TASK-037: парсит top-level `junction` directive в форме массива `[a, b]`.
+     * TASK-040: маркер codegen-директивы junction в YAML-комментарии.
+     *
+     * Якорь на **колонку 0** (`^#` без отступа) — это снимает единственный сценарий
+     * ложного срабатывания: `#` внутри block scalar или строкового default'а.
+     * Содержимое block scalar / поля обязано быть с отступом, поэтому на колонке 0
+     * его быть не может. Тот же приём применён в `parseField` для quoted-строк
+     * (BUG-012 side-fix).
+     *
+     * `[ \t]*` после `#` — любой горизонтальный отступ (0, 1 или несколько пробелов/
+     * табов): `#codegen:`, `# codegen:` и `#  codegen:` эквивалентны. Опечатка в
+     * пробеле не должна молча ронять директиву в fallback (review minor #1, TASK-040).
+     * `[ \t]` (а не `\s`) намеренно — `\s` матчит `\n` и мог бы перепрыгнуть на
+     * следующую строку, сломав якорь колонки 0.
+     *
+     * `m` — multiline (`^` матчит начало строки, не только строки целиком).
+     * `\r?$`-хвост нормализуется trim'ом в `parseJunctionMarker` (CRLF-файлы).
+     */
+    private static readonly JUNCTION_MARKER_RE = /^#[ \t]*codegen:junction:(.*)$/gm;
+
+    /**
+     * TASK-040 (ADR-0006): читает директиву junction из YAML-**комментария**
+     * по сырому содержимому файла — ДО `yaml.load`.
+     *
+     * Контракт (консенсус дискуссии #13):
+     *   - маркер якорится на колонку 0 (`^# codegen:junction:`);
+     *   - разрешён ровно ОДИН такой маркер, дубликат — ошибка;
+     *   - RHS — `true` или flow-массив `[a, b]`; всё остальное (пустой RHS,
+     *     `false`, произвольный текст) → fail-fast, НЕ тихая деградация к
+     *     эвристике.
+     *
+     * @returns `true` (форма override), `[a, b]`-массив (форма explicit-parents)
+     *          или `undefined` если маркера нет.
+     * @throws Error при дубликате маркера или нераспознаваемом RHS.
+     */
+    private static parseJunctionMarker(
+        yamlContent: string,
+        className: string,
+    ): boolean | string[] | undefined {
+        const matches = [...yamlContent.matchAll(this.JUNCTION_MARKER_RE)];
+
+        if (matches.length === 0) {
+            return undefined;
+        }
+        if (matches.length > 1) {
+            throw new Error(
+                `Entity "${className}": найдено ${matches.length} маркеров `
+                + `\`# codegen:junction:\` — разрешён ровно один (дубликат директивы). `
+                + `Удалите лишние строки.`,
+            );
+        }
+
+        const rhs = matches[0][1].trim();
+
+        if (rhs === '') {
+            throw new Error(
+                `Entity "${className}": маркер \`# codegen:junction:\` без значения. `
+                + `Ожидается \`# codegen:junction: true\` или \`# codegen:junction: [entity1, entity2]\`.`,
+            );
+        }
+        if (rhs === 'true') {
+            return true;
+        }
+        if (rhs.startsWith('[')) {
+            // Разбираем flow-массив тем же YAML-парсером, что и раньше разбирал
+            // значение ключа — правила валидации RHS остаются идентичными.
+            let parsedRhs: unknown;
+            try {
+                parsedRhs = yaml.load(rhs);
+            } catch (e) {
+                throw new Error(
+                    `Entity "${className}": маркер \`# codegen:junction: ${rhs}\` — `
+                    + `невалидный YAML-массив: ${(e as Error).message}`,
+                );
+            }
+            if (!Array.isArray(parsedRhs)) {
+                throw new Error(
+                    `Entity "${className}": маркер \`# codegen:junction: ${rhs}\` — `
+                    + `ожидался массив \`[entity1, entity2]\`.`,
+                );
+            }
+            return parsedRhs as string[];
+        }
+
+        throw new Error(
+            `Entity "${className}": нераспознанное значение маркера `
+            + `\`# codegen:junction: ${rhs}\`. Допустимо только \`true\` `
+            + `или \`[entity1, entity2]\`. `
+            + `(\`false\` не поддерживается — negative override может скрыть structural junction.)`,
+        );
+    }
+
+    /**
+     * TASK-040 (ADR-0006): migration-guard на старый носитель.
+     *
+     * YAML-ключ `junction` живёт в namespace'е Serverpod-валидатора, который его
+     * отвергает: `The "junction" property is not allowed for class type. Valid keys
+     * are {class, sealed, extends, immutable, table, managedMigration, serverOnly,
+     * fields, indexes}`. Такой файл нерабочий end-to-end (пользователь вынужден
+     * снимать ключ руками перед каждым `serverpod generate`), поэтому падаем
+     * громко с инструкцией переноса — иначе сценарий «забыл снять» просто живёт
+     * дальше в тишине.
+     */
+    private static assertNoLegacyJunctionKey(parsed: any, className: string): void {
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(parsed, 'junction')) {
+            return;
+        }
+        const raw = parsed.junction;
+        const rendered = Array.isArray(raw)
+            ? `[${raw.join(', ')}]`
+            : String(raw);
+        throw new Error(
+            `Entity "${className}": YAML-ключ \`junction\` больше не поддерживается — `
+            + `Serverpod отвергает этот ключ ("The \\"junction\\" property is not allowed `
+            + `for class type"), поэтому \`serverpod generate\` на таком файле падает. `
+            + `Перенесите директиву в комментарий: замените строку \`junction: ${rendered}\` `
+            + `на \`# codegen:junction: ${rendered}\` (комментарий Serverpod не видит). `
+            + `См. ADR-0006 / TASK-040.`,
+        );
+    }
+
+    /**
+     * TASK-037: парсит junction directive в форме массива `[a, b]`.
+     * TASK-040: источник значения — маркер-комментарий `# codegen:junction:`
+     * (раньше — YAML-ключ `junction`). Правила валидации RHS не изменились.
      *
      * Возвращает:
-     *   - `[a, b]` если `junction` — массив ровно из 2 непустых строк.
-     *   - `undefined` если `junction` отсутствует или является boolean
+     *   - `[a, b]` если значение маркера — массив ровно из 2 непустых строк.
+     *   - `undefined` если маркера нет или он в boolean-форме
      *     (boolean-форма обрабатывается отдельно как explicit override).
      *
-     * @throws Error если `junction` — массив, но некорректной формы (не 2 элемента,
+     * @throws Error если значение — массив, но некорректной формы (не 2 элемента,
      *         не строки, пустые) — fail-fast, чтобы malformed директива не
      *         деградировала silently до эвристики.
      */
@@ -104,14 +244,15 @@ export class ServerpodYamlParser {
         }
         if (!Array.isArray(junctionValue)) {
             throw new Error(
-                `Entity "${className}" has invalid junction directive: expected boolean (junction: true) `
-                + `or a 2-element array (junction: [a, b]), got ${typeof junctionValue}.`,
+                `Entity "${className}" has invalid junction directive: expected `
+                + `\`# codegen:junction: true\` or \`# codegen:junction: [a, b]\`, `
+                + `got ${typeof junctionValue}.`,
             );
         }
         if (junctionValue.length !== 2) {
             throw new Error(
                 `Entity "${className}" junction directive must have exactly 2 elements `
-                + `(junction: [entity1, entity2]), got ${junctionValue.length}.`,
+                + `(\`# codegen:junction: [entity1, entity2]\`), got ${junctionValue.length}.`,
             );
         }
         const [a, b] = junctionValue;
@@ -128,7 +269,8 @@ export class ServerpodYamlParser {
         if (aTrimmed === bTrimmed) {
             throw new Error(
                 `Entity "${className}" junction directive parents must be distinct: `
-                + `"${aTrimmed}" is specified twice (junction: [a, b] requires two different parents).`,
+                + `"${aTrimmed}" is specified twice `
+                + `(\`# codegen:junction: [a, b]\` requires two different parents).`,
             );
         }
         return [aTrimmed, bTrimmed];
