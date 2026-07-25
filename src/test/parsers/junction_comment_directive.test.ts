@@ -173,6 +173,48 @@ fields:
         assert.strictEqual(model.entity2, 'task');
     });
 
+    // ── Вариации пробела после # (review minor #1) ───────────────────────────
+
+    test('пробел после #: варианты #codegen / # codegen / #  codegen эквивалентны', () => {
+        // Опечатка в числе пробелов НЕ должна молча ронять директиву в fallback.
+        // Якорь колонки 0 сохраняется — послаблен только горизонтальный отступ [ \t]*.
+        for (const marker of [
+            '#codegen:junction: [task, tag]',       // без пробела
+            '# codegen:junction: [task, tag]',      // один пробел (канон)
+            '#  codegen:junction: [task, tag]',     // два пробела
+            '#\tcodegen:junction: [task, tag]',     // таб
+        ]) {
+            const yamlContent = `${marker}
+class: TaskTagMap
+table: task_tag_map
+fields:
+  id: UuidValue?, defaultPersist=random_v7
+  customerId: UuidValue, relation(parent=customer, onDelete=Cascade)
+  taskId: UuidValue, relation(parent=task, onDelete=Cascade)
+  tagId: UuidValue, relation(parent=tag, onDelete=Cascade)
+`;
+            const model = ServerpodYamlParser.parse(yamlContent);
+            assert.strictEqual(model.entity1, 'task', `директива должна примениться для "${marker}"`);
+            assert.strictEqual(model.entity2, 'tag', `директива должна примениться для "${marker}"`);
+        }
+    });
+
+    test('послабление пробела НЕ ломает якорь колонки 0: отступ по-прежнему игнорируется', () => {
+        // [ \t]* стоит ПОСЛЕ ^# — отступ перед # (block scalar / вложенный) не матчится.
+        const yamlContent = `class: TaskTagMap
+table: task_tag_map
+fields:
+  #codegen:junction: [task, tag]
+  id: UuidValue?, defaultPersist=random_v7
+  customerId: UuidValue, relation(parent=customer, onDelete=Cascade)
+  taskId: UuidValue, relation(parent=task, onDelete=Cascade)
+  tagId: UuidValue, relation(parent=tag, onDelete=Cascade)
+`;
+        const model = ServerpodYamlParser.parse(yamlContent);
+        assert.strictEqual(model.entity1, 'customer', 'отступ перед # → директива игнорируется даже без пробела');
+        assert.strictEqual(model.entity2, 'task');
+    });
+
     // ── Malformed RHS → fail-fast, не деградация ─────────────────────────────
 
     test('malformed: [task] (1 элемент) → ошибка, не тихая деградация к эвристике', () => {

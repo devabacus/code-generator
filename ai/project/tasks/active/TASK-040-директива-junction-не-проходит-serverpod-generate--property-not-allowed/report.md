@@ -195,3 +195,25 @@ Serverpod отвергает этот ключ ("The \"junction\" property is no
 Reviewed: **APPROVE WITH MINOR**. Единственное замечание (строгая форма маркера с
 ровно одним пробелом после `#`) зафиксировано в user-facing документации; блокеров нет.
 Ready for PR.
+
+---
+
+## Аддендум (2026-07-22) — pre-merge fix minor #1 (решение владельца)
+
+По итогам review (APPROVE WITH MINOR) владелец выбрал послабить regex. Реализовано на
+этой же ветке до PR:
+
+- `JUNCTION_MARKER_RE`: `^# codegen:junction:` → `^#[ \t]*codegen:junction:`. Теперь
+  `#codegen:`, `# codegen:` и `#  codegen:` (0/1/несколько пробелов или таб) эквивалентны —
+  опечатка в пробеле больше не роняет директиву молча в fallback (был тот самый silent
+  misgeneration BUG-026). `[ \t]` (а не `\s`) намеренно: `\s` матчит `\n` и мог бы
+  перепрыгнуть строку, сломав якорь колонки 0.
+- +2 теста: (1) 4 варианта пробела (`#codegen` / `# codegen` / `#  codegen` / `#\tcodegen`)
+  применяют директиву; (2) отступ ПЕРЕД `#` по-прежнему игнорируется (якорь колонки 0 цел).
+
+Checks после фикса: compile — `src/` 0 ошибок (локальный tsc спотыкается о gitignored
+`tmp/worktrees/task-042/`, в CI-checkout'е его нет); lint 0 errors / 18 baseline;
+unit **345 passing** (343 + 2), 0 failing.
+
+Minor #2 (guard top-level) и minor #3 (типизация `as string[]`) — не требуют действий
+(reviewer признал #2 корректной границей, #3 — косметика при верном поведении).
