@@ -6,7 +6,7 @@ import { getDictionaryRules, DictionaryName } from '../replacement/replacement_u
 import { ReplacingFileProcessor, ReplaceTask, ReplacementRule } from './replacing_file_processor';
 import { SectionReplacer } from './section_config';
 import { ServerpodModel } from '../parsers/formatters/types';
-import { getPathInfo, PathInfo } from '../config/path_handle';
+import { getPathInfo } from '../config/path_handle';
 import { FileManifest, MarkerAnalyzer } from './marker_analyzer';
 import { allManifests, manifestType } from './manifests';
 
@@ -71,6 +71,67 @@ import { RelationPatcher } from './relation_patcher';
 import { OrchestratorPatcher } from './orchestrator_patcher';
 import { scanWithIgnore } from '../../../utils/dir_handle_adv';
 import { toSnakeCase, unCap } from '../../../utils/text_work/text_util';
+import { CodegenLedger, LedgerOwnership } from './ledger';
+import {
+    Classification,
+    GenerationConflict,
+    GenerationConflictError,
+    MACHINE_OWNED_REGIONS,
+    PlannedAction,
+    classifyGeneratedFile,
+    classifyMergeFile,
+    formatConflictDiff,
+} from './preflight';
+import { problemsFor, replaceRegionBody, scanRegions } from './region_parser';
+
+/** TASK-042: опции запуска генерации. */
+export interface GenerationOptions {
+    /**
+     * Явное подтверждение перезаписи файлов, в которых preflight нашёл
+     * пользовательские правки (CLI `--overwrite-existing`, VS Code confirm).
+     * Флаг намеренно узкий: он НЕ отключает preflight и НЕ трогает ничего,
+     * кроме перечисленных в отчёте конфликтов.
+     */
+    overwriteExisting?: boolean;
+}
+
+/** TASK-042: результат генерации (фаза apply завершена, ledger записан). */
+export interface GenerationResult {
+    /** Project-relative пути записанных файлов. */
+    written: string[];
+    /** Legacy-файлы, совпавшие с render: запись не требовалась, засеян baseline. */
+    seeded: string[];
+    /** Конфликты, перезаписанные по явному подтверждению. */
+    overwritten: GenerationConflict[];
+    /** Абсолютный путь к ledger'у. */
+    ledgerPath: string;
+}
+
+/** TASK-042: единица плана — что и куда будет записано, если apply состоится. */
+interface PlannedFile {
+    destinationPath: string;
+    /** Project-relative путь (ключ ledger'а). */
+    relativePath: string;
+    ownership: LedgerOwnership;
+    /** Итоговое содержимое для записи. */
+    content: string;
+    action: PlannedAction;
+    /** Имена machine-owned регионов (только для `ownership: merge`). */
+    ownedRegions: string[];
+    conflict?: GenerationConflict;
+}
+
+/**
+ * TASK-042: корень целевого проекта — база для project-relative путей ledger'а.
+ * `workspacesPath` — то, что передаёт `generate-entity --workspace` и VS Code
+ * (корень открытого монорепо); для `create-project` он пуст, там корень —
+ * `monoRepoTargetPath`.
+ */
+export function resolveLedgerRoot(config: GenerationConfig): string {
+    return config.workspacesPath && config.workspacesPath.length > 0
+        ? config.workspacesPath
+        : config.monoRepoTargetPath;
+}
 
 /**
  * Сервис для генерации кода.
@@ -93,12 +154,35 @@ export class GenerationService {
 
     /**
      * Основной метод запуска генерации.
+     *
+     * **TASK-042 / BUG-029 — поток строго двухфазный:**
+     *
+     * 1. **plan** — вычисляются все destination-пути и всё новое содержимое,
+     *    читается existing, каждый файл классифицируется по трём точкам
+     *    сравнения (`existing ↔ ledger ↔ render`). Filesystem НЕ меняется.
+     * 2. **apply** — записи выполняются, только если конфликтов нет либо
+     *    получено явное подтверждение (`options.overwriteExisting`).
+     *
+     * Раньше проверка «файл существует» жила внутри `_processFile`, который
+     * запускался через `Promise.all`: бросок в одном promise не остановил бы
+     * остальные и оставил бы полузаписанное дерево. Теперь `Promise.all`
+     * остаётся ТОЛЬКО в фазе plan (она read-only).
+     *
      * @param config Конфигурация генерации (какие фичи генерировать, пути и т.д.)
      * @param model Опциональная модель Serverpod (используется для генерации сущностей)
+     * @param options Подтверждение перезаписи (см. `GenerationOptions`)
+     * @throws {GenerationConflictError} если найдены конфликты и подтверждения нет —
+     *         до этого момента НИ ОДИН файл не записан.
      */
-    public async generate(config: GenerationConfig, model?: ServerpodModel): Promise<void> {
+    public async generate(
+        config: GenerationConfig,
+        model?: ServerpodModel,
+        options: GenerationOptions = {},
+    ): Promise<GenerationResult> {
 
-        const allPromises: Promise<void>[] = [];
+        const ledgerRoot = resolveLedgerRoot(config);
+        const ledger = await CodegenLedger.load(this.fileSystem, ledgerRoot);
+        const allPromises: Promise<PlannedFile>[] = [];
 
         // Собираем все директории, которые нужно просканировать исходя из выбранных
         // манифестов. TASK-029 Bug 5: для entity/manyToMany manifests `server/`
@@ -169,14 +253,41 @@ export class GenerationService {
                 if (processedDestinations.has(destinationPath)) { continue; }
                 processedDestinations.add(destinationPath);
 
-                allPromises.push(this._processFile(config, templateFullPath, templateContent, fileManifest, pathInfo, model, destinationPath));
+                allPromises.push(this._plan(config, templateFullPath, templateContent, fileManifest, ledger, model, destinationPath));
             }
         }
 
-        // Ждем завершения обработки всех файлов
-        await Promise.all(allPromises);
+        // ── ФАЗА 1 (plan) — read-only. Ждём классификацию ВСЕХ файлов. ─────────
+        const plans = await Promise.all(allPromises);
 
-        // Если есть модель и в ней найдены связи many-to-one, применяем патчер связей
+        const conflicts = plans.filter(p => p.conflict).map(p => p.conflict!);
+        if (conflicts.length > 0 && !options.overwriteExisting) {
+            // Fail-closed: ни одной записи не было и не будет.
+            throw new GenerationConflictError(conflicts, CodegenLedger.filePath(ledgerRoot));
+        }
+
+        // ── ФАЗА 2 (apply) — записи. ──────────────────────────────────────────
+        const written: string[] = [];
+        const seeded: string[] = [];
+        for (const plan of plans) {
+            if (plan.action === 'seed') {
+                // Писать нечего: на диске уже ровно то, что дал бы render.
+                seeded.push(plan.relativePath);
+                continue;
+            }
+            // `conflict` доходит сюда только подтверждённым (иначе выше был throw) —
+            // и пишется как обычная перезапись. Отдельного состояния для этого не
+            // заводим: подтверждённые конфликты уже перечислены в
+            // `GenerationResult.overwritten`.
+            await this.fileSystem.createFolder(path.dirname(plan.destinationPath));
+            await this.fileSystem.createFile(plan.destinationPath, plan.content);
+            written.push(plan.relativePath);
+        }
+
+        // Если есть модель и в ней найдены связи many-to-one, применяем патчер связей.
+        // ВНИМАНИЕ (TASK-042 п.7): патчеры пишут в обход plan/apply. Их правки
+        // попадают в ledger, потому что baseline снимается с ДИСКА уже после них
+        // (иначе каждый regen сущности со связями давал бы ложный конфликт).
         if (model && RelationAnalyzer.manyToOneFields(model.fields).length > 0) {
             await this.relationPatcher.patch(config, model);
         }
@@ -187,91 +298,209 @@ export class GenerationService {
         if (model && isEntityBasedGeneration) {
             await this.orchestratorPatcher.patch(config, model);
         }
+
+        // ── ФАЗА 3 (ledger) — ПОСЛЕДНИМ, атомарно. ────────────────────────────
+        // Порядок критичен: ledger, записанный до успешного apply, при падении
+        // посередине оставил бы ложное «файл нетронут» — а это опаснее, чем
+        // отсутствие baseline.
+        for (const plan of plans) {
+            await this._recordBaseline(ledger, plan);
+        }
+        await ledger.save();
+
+        return {
+            written,
+            seeded,
+            overwritten: options.overwriteExisting ? conflicts : [],
+            ledgerPath: CodegenLedger.filePath(ledgerRoot),
+        };
     }
 
     /**
-     * Обрабатывает отдельный файл шаблона.
+     * ФАЗА PLAN для одного файла шаблона: вычисляет destination, новое
+     * содержимое и классификацию. **Не производит записей.**
      */
-    private async _processFile(
+    private async _plan(
         config: GenerationConfig,
         templateFullPath: string,
         templateContent: string,
         fileManifest: FileManifest,
-        pathInfo: PathInfo,
-        model?: ServerpodModel,
-        precomputedDestinationPath?: string
-    ): Promise<void> {
-        // Вычисляем относительный путь и целевой путь назначения
-        const relativePath = path.relative(pathInfo.sourceBasePath, templateFullPath).replace(/\\/g, '/');
-        const destinationPath = precomputedDestinationPath || path.join(pathInfo.destinationBasePath, this._getDestinationPath(relativePath, config, model));
+        ledger: CodegenLedger,
+        model: ServerpodModel | undefined,
+        destinationPath: string,
+    ): Promise<PlannedFile> {
+        const relativePath = ledger.toRelative(destinationPath);
+        const entry = ledger.get(relativePath);
 
-        const destinationExists = await this.fileSystem.exists(destinationPath);
-        // Проверяем наличие маркера "base", который указывает на то, что нужно объединять контент, а не перезаписывать полностью
-        const hasBaseMarker = /(?:\/\/|#) === generated_start:base ===/.test(templateContent);
-
-        // --- СТРАТЕГИЯ 1: СЛИЯНИЕ (MERGE) ---
-        // Используется, если файл уже существует и в шаблоне есть блок "base"
-        if (destinationExists && hasBaseMarker) {
-            const destinationContent = await this.fileSystem.readFile(destinationPath);
-            const newContent = this._mergeBaseContent(templateContent, destinationContent, fileManifest, config);
-            await this.fileSystem.createFile(destinationPath, newContent);
-            return;
-        }
-
-        // --- СТРАТЕГИЯ 2: ПОЛНАЯ ЗАМЕНА (FULL REPLACE) ---
-        // Определяем словари для замены (либо из файла, либо дефолтные из манифеста)
-        const dictionaries = fileManifest.dictionaries.length > 0 ? fileManifest.dictionaries : allManifests[config.allManifests[0]]?.dictionaries || [];
+        // Правила замены словарей — общие для обеих стратегий.
+        const dictionaries = fileManifest.dictionaries.length > 0
+            ? fileManifest.dictionaries
+            : allManifests[config.allManifests[0]]?.dictionaries || [];
         const rules = getDictionaryRules(dictionaries, config);
+        const applyRules = (text: string): string => {
+            let result = text;
+            for (const rule of rules) {
+                result = result.replace(new RegExp(rule.from, 'g'), rule.to);
+            }
+            return result;
+        };
 
-        let newContent = templateContent;
-        // Применяем текстовые замены на основе словарей
-        for (const rule of rules) {
-            newContent = newContent.replace(new RegExp(rule.from, 'g'), rule.to);
+        // Разбор шаблона на регионы. Порча marker-разметки В ШАБЛОНЕ — ошибка
+        // сборки, а не повод молча уйти в полную замену (раньше `_mergeBaseContent`
+        // в этом случае тихо возвращал содержимое target-файла).
+        const templateScan = scanRegions(templateContent);
+        for (const name of MACHINE_OWNED_REGIONS) {
+            const templateProblems = problemsFor(templateScan, name);
+            if (templateProblems.length > 0) {
+                throw new Error(
+                    `Шаблон "${templateFullPath}": повреждена marker-разметка региона "${name}". ` +
+                    `Генерация остановлена.`,
+                );
+            }
+        }
+        const ownedRegions = MACHINE_OWNED_REGIONS.filter(name => templateScan.regions.has(name));
+        const ownership: LedgerOwnership = ownedRegions.length > 0 ? 'merge' : 'generated';
+
+        // Полный render (СТРАТЕГИЯ 2): словари + секционные генераторы.
+        //
+        // Считается ЛЕНИВО: merge-ветка при живом target-файле полного render'а не
+        // использует, а `SectionReplacer` на шаблоне с `:base` печатает в stderr
+        // «Generator function not found for name: base» — по строке на каждый из 16
+        // merge-шаблонов t115. До TASK-042 merge-ветка возвращалась ДО секционных
+        // генераторов; ленивое вычисление восстанавливает ровно то поведение.
+        let fullRenderCache: string | null = null;
+        const fullRender = (): string => {
+            if (fullRenderCache === null) {
+                let rendered = applyRules(templateContent);
+                if (fileManifest.isTemplated && model) {
+                    rendered = this.sectionReplacer.process(rendered, config, model);
+                }
+                fullRenderCache = rendered;
+            }
+            return fullRenderCache;
+        };
+
+        const exists = await this.fileSystem.exists(destinationPath);
+        const existing = exists ? await this.fileSystem.readFile(destinationPath) : null;
+
+        // ── generated: генератор владеет файлом целиком ────────────────────────
+        if (ownership === 'generated') {
+            const rendered = fullRender();
+            const classification = classifyGeneratedFile(existing, rendered, entry);
+            return this._toPlannedFile({
+                destinationPath, relativePath, ownership, ownedRegions,
+                content: rendered, existing, classification,
+            });
         }
 
-        // Если файл является шаблонизированным (секции [FOR_EACH_FIELD] и т.д.) и есть модель
-        if (fileManifest.isTemplated && model) {
-            newContent = this.sectionReplacer.process(newContent, config, model);
+        // ── merge: заменяется только тело machine-owned региона ───────────────
+        // Тела регионов рендерятся ТОЛЬКО словарями — так же, как это делал
+        // `_mergeBaseContent` до TASK-042 (секционные генераторы к `base` не
+        // применяются: в реестре нет генератора с таким именем).
+        const renderedRegions = new Map<string, string>();
+        for (const name of ownedRegions) {
+            renderedRegions.set(name, applyRules(templateScan.regions.get(name)!));
         }
 
-        // Создаем папку (если нет) и записываем итоговый файл
-        await this.fileSystem.createFolder(path.dirname(destinationPath));
-        await this.fileSystem.createFile(destinationPath, newContent);
+        const existingScan = existing === null ? null : scanRegions(existing);
+        const classification = classifyMergeFile({ existing, existingScan, renderedRegions, entry });
+
+        // Содержимое для записи: при здоровых маркерах — слияние (custom-зоны
+        // target-файла переносятся дословно); при отсутствующих/битых маркерах
+        // подтверждённая перезапись кладёт полный render, восстанавливая разметку.
+        const markersUsable = existing !== null
+            && classification.reason !== 'missing-markers'
+            && classification.reason !== 'broken-markers';
+
+        let content: string;
+        if (markersUsable) {
+            let merged = existing!;
+            for (const [name, body] of renderedRegions) {
+                const next = replaceRegionBody(merged, name, body);
+                if (next === null) {
+                    throw new Error(
+                        `Внутренняя ошибка: регион "${name}" в "${destinationPath}" прошёл классификацию, ` +
+                        `но не поддался замене.`,
+                    );
+                }
+                merged = next;
+            }
+            content = merged;
+        } else {
+            content = fullRender();
+        }
+
+        return this._toPlannedFile({
+            destinationPath, relativePath, ownership, ownedRegions,
+            content, existing, classification,
+        });
+    }
+
+    private _toPlannedFile(input: {
+        destinationPath: string;
+        relativePath: string;
+        ownership: LedgerOwnership;
+        ownedRegions: string[];
+        content: string;
+        existing: string | null;
+        classification: Classification;
+    }): PlannedFile {
+        const { destinationPath, relativePath, ownership, ownedRegions, content, existing, classification } = input;
+        const planned: PlannedFile = {
+            destinationPath,
+            relativePath,
+            ownership,
+            ownedRegions,
+            content,
+            action: classification.action,
+        };
+        if (classification.action === 'conflict') {
+            planned.conflict = {
+                path: relativePath,
+                absolutePath: destinationPath,
+                reason: classification.reason!,
+                message: classification.message!,
+                diff: formatConflictDiff(existing ?? '', content),
+            };
+        }
+        return planned;
     }
 
     /**
-     * Сливает обновленный базовый блок из шаблона в существующий файл.
-     * Это позволяет сохранять кастомные изменения пользователя вне базового блока.
+     * Снимает baseline с ДИСКА после завершения apply и патчеров.
+     *
+     * Почему с диска, а не из `plan.content`: `RelationPatcher` дописывает в те же
+     * файлы блок `:oneToManyMethods` уже после apply. Если бы ledger хранил хеш
+     * до-патчевого содержимого, следующий regen любой сущности со связями видел
+     * бы расхождение и выдавал конфликт на ровном месте.
+     *
+     * Инвариант «в» («оставить как есть» НЕ сеет baseline) обеспечен раньше и
+     * жёстче: неподтверждённый конфликт бросает `GenerationConflictError` до
+     * фазы apply, поэтому до записи baseline такой план просто не доживает.
      */
-    private _mergeBaseContent(
-        templateContent: string,
-        destinationContent: string,
-        fileManifest: FileManifest,
-        config: GenerationConfig,
-    ): string {
-        const baseBlockRegex = /((?:\/\/|#) === generated_start:base ===)([\s\S]*?)((?:\/\/|#) === generated_end:base ===)/;
-
-        const templateMatch = templateContent.match(baseBlockRegex);
-        if (!templateMatch || typeof templateMatch[2] !== 'string') {
-            return destinationContent;
+    private async _recordBaseline(ledger: CodegenLedger, plan: PlannedFile): Promise<void> {
+        if (!(await this.fileSystem.exists(plan.destinationPath))) {
+            return;
         }
-        let newBlockContent = templateMatch[2];
-
-        // К содержимому базового блока также применяем правила замены словарей
-        const dictionaries = fileManifest.dictionaries.length > 0 ? fileManifest.dictionaries : allManifests[config.allManifests[0]]?.dictionaries || [];
-        const rules = getDictionaryRules(dictionaries, config);
-
-        for (const rule of rules) {
-            newBlockContent = newBlockContent.replace(new RegExp(rule.from, 'g'), rule.to);
+        const onDisk = await this.fileSystem.readFile(plan.destinationPath);
+        if (plan.ownership === 'generated') {
+            ledger.setGenerated(plan.relativePath, onDisk);
+            return;
         }
-
-        // Заменяем блок в существующем файле на новый обработанный блок из шаблона
-        const finalContent = destinationContent.replace(
-            baseBlockRegex,
-            `$1${newBlockContent}$3`
-        );
-
-        return finalContent;
+        const scan = scanRegions(onDisk);
+        const regions = new Map<string, string>();
+        for (const name of plan.ownedRegions) {
+            const body = scan.regions.get(name);
+            if (body === undefined) {
+                // Маркеры не пережили запись — baseline'у неоткуда взяться.
+                // Молча писать хеш всего файла нельзя: это объявило бы
+                // неизвестное содержимое машинным.
+                ledger.remove(plan.relativePath);
+                return;
+            }
+            regions.set(name, body);
+        }
+        ledger.setMerge(plan.relativePath, regions);
     }
 
     /**

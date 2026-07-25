@@ -62,4 +62,28 @@ export class TrackingFileSystem implements IFileSystem {
     async deleteFile(filePath: string): Promise<void> {
         return this.inner.deleteFile(filePath);
     }
+
+    /**
+     * TASK-042: атомарная запись ledger'а идёт как `createFile(tmp)` + `rename`.
+     * Чтобы отчёт CLI оставался правдивым, temp-путь снимается с учёта (его
+     * после rename не существует), а в списки попадает реальный destination.
+     *
+     * Снятие с учёта — в `finally`: при сбое rename вызывающий (`CodegenLedger.save`)
+     * удаляет temp в своём `finally`, поэтому оставить его в `files_created` значит
+     * отчитаться о созданном файле, которого нет, — ровно то, что `untrackFile`
+     * и призван предотвращать.
+     */
+    async rename(source: string, dest: string): Promise<void> {
+        const destExisted = await this.inner.exists(dest);
+        try {
+            await this.inner.rename(source, dest);
+        } finally {
+            this.logger.untrackFile(source);
+        }
+        if (destExisted) {
+            this.logger.trackFileModified(dest);
+        } else {
+            this.logger.trackFileCreated(dest);
+        }
+    }
 }

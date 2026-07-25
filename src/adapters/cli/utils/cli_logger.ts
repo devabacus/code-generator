@@ -42,6 +42,16 @@ export class CliLogger {
         this.filesModified.push(filePath);
     }
 
+    /**
+     * TASK-042: снимает путь с учёта. Нужен для атомарной записи через
+     * temp + rename — temp-файла после rename не существует, и держать его
+     * в `files_created` значит врать в отчёте.
+     */
+    untrackFile(filePath: string): void {
+        this.filesCreated = this.filesCreated.filter(p => p !== filePath);
+        this.filesModified = this.filesModified.filter(p => p !== filePath);
+    }
+
     emitResult(command: string, success: boolean, startTime: number): void {
         const result: CliResult = {
             success,

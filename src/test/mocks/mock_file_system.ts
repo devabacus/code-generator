@@ -7,6 +7,10 @@ import { IFileSystem } from '../../core/interfaces/file_system';
 export class MockFileSystem implements IFileSystem {
     private files: Map<string, string> = new Map();
     private directories: Set<string> = new Set();
+    /** TASK-042: предикат инъекции сбоя записи (см. `setWriteFailure`). */
+    private failWriteOn: ((normalizedPath: string) => boolean) | null = null;
+    /** TASK-042: предикат инъекции сбоя `rename` (см. `setRenameFailure`). */
+    private failRenameOn: ((normalizedSource: string, normalizedDest: string) => boolean) | null = null;
 
     constructor() {
         // Root always exists
@@ -64,7 +68,46 @@ export class MockFileSystem implements IFileSystem {
     }
 
     async createFile(path: string, content: string): Promise<void> {
+        const normalized = this.normalizePath(path);
+        const fail = this.failWriteOn;
+        if (fail && fail(normalized)) {
+            throw new Error(`MockFileSystem: injected write failure at ${normalized}`);
+        }
         this.setFile(path, content);
+    }
+
+    /**
+     * TASK-042: инъекция сбоя записи для теста «падение посередине apply не
+     * оставляет ledger». Предикат получает нормализованный путь; `true` →
+     * `createFile` бросает.
+     */
+    setWriteFailure(predicate: ((normalizedPath: string) => boolean) | null): void {
+        this.failWriteOn = predicate;
+    }
+
+    /**
+     * TASK-042: инъекция сбоя `rename` — воспроизводит Windows-реальность, где
+     * `fs.rename` отдаёт EPERM/EBUSY, если целевой файл держит антивирус,
+     * индексатор или редактор. Отличается от `setWriteFailure` тем, что temp-файл
+     * к моменту сбоя уже создан (и, если его не убрать, останется мусором).
+     */
+    setRenameFailure(predicate: ((normalizedSource: string, normalizedDest: string) => boolean) | null): void {
+        this.failRenameOn = predicate;
+    }
+
+    /** TASK-042: атомарная замена (в mock — просто перенос ключа в Map). */
+    async rename(source: string, dest: string): Promise<void> {
+        const from = this.normalizePath(source);
+        const failRename = this.failRenameOn;
+        if (failRename && failRename(from, this.normalizePath(dest))) {
+            throw new Error(`MockFileSystem: injected rename failure ${from} → ${this.normalizePath(dest)}`);
+        }
+        const content = this.files.get(from);
+        if (content === undefined) {
+            throw new Error(`File not found: ${source}`);
+        }
+        this.files.delete(from);
+        this.setFile(dest, content);
     }
 
     async createFolder(folderPath: string): Promise<void> {
@@ -151,5 +194,7 @@ export class MockFileSystem implements IFileSystem {
         this.files.clear();
         this.directories.clear();
         this.directories.add('/');
+        this.failWriteOn = null;
+        this.failRenameOn = null;
     }
 }

@@ -10,4 +10,11 @@ export interface IFileSystem {
     isDirectory(path: string): Promise<boolean>;
     deleteDirectory(path: string): Promise<void>;
     deleteFile(path: string): Promise<void>;
+    /**
+     * TASK-042: атомарная замена файла (temp → target). Нужна ledger'у
+     * (`.codegen/ledger.json`): при падении посередине записи на диске обязан
+     * остаться либо старый ledger целиком, либо новый целиком — «половина
+     * JSON» сделала бы baseline нечитаемым и увела бы весь проект в legacy.
+     */
+    rename(pathSource: string, pathDest: string): Promise<void>;
 }

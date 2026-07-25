@@ -121,7 +121,21 @@ async function handleCreateProject(opts: CreateProjectOptions): Promise<void> {
         // 4. Main generation
         logger.info('Running generation service...');
         const generationService = new GenerationService(fileSystem);
-        await generationService.generate(config);
+        // TASK-042 / BUG-029: `overwriteExisting: true` здесь — не ослабление guard'а,
+        // а единственный корректный режим для bootstrap. Шаги 1-2 (`serverpod create`,
+        // `flutter create`) уже разложили на диске свой скелет (pubspec.yaml, main.dart,
+        // analysis_options.yaml, README), который шаблон обязан заменить. Записи в
+        // ledger для них нет и быть не может → preflight классифицировал бы их как
+        // legacy-mismatch и остановил бы создание проекта на ровном месте. Пользовательского
+        // кода в только что созданном проекте не существует, терять нечего.
+        //
+        // Побочный (и нужный) эффект: именно здесь ledger засевается впервые. Без этого
+        // первый же `generate-entity` на свежем проекте увидел бы legacy-состояние без
+        // baseline и ушёл в конфликт. Ledger пишется до `git init` (шаг 7), поэтому
+        // `.codegen/ledger.json` попадает в первый коммит — как и требует ADR-0007
+        // («хранится в git»).
+        const generationResult = await generationService.generate(config, undefined, { overwriteExisting: true });
+        logger.info(`Ledger seeded: ${generationResult.ledgerPath} (${generationResult.written.length} files)`);
 
         // 4a/b. Bootstrap-шаги вынесены в shared core/services/project_bootstrapper.ts
         // чтобы и CLI, и VS Code адаптер использовали одинаковую логику.

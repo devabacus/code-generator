@@ -51,4 +51,13 @@ export class DefaultFileSystem implements IFileSystem {
             // Игнорируем ошибки если файл не существует
         }
     }
+
+    /**
+     * TASK-042: атомарная замена. `fs.rename` на одном томе — atomic на POSIX и
+     * на NTFS (MoveFileEx с MOVEFILE_REPLACE_EXISTING). Ошибки НЕ глотаем:
+     * несостоявшаяся запись ledger'а обязана быть громкой.
+     */
+    async rename(pathSource: string, pathDest: string): Promise<void> {
+        await fs.rename(pathSource, pathDest);
+    }
 }

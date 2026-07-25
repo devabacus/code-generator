@@ -63,7 +63,11 @@ export async function createNewProject(): Promise<void> {
 
     // Main generation service
     const generationService = new GenerationService(fileSystem);
-    await generationService.generate(config);
+    // TASK-042 / BUG-029: bootstrap перезаписывает скелет `serverpod create` /
+    // `flutter create` — пользовательского кода в новом проекте нет, а ledger
+    // должен засеяться именно здесь (иначе первый generate-entity увидит legacy
+    // без baseline). Симметрично CLI `create-project`.
+    await generationService.generate(config, undefined, { overwriteExisting: true });
 
     // Bootstrap-шаги (вынесены в shared core/services/project_bootstrapper.ts).
     // ВАЖНО: tasks-фичу НЕ генерируем. Tasks (Category/Tag/Task/TaskTagMap) —
