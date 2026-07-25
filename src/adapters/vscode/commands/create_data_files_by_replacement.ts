@@ -5,6 +5,7 @@ import { pickPath } from "../ui/ui_ask_folder";
 import { getDocText } from "../ui/ui_util";
 import { AppDatabaseGenerator } from "../../../features/generation/generators/app_database_generator";
 import { GenerationService } from "../../../features/generation/generators/generation_service";
+import { GenerationConflictError } from "../../../features/generation/generators/preflight";
 import { manifestType } from "../../../features/generation/generators/manifests";
 import { GenerationConfig } from "../../../features/generation/config/generation_config";
 import { ServerpodYamlParser } from "../../../features/generation/parsers/server_yaml_parser";
@@ -84,7 +85,33 @@ export async function createDataFilesByReplacement() {
     } else { return; }
 
     const generationService = new GenerationService(fileSystem);
-    await generationService.generate(config, model);
+
+    // TASK-042 / BUG-029: preflight fail-closed. Если target-файлы содержат правки,
+    // которых нет в ledger машинного вывода, generate() бросает ДО первой записи —
+    // показываем список и требуем явного подтверждения. Отмена = ничего не записано.
+    try {
+        await generationService.generate(config, model);
+    } catch (error) {
+        if (!(error instanceof GenerationConflictError)) { throw error; }
+
+        const preview = error.conflicts
+            .map(c => `• ${c.path} — ${c.message}`)
+            .join('\n');
+        const OVERWRITE = 'Overwrite existing';
+        const action = await window.showWarningMessage(
+            `Обнаружены файлы с ручными правками (${error.conflicts.length}). ` +
+            `Ничего не записано.\n\n${preview}\n\n` +
+            `«${OVERWRITE}» перезапишет перечисленное — правки будут потеряны.`,
+            { modal: true },
+            OVERWRITE,
+        );
+        if (action !== OVERWRITE) {
+            window.showInformationMessage('Генерация отменена — ни один файл не изменён');
+            return;
+        }
+        await generationService.generate(config, model, { overwriteExisting: true });
+    }
+
     const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
     await appDatabaseGenerator.generate();
 }

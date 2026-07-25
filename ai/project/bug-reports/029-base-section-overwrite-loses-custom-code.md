@@ -23,8 +23,57 @@
 > (RESOLVED 2026-04-26). Разведено 2026-07-22 (TASK-039 follow-up): `:base` overwrite
 > получил собственный номер **029**, ссылка в CLAUDE.md поправлена.
 
-**Статус:** OPEN — архитектурное решение принято (дискуссия #14, 2026-07-22), ожидает реализации
+**Статус:** **RESOLVED для regen-пути** (`generate-entity`, VS Code `createDataFilesByReplacement`) —
+2026-07-25, [TASK-042](../tasks/): двухфазный fail-closed preflight + ledger, все три
+silent-режима на этом пути стали громкими.
+
+**Где guard НЕ действует (осознанно, формулировка «65 из 81 шаблона пишутся `createFile()`
+без проверки существования» для этих случаев остаётся буквально верной):**
+
+- **`create-project` (bootstrap).** Вызывает `generate(..., { overwriteExisting: true })` —
+  preflight отрабатывает, но конфликты подтверждены заранее и записи идут всегда. Так
+  сделано намеренно: `serverpod create` / `flutter create` раскладывают собственный скелет
+  (`pubspec.yaml`, `main.dart`, `analysis_options.yaml`, `README`), записей в ledger для
+  него нет → каждый такой файл классифицировался бы как `legacy-mismatch` и ронял бы
+  создание проекта. Пользовательского кода в только что созданном проекте не существует —
+  терять нечего. Побочный и нужный эффект: ledger засевается именно здесь, до `git init`.
+  **Следствие для агентов:** запускать `create-project` поверх существующего непустого
+  проекта по-прежнему опасно, guard от этого не защищает.
+- **[BUG-030](030-relation-patcher-otm-region-outside-guard.md)** — правка внутри
+  `:oneToManyMethods` в merge-файлах (`*_dao.dart`, `*_local_data_source.dart`,
+  `*_repository.dart`) теряется молча: `RelationPatcher` пишет в обход plan/apply.
+- **Прочие писатели вне plan** — `orchestrator_patcher`, `app_database_generator`
+  (детали и обоснование — в report TASK-042).
+
+**Следующие этапы (отдельные задачи, НЕ входили в scope):** миграция 65 шаблонов на
+merge-дисциплину и ownership-директива `// codegen:ownership:`.
 **Критичность:** High — silent потеря пользовательского кода при regen.
+
+## Что закрыто (TASK-042, 2026-07-25)
+
+- **Двухфазный поток** `plan → apply` в `GenerationService.generate`. `Promise.all` остался
+  только в read-only фазе plan; при конфликте хотя бы в одном файле не записывается **ни один**.
+- **Ledger** `<project>/.codegen/ledger.json` (`schemaVersion: 1`, project-relative пути,
+  точный SHA-256 без нормализации, запись атомарная и **последней**). Для `ownership: merge`
+  хранятся хеши **регионов**, не файла целиком.
+- **Три режима отказа стали громкими:** полная замена existing-файла (65 шаблонов) → conflict;
+  правка внутри `:base` → conflict; потерянные/битые/дублированные маркеры → conflict
+  (silent staleness закрыт `region_parser`, который отличает «маркеров нет» от «маркеры битые»).
+- **Анти-prompt-fatigue:** `sha(existing) == ledger` → молчаливая перезапись, даже если render
+  изменился. Legacy без записи: `existing == render` → seed; иначе conflict; «оставить как есть»
+  baseline **не** сеет.
+- **Точки входа:** CLI `generate-entity --overwrite-existing` (без него — отчёт с diff в stderr
+  и non-zero exit), VS Code — модальный preview/confirm. `create-project` сеет ledger в момент
+  bootstrap (до `git init`, поэтому файл попадает в первый коммит).
+- **Вне guard'а осознанно остались** `relation_patcher`, `orchestrator_patcher`,
+  `app_database_generator` — пишут в обход plan/apply (обоснование — в report TASK-042).
+  Единственный из них, который приводит к **молчаливой потере пользовательского кода**,
+  выделен в [BUG-030](030-relation-patcher-otm-region-outside-guard.md).
+- **Самовосстановление ledger'а:** если запись в ledger разошлась с диском не по вине
+  пользователя (сбой `save()` после apply, throw/Ctrl-C между apply и save, разрешение
+  git-конфликта в `.codegen/ledger.json`), а на диске лежит побайтово то, что генератор и
+  записал бы, — конфликт **не** поднимается, baseline пересеивается. Иначе единственным
+  предложенным выходом был бы деструктивный `--overwrite-existing` там, где терять нечего.
 
 ## Симптом (уточнённый)
 
@@ -105,10 +154,13 @@ merge) и **65 без** (СТРАТЕГИЯ 2, полная замена).
   делает слепой каст токенов в `ManifestType` без валидации). Синтаксис — общая конвенция
   `codegen:<key>: <value>` с решением [дискуссии #13](../discussions/archive/13-где-должна-жить-codegen-метадата-junctio/discussion.md).
 
-## Текущий workaround (до реализации)
+## Бывший workaround (снят TASK-042)
 
-`git diff` перед regen руками (CLAUDE.md → «Порядок работы → Добавь поле»). Требует
-дисциплины; при её отсутствии — silent потеря.
+До guard'а: `git diff` перед regen руками (CLAUDE.md → «Порядок работы → Добавь поле»).
+Требовал дисциплины; при её отсутствии — silent потеря. **Больше не нужен на regen-пути**:
+preflight сам сравнивает диск с ledger'ом и останавливается до первой записи. Остаётся
+актуальным для зон из списка «где guard не действует» (в первую очередь
+[BUG-030](030-relation-patcher-otm-region-outside-guard.md)).
 
 ## Совместимость
 
@@ -125,5 +177,6 @@ sync_core 0.3.0. Partial-файлы / наследование / новые call
 
 ## Связанное
 
+- [BUG-030](030-relation-patcher-otm-region-outside-guard.md) — остаток этого же класса дефекта: `:oneToManyMethods` в merge-файлах вне guard'а.
 - [BUG-005](005-app-database-generator-incremental-only.md) — другой баг, тот же бывший номер (разведено).
 - sync hooks partial-файлы (sync_core 0.3.0) — референс паттерна custom/generated (вариант 3).

@@ -59,7 +59,7 @@
 
 ## Активные задачи (на 2026-07-22)
 
-- **TASK-042** (`active`) — BUG-029 preflight + ledger (fail-closed guard против потери пользовательского кода). Контракт готов (3 инварианта, 11 критериев), ждёт старта. Следующая по порядку 040→042.
+- **TASK-042** (`active`, ветка `feature/TASK-042-preflight-ledger`, **реализовано, на ревью**) — BUG-029 preflight + ledger. В коде: двухфазный `plan → apply` в `GenerationService.generate` (при конфликте хотя бы в одном файле не записывается ни один), ledger `<project>/.codegen/ledger.json` (schema v1, project-relative пути, точный SHA-256, для merge-файлов — хеши регионов), CLI `generate-entity --overwrite-existing` + non-zero exit с diff, VS Code preview/confirm. **Workaround «`git diff` перед regen» больше не актуален** — guard громкий. Не входило в scope и остаётся открытым: миграция 65 шаблонов на merge-дисциплину, ownership-директива, [BUG-030](../bug-reports/030-relation-patcher-otm-region-outside-guard.md).
 - **TASK-041** (`active`, `depends_on: TASK-040`) — ужесточение junction fallback до fail-fast. **Ждёт подтверждения владельца, что шаблоны t115/simplified мигрированы** на `# codegen:junction:` (иначе fail-fast ломает `create-project` из коробки). Условие старта зафиксировано в контракте.
 
 **Зона владельца (вне репо кодогенератора):** миграция junction-YAML шаблонов t115/simplified на `# codegen:junction:` + строка в weight `customer_user.spy.yaml`. От неё зависит старт TASK-041.
@@ -237,4 +237,4 @@ Sequence per Discussion #4 → #6:
 | TASK-039 | BUG-015 cross-feature junction prove-out + фикс при провале | ✅ Merged (PR #49) | 2026-07-21 |
 | TASK-040 | директива junction не проходит serverpod generate (property not allowed) | ✅ Merged (PR #51) | 2026-07-22 |
 | TASK-041 | ужесточение junction fallback до fail-fast при структурной неоднозначности | ⛔ Active/BLOCKED (ждёт миграции шаблонов) | 2026-07-22 |
-| TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 Active (готова к старту) | 2026-07-22 |
+| TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 Active (реализовано, ревью; ветка `feature/TASK-042-preflight-ledger`) | 2026-07-25 |

@@ -6,7 +6,7 @@
 | Tier | Модель | Примечание |
 | --- | --- | --- |
 | `frontier` | Claude Fable 5 | Только главная интерактивная сессия владельца, по его явному выбору (`/model`). Субагентам запрещён |
-| `standard` | Claude Opus 4.8 | Default для executor/reviewer-субагентов |
+| `standard` | Claude Opus 5 | Default для executor/reviewer-субагентов (Opus 4.8 снят с парка 2026-07-25) |
 | `mechanical` | Claude Sonnet 5 | Поиск, массовые правки, первичное чтение, скачивание |
 | `independent_reviewer` | GPT (актуальный флагман OpenAI) | Другой вендор обязателен; недоступен → fail-closed (TASK-011 шаблон-репо) |
 

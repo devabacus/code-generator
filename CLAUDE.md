@@ -131,7 +131,7 @@ G:/Projects/Flutter/serverpod/<name>/
 
 **Дополнительно:** parser игнорирует `relation(parent=X)` directive — derives `relatedModel` через `name.replace(/(.*)Id/, '$1')`, что ломает FK alias case (`assigneeId, parent=member` → broken). См. [BUG-012](ai/project/bug-reports/012-server-yaml-parser-ignores-relation-parent-directive.md).
 
-- НЕ ТРОГАЕТ `:base` секции — это отдельная проблема (см. [BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md) в backlog).
+- НЕ ТРОГАЕТ `:base` секции — это отдельный контур ([BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md), закрыт guard'ом TASK-042: `:base` — machine-owned регион, правка внутри него даёт conflict). Обратная сторона: сам `relation_patcher` работает **в обход** plan/apply, и в merge-файлах (`*_dao.dart`, `*_local_data_source.dart`, `*_repository.dart`) правка внутри `:oneToManyMethods` guard'ом не ловится — [BUG-030](ai/project/bug-reports/030-relation-patcher-otm-region-outside-guard.md).
 
 ### 2. Файловые имена — snake_case (TASK / BUG-002)
 
@@ -264,7 +264,7 @@ python ai/core/scripts/task.py finish    # pr + merge
 1. Прочитать [ai/project/docs/agent_memory.md](ai/project/docs/agent_memory.md) и этот файл.
 2. Отредактировать `<entity>.spy.yaml` в `<name>_server/lib/src/models/<entity>/`.
 3. `codegen generate-entity --yaml ... --feature-path ... --workspace ...` — относительно безопасно для добавления полей и relations (см. инварианты выше).
-4. **ВНИМАНИЕ:** `:base` секции (handleSyncEvent, createX, mappers) **перезапишутся**. Если в них есть кастомный код — забэкапить через `git diff` ПЕРЕД regen. `:syncImports` / `:syncEntityTypes` / `:syncRegistrations` marker блоки в orchestrator — патчатся идемпотентно (existing entries сохраняются + новый append'ится).
+4. **ВНИМАНИЕ (изменилось в TASK-042):** ручной `git diff` перед regen больше не нужен как страховка — preflight сам сравнивает файл на диске с ledger'ом (`<project>/.codegen/ledger.json`) и при расхождении **останавливает генерацию до первой записи** с non-zero exit и diff'ом. Что это значит на практике: правка внутри `:base` (handleSyncEvent, createX, mappers) и правка любого generated-файла дают **conflict**, а не молчаливую потерю; осознанная перезапись — `--overwrite-existing` (перезапишет **всё** перечисленное, per-file выбора пока нет). Не покрыто guard'ом: `:oneToManyMethods` в merge-файлах ([BUG-030](ai/project/bug-reports/030-relation-patcher-otm-region-outside-guard.md)) — там правка теряется молча. `:syncImports` / `:syncEntityTypes` / `:syncRegistrations` в orchestrator — патчатся идемпотентно (existing entries сохраняются + новый append'ится).
 5. `serverpod generate --experimental-features=all` (server)
 6. `flutter pub run build_runner build --delete-conflicting-outputs` (flutter)
 7. `flutter analyze` — проверить чистоту.
@@ -290,7 +290,7 @@ python ai/core/scripts/task.py finish    # pr + merge
 ## Известные ограничения / backlog
 
 - **BUG-001 (Open, High):** Ref disposed в state_providers — повторяется в каждой новой сущности. См. [ai/project/bug-reports/001-state-provider-ref-disposed.md](ai/project/bug-reports/001-state-provider-ref-disposed.md).
-- **[BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md) (backlog):** перезапись `:base` секций при regen теряет custom code. Требует архитектурного решения (per-method markers или patch-only mode). Сейчас workaround — `git diff` перед regen. (Ранее числился как «BUG-005» — номер разведён, 005 занят закрытым AppDatabaseGenerator-багом.)
+- **[BUG-029](ai/project/bug-reports/029-base-section-overwrite-loses-custom-code.md) (RESOLVED для regen-пути, TASK-042):** молчаливая потеря пользовательского кода при `generate-entity` / VS Code закрыта двухфазным fail-closed preflight'ом + ledger'ом (`<project>/.codegen/ledger.json`). Не закрыто и осознанно: (1) `create-project` bootstrap идёт с `overwriteExisting: true` — guard там выключен (проект пустой, терять нечего); (2) [BUG-030](ai/project/bug-reports/030-relation-patcher-otm-region-outside-guard.md) — `:oneToManyMethods` в merge-файлах пишет `relation_patcher` в обход plan/apply; (3) миграция 65 шаблонов на merge-дисциплину и ownership-директива — отдельные этапы. (Ранее числился как «BUG-005» — номер разведён, 005 занят закрытым AppDatabaseGenerator-багом.)
 - **MCP сервер для генератора** — отдельная задача (стек: Python stdio как `webcam` сервер, обёртки над JSON-режимом CLI). Делать после стабилизации основных багов.
 
 ---

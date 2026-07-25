@@ -4,6 +4,7 @@ import { ServerpodYamlParser } from '../../../features/generation/parsers/server
 import { EntityYamlValidator, ValidationError } from '../../../features/generation/parsers/entity_yaml_validator';
 import { GenerationConfig } from '../../../features/generation/config/generation_config';
 import { GenerationService } from '../../../features/generation/generators/generation_service';
+import { GenerationConflictError, formatConflictReport } from '../../../features/generation/generators/preflight';
 import { AppDatabaseGenerator } from '../../../features/generation/generators/app_database_generator';
 import { DefaultFileSystem } from '../../../core/implementations/default_file_system';
 import { TrackingFileSystem } from '../utils/cli_file_system';
@@ -37,6 +38,8 @@ interface GenerateEntityOptions {
     withServer?: boolean;
     /** BUG-023: ceremony-профиль (`full` default | `minimal`). */
     ceremony?: 'full' | 'minimal';
+    /** TASK-042 / BUG-029: подтверждение перезаписи файлов с ручными правками. */
+    overwriteExisting?: boolean;
 }
 
 export function registerGenerateEntity(program: Command): void {
@@ -84,6 +87,10 @@ export function registerGenerateEntity(program: Command): void {
                 .choices(['full', 'minimal'])
                 .default('full'),
         )
+        // TASK-042 / BUG-029: узкий флаг подтверждения (НЕ универсальный --force).
+        // Без него preflight останавливает генерацию ДО первой записи, если хотя бы
+        // один целевой файл содержит правки, которых нет в ledger машинного вывода.
+        .option('--overwrite-existing', 'Confirm overwriting files that contain manual edits (BUG-029 preflight). Without it, conflicts abort generation before any write.', false)
         .action(async (opts: GenerateEntityOptions) => {
             await handleGenerateEntity(opts);
         });
@@ -172,7 +179,16 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
 
         logger.info(`Generating files...`);
         const generationService = new GenerationService(fileSystem);
-        await generationService.generate(config, model);
+        const result = await generationService.generate(config, model, {
+            overwriteExisting: opts.overwriteExisting,
+        });
+        if (result.overwritten.length > 0) {
+            logger.info(
+                `--overwrite-existing: перезаписано файлов с ручными правками — ${result.overwritten.length} ` +
+                `(${result.overwritten.map(c => c.path).join(', ')})`,
+            );
+        }
+        logger.info(`Ledger: ${result.ledgerPath} (записано ${result.written.length}, seed ${result.seeded.length})`);
 
         logger.info(`Updating AppDatabase...`);
         const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
@@ -180,6 +196,18 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
 
         logger.emitResult('generate-entity', true, startTime);
     } catch (error) {
+        // TASK-042 / BUG-029: конфликт preflight — отдельная, читаемая ветка.
+        // Ни один файл не записан; выход non-zero, чтобы вызывающий скрипт
+        // (или агент) не принял отказ за успех.
+        if (error instanceof GenerationConflictError) {
+            logger.error(formatConflictReport(error.conflicts));
+            logger.error(
+                `Ledger: ${error.ledgerPath}. ` +
+                `Перепроверь diff выше и повтори с --overwrite-existing, если правки не нужны.`,
+            );
+            logger.emitResult('generate-entity', false, startTime);
+            process.exit(1);
+        }
         logger.error(String(error));
         logger.emitResult('generate-entity', false, startTime);
         process.exit(1);
