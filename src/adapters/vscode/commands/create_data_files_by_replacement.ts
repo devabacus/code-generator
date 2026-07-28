@@ -4,8 +4,12 @@ import { getRootWorkspaceFolders } from "../utils/path_util";
 import { pickPath } from "../ui/ui_ask_folder";
 import { getDocText } from "../ui/ui_util";
 import { AppDatabaseGenerator } from "../../../features/generation/generators/app_database_generator";
-import { GenerationService } from "../../../features/generation/generators/generation_service";
-import { GenerationConflictError } from "../../../features/generation/generators/preflight";
+import { GenerationResult, GenerationService } from "../../../features/generation/generators/generation_service";
+import {
+    GenerationConflictError,
+    UnknownOverwriteSelectionError,
+    formatPatchSkipReport,
+} from "../../../features/generation/generators/preflight";
 import { manifestType } from "../../../features/generation/generators/manifests";
 import { GenerationConfig } from "../../../features/generation/config/generation_config";
 import { ServerpodYamlParser } from "../../../features/generation/parsers/server_yaml_parser";
@@ -87,31 +91,85 @@ export async function createDataFilesByReplacement() {
     const generationService = new GenerationService(fileSystem);
 
     // TASK-042 / BUG-029: preflight fail-closed. Если target-файлы содержат правки,
-    // которых нет в ledger машинного вывода, generate() бросает ДО первой записи —
-    // показываем список и требуем явного подтверждения. Отмена = ничего не записано.
+    // которых нет в ledger машинного вывода, generate() бросает ДО первой записи.
+    // TASK-043: выбор — по файлу. Ни одна галочка не стоит по умолчанию: значение
+    // по умолчанию обязано быть безопасным (сохранить), а не разрушительным.
+    let result: GenerationResult;
     try {
-        await generationService.generate(config, model);
+        result = await generationService.generate(config, model);
     } catch (error) {
         if (!(error instanceof GenerationConflictError)) { throw error; }
 
-        const preview = error.conflicts
-            .map(c => `• ${c.path} — ${c.message}`)
-            .join('\n');
-        const OVERWRITE = 'Overwrite existing';
-        const action = await window.showWarningMessage(
-            `Обнаружены файлы с ручными правками (${error.conflicts.length}). ` +
-            `Ничего не записано.\n\n${preview}\n\n` +
-            `«${OVERWRITE}» перезапишет перечисленное — правки будут потеряны.`,
-            { modal: true },
-            OVERWRITE,
+        const picked = await window.showQuickPick(
+            error.conflicts.map(c => ({
+                label: c.path,
+                description: c.reason,
+                detail: c.message,
+            })),
+            {
+                canPickMany: true,
+                ignoreFocusOut: true,
+                title: `Файлы с ручными правками: ${error.conflicts.length}. Ничего пока не записано.`,
+                placeHolder:
+                    'Отметь ТОЛЬКО те файлы, которые можно перезаписать (прежнее содержимое уйдёт ' +
+                    'в .codegen/backup/). Неотмеченные не тронет ни запись, ни патчеры. Esc — отменить.',
+            },
         );
-        if (action !== OVERWRITE) {
+
+        // Esc → undefined, «ок» без единой галочки → []. Оба случая означают
+        // «перезаписывать нечего»; продолжать генерацию после этого нельзя —
+        // прежний контракт команды: отмена = ни один файл не изменён.
+        if (picked === undefined || picked.length === 0) {
             window.showInformationMessage('Генерация отменена — ни один файл не изменён');
             return;
         }
-        await generationService.generate(config, model, { overwriteExisting: true });
+
+        // TASK-043 R2-5: второй вызов обязан иметь собственную обработку. Он живёт
+        // ВНУТРИ catch, своего try раньше не имел — и любая ошибка отсюда уходила
+        // сырым исключением («command resulted in an error»). Сценарий достижим без
+        // экзотики: QuickPick не показывает diff, пользователь уходит смотреть файлы
+        // в редакторе, format-on-save устраняет конфликт — и подтверждённый путь
+        // больше не значится конфликтом.
+        try {
+            result = await generationService.generate(config, model, {
+                overwriteExisting: picked.map(item => item.label),
+            });
+        } catch (retryError) {
+            if (retryError instanceof UnknownOverwriteSelectionError) {
+                window.showErrorMessage(
+                    'Набор конфликтов изменился, пока был открыт список (файлы правились в редакторе?). ' +
+                    'Ни один файл не изменён — запусти генерацию заново. ' +
+                    `Подробности: ${retryError.message}`,
+                );
+                return;
+            }
+            if (retryError instanceof GenerationConflictError) {
+                window.showErrorMessage(
+                    'Между показом списка и подтверждением появились новые конфликты — ' +
+                    'ни один файл не изменён. Запусти генерацию заново.',
+                );
+                return;
+            }
+            window.showErrorMessage(`Генерация прервана: ${String(retryError)}`);
+            return;
+        }
+
+        const preservedNote = result.preserved.length > 0
+            ? ` Оставлено как есть: ${result.preserved.length} (не тронуты ни записью, ни патчерами, ` +
+              `baseline им не засеян — при следующей генерации они снова попадут в этот список).`
+            : '';
+        window.showInformationMessage(
+            `Перезаписано файлов: ${result.overwritten.length}. ` +
+            `Копии прежнего содержимого: ${result.backupDir ?? '—'}.${preservedNote}`,
+        );
     }
 
+    // TASK-043 R2-1: `AppDatabaseGenerator` тоже пишет в обход plan/apply — ему
+    // передаётся тот же гард, иначе `database.dart`, оставленный пользователю,
+    // был бы перезаписан вопреки выбору.
     const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
-    await appDatabaseGenerator.generate();
+    await appDatabaseGenerator.generate(result.preservedFiles);
+
+    const skipReport = formatPatchSkipReport(result.preservedFiles.skipped);
+    if (skipReport.length > 0) { window.showWarningMessage(skipReport); }
 }

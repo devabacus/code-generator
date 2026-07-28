@@ -8,11 +8,24 @@ import { RelationAnalyzer } from '../parsers/relation-analyzer';
 import { JunctionDetector } from '../parsers/junction_detector';
 import { DictionaryPresets } from '../replacement/dictionary_presets';
 import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
+import { PreservedFiles } from './preflight';
 
 export class RelationPatcher {
     constructor(private fileSystem: IFileSystem) { }
 
-    public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
+    /**
+     * @param preserved TASK-043 (R2-1): файлы, которые пользователь оставил за
+     *        собой при разборе конфликтов. Патчер пишет в обход plan/apply, и без
+     *        этого гарда он переписывал бы регион `:oneToManyMethods` в файле,
+     *        который просили НЕ трогать — молча и без backup'а. Цели патчера
+     *        (`*_dao`, `*_repository`, `*_local_data_source` и т.п.) — ровно те
+     *        файлы, в которые чаще всего дописывают руками.
+     */
+    public async patch(
+        config: GenerationConfig,
+        model: ServerpodModel,
+        preserved: PreservedFiles = PreservedFiles.none(),
+    ): Promise<void> {
         console.log('Relations detected, starting patching process...');
 
         // TASK-022 / Phase B1: literals читаются из config.templateConfig.relationPatcher
@@ -142,6 +155,15 @@ export class RelationPatcher {
                 const destinationPath = path.join(destinationBasePath, this._getDestinationPath(new GenerationConfig({ ...config, templEntity: templateRelatedEntity }), relativePath));
 
                 if (!await this.fileSystem.exists(destinationPath)) {
+                    continue;
+                }
+
+                // TASK-043 R2-1: пользователь оставил этот файл за собой. Пропускаем
+                // ЦЕЛИКОМ, до чтения: любая ветка ниже заканчивается записью, а
+                // «не тронут» обязано значить «не тронут». Плата — регион остаётся
+                // от прошлой генерации; отказ фиксируется в `preserved.skipped`,
+                // вызывающий печатает его пользователю.
+                if (preserved.blocks(destinationPath)) {
                     continue;
                 }
 
