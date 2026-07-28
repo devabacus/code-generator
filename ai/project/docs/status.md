@@ -238,3 +238,7 @@ Sequence per Discussion #4 → #6:
 | TASK-040 | директива junction не проходит serverpod generate (property not allowed) | ✅ Merged (PR #51) | 2026-07-22 |
 | TASK-041 | ужесточение junction fallback до fail-fast при структурной неоднозначности | ⛔ Active/BLOCKED (ждёт миграции шаблонов) | 2026-07-22 |
 | TASK-042 | BUG-029 preflight + ledger — fail-closed guard против потери пользовательского кода | 🟡 Active (реализовано, ревью; ветка `feature/TASK-042-preflight-ledger`) | 2026-07-25 |
+| TASK-043 | BUG-029 follow-up: per-file preserve вместо all-or-nothing overwrite + backup | 🟡 In Progress | 2026-07-28 |
+| TASK-044 | CLI: поле conflicts в stdout-JSON generate-entity | 🟡 In Progress | 2026-07-28 |
+| TASK-045 | Ledger: валидация project-relative путей (feature-path внутри workspace) | 🟡 In Progress | 2026-07-28 |
+| TASK-046 | Ledger: протухающие записи для писателей вне plan (патчеры, bootstrap) | 🟡 In Progress | 2026-07-28 |
