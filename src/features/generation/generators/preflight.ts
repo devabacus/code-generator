@@ -400,6 +400,11 @@ export function resolveOverwriteSelection(
  * что и молчаливая запись, только в другую сторону. Вызывающий обязан показать
  * список пользователю.
  */
+/** Приводит разделители к `/` — единая форма пути независимо от платформы. */
+function toForwardSlashes(value: string): string {
+    return value.replace(/\\/g, '/');
+}
+
 export class PreservedFiles {
     private readonly skippedPaths = new Set<string>();
 
@@ -429,7 +434,14 @@ export class PreservedFiles {
      */
     public blocks(absolutePath: string): boolean {
         if (this.paths.size === 0) { return false; }
-        const relative = path.relative(this.projectRoot, absolutePath).replace(/\\/g, '/');
+        // Разделители приводятся к `/` ДО `path.relative`, а не после: на posix-платформах
+        // `\` не является разделителем, поэтому `path.relative` его не разберёт и гард
+        // молча пропустит запись (тест на windows-путь падал в CI на ubuntu). Гард против
+        // потери пользовательского кода не имеет права зависеть от платформы, на которой
+        // его исполняют.
+        const relative = path
+            .relative(toForwardSlashes(this.projectRoot), toForwardSlashes(absolutePath))
+            .replace(/\\/g, '/');
         if (!this.paths.has(relative)) { return false; }
         this.skippedPaths.add(relative);
         return true;
