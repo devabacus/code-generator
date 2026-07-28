@@ -4,7 +4,14 @@ import { ServerpodYamlParser } from '../../../features/generation/parsers/server
 import { EntityYamlValidator, ValidationError } from '../../../features/generation/parsers/entity_yaml_validator';
 import { GenerationConfig } from '../../../features/generation/config/generation_config';
 import { GenerationService } from '../../../features/generation/generators/generation_service';
-import { GenerationConflictError, formatConflictReport } from '../../../features/generation/generators/preflight';
+import {
+    GenerationConflictError,
+    OverwriteSelection,
+    UnknownOverwriteSelectionError,
+    formatConflictReport,
+    formatOverwriteReport,
+    formatPatchSkipReport,
+} from '../../../features/generation/generators/preflight';
 import { AppDatabaseGenerator } from '../../../features/generation/generators/app_database_generator';
 import { DefaultFileSystem } from '../../../core/implementations/default_file_system';
 import { TrackingFileSystem } from '../utils/cli_file_system';
@@ -38,12 +45,84 @@ interface GenerateEntityOptions {
     withServer?: boolean;
     /** BUG-023: ceremony-профиль (`full` default | `minimal`). */
     ceremony?: 'full' | 'minimal';
-    /** TASK-042 / BUG-029: подтверждение перезаписи файлов с ручными правками. */
-    overwriteExisting?: boolean;
+    /**
+     * TASK-043 R2-3: поля `overwriteExisting` здесь НЕТ намеренно. Значение,
+     * которое собирает commander, не различает «список путей» и «голый флаг»
+     * достаточно надёжно (см. `resolveOverwriteFlag`), поэтому единственный
+     * источник истины — поток событий `option:overwrite-existing`.
+     */
+}
+
+/**
+ * TASK-043: аккумулятор значений `--overwrite-existing`. Принимает и список через
+ * запятую, и повторение флага — обе формы естественны для shell'а. Голый флаг
+ * сюда не попадает: commander для `[paths]` без значения передаёт `null` и
+ * parseArg не вызывает (проверено пробником на commander 14.0.3).
+ */
+export function collectOverwritePaths(value: string, previous: boolean | string[]): string[] {
+    const items = value.split(',').map(item => item.trim()).filter(item => item.length > 0);
+    return Array.isArray(previous) ? [...previous, ...items] : items;
+}
+
+/**
+ * TASK-043 R2-3: смешение голого флага и списка путей в одной команде.
+ *
+ * Почему отказ, а не «выбрать одно из двух». Пробник на commander 14.0.3:
+ * `--overwrite-existing a.dart --overwrite-existing` → `true`, то есть точечный
+ * выбор МОЛЧА превращается в тотальную перезапись (реалистично для скрипта-обёртки,
+ * дописывающего флаг в конец), а обратный порядок так же молча выбрасывает голый
+ * флаг. Обе трактовки — угадывание намерения там, где цена ошибки равна потере
+ * кода. Отказ до первой записи стоит пользователю одного повтора команды.
+ */
+export class ConflictingOverwriteFormsError extends Error {
+    constructor(public readonly paths: string[]) {
+        super(
+            `--overwrite-existing указан и со списком путей (${paths.join(', ')}), и без него. ` +
+            `Это два разных действия: список перезаписывает только перечисленное, ` +
+            `голый флаг — ВСЕ конфликтующие файлы. Угадывать намерение генератор не будет, ` +
+            `ни один файл не записан.\n` +
+            `Оставь одну форму: либо --overwrite-existing ${paths.join(',')}, либо голый ` +
+            `--overwrite-existing (осознанно, со всеми последствиями).`,
+        );
+        this.name = 'ConflictingOverwriteFormsError';
+    }
+}
+
+/**
+ * TASK-043 R2-3: сводит поток вхождений флага `--overwrite-existing` в подтверждение.
+ *
+ * На вход — то, что отдаёт commander событием `option:overwrite-existing`:
+ * `null` за голое вхождение, строку за вхождение со значением. Читать
+ * `opts.overwriteExisting` нельзя: там уже схлопнутое значение, в котором
+ * эскалация «список → всё» неотличима от честного голого флага.
+ *
+ * @throws {ConflictingOverwriteFormsError} если формы смешаны.
+ */
+export function resolveOverwriteFlag(occurrences: readonly (string | null)[]): OverwriteSelection {
+    if (occurrences.length === 0) { return undefined; }
+
+    const listed = occurrences.filter((value): value is string => value !== null);
+    const hasBare = listed.length < occurrences.length;
+
+    let paths: string[] = [];
+    for (const raw of listed) { paths = collectOverwritePaths(raw, paths); }
+
+    if (hasBare && listed.length > 0) {
+        throw new ConflictingOverwriteFormsError(paths);
+    }
+    // Голый флаг — историческое «перезаписать все конфликты» (обратная совместимость).
+    return hasBare ? true : paths;
 }
 
 export function registerGenerateEntity(program: Command): void {
-    program
+    /**
+     * TASK-043 R2-3: каждое вхождение `--overwrite-existing` — `null` за голое,
+     * строка за вхождение со значением. Событийный API commander'а — единственная
+     * точка, где эти формы ещё различимы (к моменту `.action()` они уже схлопнуты).
+     */
+    const overwriteOccurrences: (string | null)[] = [];
+
+    const command = program
         .command('generate-entity')
         .description('Generate Serverpod entity files from YAML definition')
         .option('--yaml <path>', 'Path to .spy.yaml file')
@@ -90,18 +169,45 @@ export function registerGenerateEntity(program: Command): void {
         // TASK-042 / BUG-029: узкий флаг подтверждения (НЕ универсальный --force).
         // Без него preflight останавливает генерацию ДО первой записи, если хотя бы
         // один целевой файл содержит правки, которых нет в ledger машинного вывода.
-        .option('--overwrite-existing', 'Confirm overwriting files that contain manual edits (BUG-029 preflight). Without it, conflicts abort generation before any write.', false)
+        //
+        // TASK-043: значение опционально. Голый флаг = историческое «перезаписать
+        // все конфликты» (обратная совместимость с существующими вызовами), со
+        // списком project-relative путей — перезаписываются ТОЛЬКО они, остальные
+        // конфликты остаются нетронутыми и без baseline в ledger.
+        //
+        // TASK-043 R2-3: без `parseArg` намеренно — значение читается из потока
+        // событий ниже, иначе «список + голый флаг» молча схлопывается в «все».
+        .option(
+            '--overwrite-existing [paths]',
+            'Confirm overwriting files that contain manual edits (BUG-029 preflight). ' +
+            'Bare flag = ALL conflicting files; with a comma-separated list of project-relative ' +
+            'paths (repeatable) = only those, the rest stay untouched. Mixing both forms is ' +
+            'rejected. Previous content is copied to .codegen/backup/<timestamp>/ before every ' +
+            'destructive write.',
+        )
         .action(async (opts: GenerateEntityOptions) => {
-            await handleGenerateEntity(opts);
+            await handleGenerateEntity(opts, overwriteOccurrences);
         });
+
+    command.on('option:overwrite-existing', (value: string | null) => {
+        overwriteOccurrences.push(value === null || value === undefined ? null : String(value));
+    });
 }
 
-async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> {
+async function handleGenerateEntity(
+    opts: GenerateEntityOptions,
+    overwriteOccurrences: readonly (string | null)[],
+): Promise<void> {
     const jsonMode = !opts.human;
     const logger = new CliLogger(jsonMode);
     const startTime = Date.now();
 
     try {
+        // TASK-043 R2-3: разбор флага — ДО чтения YAML и любой работы: если формы
+        // подтверждения смешаны, отказ не должен зависеть от того, дошли ли мы до
+        // генерации.
+        const overwriteSelection = resolveOverwriteFlag(overwriteOccurrences);
+
         if (!opts.yaml && !opts.stdin) {
             logger.error('Either --yaml <path> or --stdin is required');
             logger.emitResult('generate-entity', false, startTime);
@@ -177,22 +283,41 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
         const inner = new DefaultFileSystem();
         const fileSystem = new TrackingFileSystem(inner, logger);
 
+        // TASK-043: голый флаг — это «перезаписать ВСЁ, что окажется в конфликте».
+        // Предупреждение печатается ДО генерации: точное число известно только
+        // после plan-фазы, но узнать о масштабе действия постфактум — поздно.
+        if (overwriteSelection === true) {
+            logger.info(
+                `⚠ --overwrite-existing без списка путей: будут перезаписаны ВСЕ конфликтующие файлы ` +
+                `(сколько именно и что в них теряется — в отчёте ниже). Нужен выбор по файлу — ` +
+                `передай пути: --overwrite-existing <путь1>,<путь2>`,
+            );
+        }
+
         logger.info(`Generating files...`);
         const generationService = new GenerationService(fileSystem);
         const result = await generationService.generate(config, model, {
-            overwriteExisting: opts.overwriteExisting,
+            overwriteExisting: overwriteSelection,
         });
-        if (result.overwritten.length > 0) {
-            logger.info(
-                `--overwrite-existing: перезаписано файлов с ручными правками — ${result.overwritten.length} ` +
-                `(${result.overwritten.map(c => c.path).join(', ')})`,
-            );
+        // TASK-043: с флагом раньше печатались только пути — пользователь не видел,
+        // что именно затирает. Теперь тот же diff, что и в отчёте о конфликте.
+        if (result.overwritten.length > 0 || result.preserved.length > 0) {
+            logger.info(formatOverwriteReport(result.overwritten, result.preserved, result.backupDir));
         }
         logger.info(`Ledger: ${result.ledgerPath} (записано ${result.written.length}, seed ${result.seeded.length})`);
 
         logger.info(`Updating AppDatabase...`);
+        // TASK-043 R2-1: тот же гард, что и у патчеров внутри `generate()` —
+        // `AppDatabaseGenerator` тоже пишет в обход plan/apply, только вызывается
+        // отсюда. Объект передаётся общий, чтобы список пропусков был один.
         const appDatabaseGenerator = new AppDatabaseGenerator(fileSystem, config);
-        await appDatabaseGenerator.generate();
+        await appDatabaseGenerator.generate(result.preservedFiles);
+
+        // TASK-043 R2-1/R2-6: отказ писать — такое же событие, как запись, и
+        // сообщается так же явно. Молчаливый пропуск оставил бы пользователя с
+        // устаревшим машинным регионом и без единого намёка на это.
+        const skipReport = formatPatchSkipReport(result.preservedFiles.skipped);
+        if (skipReport.length > 0) { logger.info(skipReport); }
 
         logger.emitResult('generate-entity', true, startTime);
     } catch (error) {
@@ -201,10 +326,31 @@ async function handleGenerateEntity(opts: GenerateEntityOptions): Promise<void> 
         // (или агент) не принял отказ за успех.
         if (error instanceof GenerationConflictError) {
             logger.error(formatConflictReport(error.conflicts));
+            // TASK-043 R2-4: готовой строки `--overwrite-existing <ВСЕ пути>` здесь
+            // намеренно НЕТ. Скопировать её — значит вернуть ровно то all-or-nothing,
+            // ради устранения которого заведена задача; пути уже перечислены в
+            // отчёте выше, и выбрать из них — осознанное действие пользователя.
             logger.error(
-                `Ledger: ${error.ledgerPath}. ` +
-                `Перепроверь diff выше и повтори с --overwrite-existing, если правки не нужны.`,
+                `Ledger: ${error.ledgerPath}. Перепроверь diff выше и повтори, перечислив ` +
+                `через запятую ТОЛЬКО те файлы (из списка выше), чьи правки не нужны:\n` +
+                `  --overwrite-existing <путь1>,<путь2>\n` +
+                `Прежнее содержимое перезаписанных файлов уйдёт в .codegen/backup/<timestamp>/. ` +
+                `Не перечисленные файлы останутся нетронутыми — их не тронут ни запись, ни патчеры.`,
             );
+            logger.emitResult('generate-entity', false, startTime);
+            process.exit(1);
+        }
+        // TASK-043 R2-3: смешение форм подтверждения — отдельная ветка, ни один
+        // файл не записан (разбор происходит до генерации).
+        if (error instanceof ConflictingOverwriteFormsError) {
+            logger.error(error.message);
+            logger.emitResult('generate-entity', false, startTime);
+            process.exit(1);
+        }
+        // TASK-043: опечатка в списке путей — отдельная ветка. Ни один файл не
+        // записан, сообщение уже содержит перечень доступных конфликтов.
+        if (error instanceof UnknownOverwriteSelectionError) {
+            logger.error(error.message);
             logger.emitResult('generate-entity', false, startTime);
             process.exit(1);
         }

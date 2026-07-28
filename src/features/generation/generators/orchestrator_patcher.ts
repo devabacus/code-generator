@@ -4,6 +4,7 @@ import { GenerationConfig } from '../config/generation_config';
 import { ServerpodModel, ServerpodField } from '../parsers/formatters/types';
 import { JunctionDetector } from '../parsers/junction_detector';
 import { toSnakeCase, unCap, cap } from '../../../utils/text_work/text_util';
+import { PreservedFiles } from './preflight';
 
 /**
  * OrchestratorPatcher — идемпотентный patcher для `sync_orchestrator_provider.dart`
@@ -53,7 +54,19 @@ export class OrchestratorPatcher {
 
     constructor(private fileSystem: IFileSystem) {}
 
-    public async patch(config: GenerationConfig, model: ServerpodModel): Promise<void> {
+    /**
+     * @param preserved TASK-043 (R2-1): файлы, оставленные пользователем за собой.
+     *        Патчер пишет в обход plan/apply, поэтому гард нужен и здесь.
+     *        На сегодня `sync_orchestrator_provider.dart` не входит в план
+     *        `generate-entity` (он приходит из manifest `startProject`) и потому
+     *        конфликтом стать не может — гард здесь защитный, на случай, когда
+     *        orchestrator попадёт в план (смена манифестов, bootstrap-профили).
+     */
+    public async patch(
+        config: GenerationConfig,
+        model: ServerpodModel,
+        preserved: PreservedFiles = PreservedFiles.none(),
+    ): Promise<void> {
         // TASK-022 / Phase B1: orchestrator path components читаются из config.templateConfig.orchestrator.relativePath
         // (default = t115TemplateConfig() через GenerationConfig constructor).
         // Pre-TASK-022 hardcoded values: ['lib', 'core', 'sync', 'sync_orchestrator_provider.dart'].
@@ -63,6 +76,13 @@ export class OrchestratorPatcher {
         );
 
         if (!(await this.fileSystem.exists(orchestratorPath))) {
+            return;
+        }
+
+        // TASK-043 R2-1: пропуск ДО `_assertMarkersPresent` — иначе сохранённый
+        // пользователем orchestrator с порченными маркерами обрушил бы прогон,
+        // хотя писать в него мы всё равно не собирались.
+        if (preserved.blocks(orchestratorPath)) {
             return;
         }
 

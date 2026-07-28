@@ -77,11 +77,15 @@ import {
     GenerationConflict,
     GenerationConflictError,
     MACHINE_OWNED_REGIONS,
+    OverwriteSelection,
     PlannedAction,
+    PreservedFiles,
     classifyGeneratedFile,
     classifyMergeFile,
     formatConflictDiff,
+    resolveOverwriteSelection,
 } from './preflight';
+import { ConflictBackup } from './backup';
 import { problemsFor, replaceRegionBody, scanRegions } from './region_parser';
 
 /** TASK-042: опции запуска генерации. */
@@ -91,8 +95,13 @@ export interface GenerationOptions {
      * пользовательские правки (CLI `--overwrite-existing`, VS Code confirm).
      * Флаг намеренно узкий: он НЕ отключает preflight и НЕ трогает ничего,
      * кроме перечисленных в отчёте конфликтов.
+     *
+     * **TASK-043:** гранулярность — по файлу. `true` — все конфликты (историческая
+     * форма голого флага), массив project-relative путей — только перечисленные,
+     * `false`/`undefined` — ни одного. Не выбранные конфликты сохраняются: файл не
+     * трогается И его baseline не сеется в ledger — см. `_recordBaseline`.
      */
-    overwriteExisting?: boolean;
+    overwriteExisting?: OverwriteSelection;
 }
 
 /** TASK-042: результат генерации (фаза apply завершена, ledger записан). */
@@ -103,6 +112,20 @@ export interface GenerationResult {
     seeded: string[];
     /** Конфликты, перезаписанные по явному подтверждению. */
     overwritten: GenerationConflict[];
+    /**
+     * TASK-043: конфликты, оставленные как есть (не попали в выбор). Файлы не
+     * тронуты, baseline им НЕ засеян — следующий запуск снова даст конфликт.
+     */
+    preserved: GenerationConflict[];
+    /** TASK-043: каталог копий прежнего содержимого; `undefined` — деструктивных записей не было. */
+    backupDir?: string;
+    /**
+     * TASK-043 (R2-1): гард «не трогать сохранённые файлы». Возвращается наружу,
+     * потому что `AppDatabaseGenerator` вызывается адаптерами ПОСЛЕ `generate()`
+     * (см. `generate_entity.ts`) — ему нужен тот же гард, а список пропусков
+     * должен накапливаться в одном месте, иначе отчёт покажет половину правды.
+     */
+    preservedFiles: PreservedFiles;
     /** Абсолютный путь к ledger'у. */
     ledgerPath: string;
 }
@@ -119,6 +142,13 @@ interface PlannedFile {
     /** Имена machine-owned регионов (только для `ownership: merge`). */
     ownedRegions: string[];
     conflict?: GenerationConflict;
+    /**
+     * TASK-043: содержимое на диске на момент plan'а (`null` — файла не было).
+     * Нужно фазе apply для backup'а: копия снимается до записи, а перечитывать
+     * файл в этот момент нечестно — между plan и apply он мог бы измениться, и
+     * в копию попало бы не то, что видел preflight.
+     */
+    existing: string | null;
 }
 
 /**
@@ -261,10 +291,22 @@ export class GenerationService {
         const plans = await Promise.all(allPromises);
 
         const conflicts = plans.filter(p => p.conflict).map(p => p.conflict!);
-        if (conflicts.length > 0 && !options.overwriteExisting) {
+
+        // TASK-043: выбор по файлу. Опечатка в списке путей бросает ДО фазы apply —
+        // «подтвердил, но не перезаписалось» хуже отказа.
+        const confirmed = resolveOverwriteSelection(options.overwriteExisting, conflicts);
+        if (conflicts.length > 0 && confirmed.size === 0) {
             // Fail-closed: ни одной записи не было и не будет.
             throw new GenerationConflictError(conflicts, CodegenLedger.filePath(ledgerRoot));
         }
+
+        const overwritten = conflicts.filter(c => confirmed.has(c.path));
+        const preserved = conflicts.filter(c => !confirmed.has(c.path));
+        const preservedPaths = new Set(preserved.map(c => c.path));
+        // TASK-043 R2-1: тот же выбор пользователя, но в форме, понятной писателям
+        // в обход plan/apply (они оперируют абсолютными путями).
+        const preservedFiles = new PreservedFiles(ledgerRoot, preservedPaths);
+        const backup = new ConflictBackup(this.fileSystem, ledgerRoot);
 
         // ── ФАЗА 2 (apply) — записи. ──────────────────────────────────────────
         const written: string[] = [];
@@ -275,10 +317,18 @@ export class GenerationService {
                 seeded.push(plan.relativePath);
                 continue;
             }
-            // `conflict` доходит сюда только подтверждённым (иначе выше был throw) —
-            // и пишется как обычная перезапись. Отдельного состояния для этого не
-            // заводим: подтверждённые конфликты уже перечислены в
-            // `GenerationResult.overwritten`.
+            if (preservedPaths.has(plan.relativePath)) {
+                // TASK-043 preserve: пользователь оставил файл за собой. Не трогаем
+                // его и НЕ сеем baseline (см. фазу 3) — иначе следующий regen увидел
+                // бы `existing == ledger` и молча стёр custom-код (BUG-029).
+                continue;
+            }
+            if (plan.conflict && plan.existing !== null) {
+                // Единственная действительно деструктивная запись за весь прогон:
+                // содержимое, отличающееся от машинного вывода, исчезнет. Копия — до
+                // записи, иначе сохранять уже нечего.
+                await backup.save(plan.relativePath, plan.existing);
+            }
             await this.fileSystem.createFolder(path.dirname(plan.destinationPath));
             await this.fileSystem.createFile(plan.destinationPath, plan.content);
             written.push(plan.relativePath);
@@ -288,15 +338,20 @@ export class GenerationService {
         // ВНИМАНИЕ (TASK-042 п.7): патчеры пишут в обход plan/apply. Их правки
         // попадают в ledger, потому что baseline снимается с ДИСКА уже после них
         // (иначе каждый regen сущности со связями давал бы ложный конфликт).
+        //
+        // TASK-043 R2-1: им передаётся `preservedFiles` — без этого «оставить как
+        // есть» не было бы preserve: патчер переписывал бы регион в файле, который
+        // пользователь явно попросил сохранить, молча и без backup'а (backup
+        // снимается только для ПОДТВЕРЖДЁННЫХ конфликтов).
         if (model && RelationAnalyzer.manyToOneFields(model.fields).length > 0) {
-            await this.relationPatcher.patch(config, model);
+            await this.relationPatcher.patch(config, model, preservedFiles);
         }
 
         // Patch orchestrator: добавление import + entityType + register block в
         // sync_orchestrator_provider.dart. Работает только при entity-based generation
         // (manifest: entity или manyToMany), для startProject — no-op.
         if (model && isEntityBasedGeneration) {
-            await this.orchestratorPatcher.patch(config, model);
+            await this.orchestratorPatcher.patch(config, model, preservedFiles);
         }
 
         // ── ФАЗА 3 (ledger) — ПОСЛЕДНИМ, атомарно. ────────────────────────────
@@ -304,6 +359,12 @@ export class GenerationService {
         // посередине оставил бы ложное «файл нетронут» — а это опаснее, чем
         // отсутствие baseline.
         for (const plan of plans) {
+            if (preservedPaths.has(plan.relativePath)) {
+                // Инвариант «в» ADR-0007: preserve НЕ сеет baseline. Здесь это уже
+                // не «просто не дошло» (как при полном отказе в TASK-042), а активный
+                // пропуск: остальные файлы того же прогона baseline получают.
+                continue;
+            }
             await this._recordBaseline(ledger, plan);
         }
         await ledger.save();
@@ -311,7 +372,10 @@ export class GenerationService {
         return {
             written,
             seeded,
-            overwritten: options.overwriteExisting ? conflicts : [],
+            overwritten,
+            preserved,
+            backupDir: backup.files.length > 0 ? backup.root : undefined,
+            preservedFiles,
             ledgerPath: CodegenLedger.filePath(ledgerRoot),
         };
     }
@@ -453,6 +517,7 @@ export class GenerationService {
             ownedRegions,
             content,
             action: classification.action,
+            existing,
         };
         if (classification.action === 'conflict') {
             planned.conflict = {

@@ -2,6 +2,7 @@ import path from "path";
 import { IFileSystem } from "../../../core/interfaces/file_system";
 import { snakeToPascalCase } from "../../../utils/text_work/text_util";
 import { GenerationConfig } from "../config/generation_config";
+import { PreservedFiles } from "./preflight";
 
 /**
  * Generator for AppDatabase file.
@@ -14,9 +15,22 @@ export class AppDatabaseGenerator {
         private config: GenerationConfig
     ) { }
 
-    public async generate(): Promise<void> {
+    /**
+     * @param preserved TASK-043 (R2-1): файлы, оставленные пользователем за собой
+     *        при разборе конфликтов. Генератор вызывается адаптерами ПОСЛЕ
+     *        `GenerationService.generate()` и пишет `database.dart` в обход
+     *        plan/apply — без гарда «оставить как есть» не распространялось бы на
+     *        него. Как и у orchestrator'а, `database.dart` приходит из manifest
+     *        `startProject` и в план `generate-entity` не входит, так что гард
+     *        здесь защитный.
+     */
+    public async generate(preserved: PreservedFiles = PreservedFiles.none()): Promise<void> {
         const destinationDir = this.config.coreDataLocalPath;
         const coreDatabasePath = path.join(destinationDir, 'database.dart');
+
+        if (preserved.blocks(coreDatabasePath)) {
+            return;
+        }
 
         // TASK-022 / Phase B1: template database path components читаются из
         // config.templateConfig.database.templateRelativePath (default = t115TemplateConfig()
