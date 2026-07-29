@@ -61,14 +61,14 @@ git worktree add --detach G:/Projects/Flutter/serverpod-probe/weight HEAD
 
 ## Критерии приёмки
 
-- [ ] Новая сущность сгенерирована с `--with-server` — файлы и на клиенте, и в `weight_server/`
-- [ ] `serverpod generate --experimental-features=all` → exit 0
-- [ ] `build_runner build --delete-conflicting-outputs` → exit 0
-- [ ] **`flutter analyze` в `weight_flutter`** — зафиксированы реальные числа errors/warnings; **errors=0** обязателен (иначе задача выявила дефект → bug-report)
-- [ ] Проверено, что общие файлы (`sync_orchestrator_provider.dart`, `database.dart`) не потеряли пользовательский код: `git diff` показывает только вставки + смену `schemaVersion`
-- [ ] Проверено, что повторный прогон той же сущности **молчит** (ledger засеян, конфликта нет)
-- [ ] Результат дописан в `weight-migration-probe-*.md` с реальным выводом команд
-- [ ] Явный вердикт в report.md: можно ли добавлять новые сущности в weight сегодня, и при каких условиях
+- [x] Новая сущность сгенерирована с `--with-server` — файлы и на клиенте, и в `weight_server/`
+- [x] `serverpod generate --experimental-features=all` → exit 0 (20260ms)
+- [x] `build_runner build --delete-conflicting-outputs` → exit 0 (44849ms)
+- [x] **`flutter analyze` в `weight_flutter`** — **errors=0**, warnings=1, infos=46 — идентично baseline до генерации
+- [x] Проверено, что общие файлы (`sync_orchestrator_provider.dart`, `database.dart`) не потеряли пользовательский код: 19/0 и 6/1, единственное удаление — строка `schemaVersion => 25`
+- [x] Проверено, что повторный прогон той же сущности **молчит** (exit 0, 0 конфликтов, патчеры идемпотентны, `schemaVersion` не подскочил)
+- [!] Результат дописан в `weight-migration-probe-*.md` — **блокировано**: файл существует только в открытом PR #56, в master его нет. Дописать после merge
+- [x] Явный вердикт в report.md: можно ли добавлять новые сущности в weight сегодня, и при каких условиях
 
 ## Заметки по реализации
 
