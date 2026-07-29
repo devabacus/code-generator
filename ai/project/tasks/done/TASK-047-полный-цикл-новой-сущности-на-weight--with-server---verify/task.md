@@ -1,7 +1,7 @@
 ---
 id: TASK-047
 schema_version: 2
-status: active
+status: done
 mode: interactive
 zone: "generator-core"
 verification_profile: "ts-generator"
@@ -67,7 +67,7 @@ git worktree add --detach G:/Projects/Flutter/serverpod-probe/weight HEAD
 - [x] **`flutter analyze` в `weight_flutter`** — **errors=0**, warnings=1, infos=46 — идентично baseline до генерации
 - [x] Проверено, что общие файлы (`sync_orchestrator_provider.dart`, `database.dart`) не потеряли пользовательский код: 19/0 и 6/1, единственное удаление — строка `schemaVersion => 25`
 - [x] Проверено, что повторный прогон той же сущности **молчит** (exit 0, 0 конфликтов, патчеры идемпотентны, `schemaVersion` не подскочил)
-- [!] Результат дописан в `weight-migration-probe-*.md` — **блокировано**: файл существует только в открытом PR #56, в master его нет. Дописать после merge
+- [x] Результат дописан в `weight-migration-probe-2026-07-28.md` — «Часть 3», факты 9-13 (было блокировано до merge PR #56, разблокировано)
 - [x] Явный вердикт в report.md: можно ли добавлять новые сущности в weight сегодня, и при каких условиях
 
 ## Заметки по реализации

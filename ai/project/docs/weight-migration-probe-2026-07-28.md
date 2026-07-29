@@ -231,3 +231,124 @@ TASK-007/008, и — содержательное — `fix(sync): защита s
 
 Оценка трудоёмкости после этих фактов: не «переписать проект», а «разобрать вручную
 единицы файлов, остальное регенерировать пакетно».
+
+---
+
+# Часть 3: полный цикл новой сущности (TASK-047, 2026-07-29)
+
+Закрытие остатка части 1. Там прогон шёл **без `--with-server`**, и компиляция не
+проверялась — то есть «новая сущность генерируется без конфликтов» доказывало ровно
+половину: сгенерировать файлы ≠ получить рабочий код.
+
+## Условия прогона
+
+Та же worktree-копия `G:/Projects/Flutter/serverpod-probe/weight` (detached, HEAD `1d5f7c0`),
+приведённая к чистому состоянию: сняты артефакты части 1 (`.codegen/`, `features/probe/`,
+`models/probe/`, правки `database.dart` и `sync_orchestrator_provider.dart`).
+Оригинал weight не тронут — `git status` чист до и после.
+
+Сущность `ProbeItem` (7 полей, без relations), feature `probe`, ceremony `full`.
+
+⚠ Копия **отстаёт от текущего weight на 21 коммит** (`df84e21`). Дельта проверена: целиком
+рукописные слои — `device_settings`, `configuration/presentation`, `settings_definitions`,
+тесты, `shared/api_spec`. Ни одного `.spy.yaml`, `database.dart`,
+`sync_orchestrator_provider.dart`, `*_dao/_table/_model/_adapter`. Для вопроса о генераторе
+копия репрезентативна.
+
+## Факт 9: цикл проходит целиком, дельта по ошибкам — ноль
+
+| Замер | errors | warnings | infos |
+| --- | --- | --- | --- |
+| baseline **до** генерации | **0** | 1 | 46 |
+| **после** генерации сущности | **0** | 1 | 46 |
+
+```text
+# baseline
+PASS: verify weight
+  ✓ flutterAnalyze — 19262ms (errors=0, warnings=1, infos=46)
+  ✓ pubGet — 6125ms
+  ✓ serverpodGenerate — 26097ms
+  ✓ buildRunner — 76532ms
+
+# после generate-entity --with-server
+PASS: verify weight
+  ✓ flutterAnalyze — 15551ms (errors=0, warnings=1, infos=46)
+  ✓ pubGet — 5005ms
+  ✓ serverpodGenerate — 20260ms
+  ✓ buildRunner — 44849ms
+```
+
+Baseline чистый — значит любая ошибка после генерации была бы наша. Её нет.
+
+Сама генерация:
+
+```text
+SUCCESS: generate-entity
+Created (25): 23 flutter + weight_server/lib/src/endpoints/probe_item_endpoint.dart
+              + .codegen/ledger.json
+Modified (2): sync_orchestrator_provider.dart, database.dart
+Ledger: записано 24, seed 0
+Duration: 156ms
+EXIT=0 — ни одного конфликта
+```
+
+`--with-server` отработал: серверный endpoint на месте (в части 1 без флага его не было).
+
+## Факт 10: общие файлы получают только вставки
+
+```text
+git diff --numstat
+19  0   weight_flutter/lib/core/sync/sync_orchestrator_provider.dart
+6   1   weight_flutter/lib/core/data/datasources/local/database.dart
+```
+
+Единственная удалённая строка во всём диффе — `int get schemaVersion => 25;` (заменена на 26).
+Больше ни одного удаления.
+
+**Повторный прогон молчит и идемпотентен:** exit 0, ноль конфликтов, диффы те же (19/0 и 6/1),
+`schemaVersion` остался **26** (не подскочил до 27), вставки не задвоились. Ledger отработал:
+`existing == ledger` → молчаливая перезапись.
+
+## Факт 11: доля merge-файлов ещё ниже, чем считалось
+
+В ledger'е 24 записи, из них с `ownership: merge` — **3**. Остальные 21 — full-replace.
+
+**3 из 24 = 12.5%**, тогда как часть 1 давала 6 из 38 ≈ 16% для существующей сущности.
+Это входное число «до» для [TASK-049](../tasks/active/TASK-049-миграция-шаблонов-на-merge-дисциплину--base-регионы-в-full-replace-файлы/task.md):
+цель ≥60% стартует с более низкой отметки, чем предполагал контракт.
+
+Побочно: три предупреждения `[SectionReplacer] Generator function not found for name: base`
+в первом прогоне — **не дефект**. `:base` не секционный генератор, а при **создании** файла
+идёт полный render; поведение описано комментарием в `generation_service.ts` и покрыто тестом.
+Во втором прогоне (target существует → merge-ветка) шума нет. Число предупреждений ровно
+совпало с числом merge-файлов — 3.
+
+## Факт 12: писатели вне plan в ledger не попадают — подтверждено на реальном проекте
+
+24 записи ledger'а — это ровно 24 сгенерированных `.dart`. `database.dart` и
+`sync_orchestrator_provider.dart` среди них **нет**, хотя оба изменены. Это ровно
+[TASK-046](../tasks/active/TASK-046-ledger--протухающие-записи-для-писателей-вне-plan--патчеры--bootstrap/task.md)
+(патчеры пишут в обход plan/apply), теперь наблюдение не теоретическое.
+
+## Факт 13: `serverpod generate` сам по себе даёт большой дифф
+
+На **baseline**-прогоне (ещё до появления сущности) `serverpod generate` переписал ~60 файлов
+в `weight_server/lib/src/generated/` — **4866 вставок / 4391 удалений**. Причина — дрейф
+версии Serverpod относительно той, которой weight генерировался раньше. К `generate-entity`
+отношения не имеет, `flutter analyze` после этого чистый.
+
+Но при реальной миграции weight **этот дифф придёт с первым же `serverpod generate`**, ещё до
+того как будет тронута хоть одна сущность. Учитывать в TASK-048/049: он засорит `git diff`
+и его легко спутать с работой генератора.
+
+## Вывод части 3
+
+**Новые сущности в weight добавлять можно сегодня.** Полный цикл проходит, компилируется,
+общие файлы не страдают, повторный прогон безопасен.
+
+**Не проверено:** runtime — миграция БД не применялась, сервер не поднимался, sync не гонялся.
+`verify` покрывает compile + analyze, но не поведение. Для 19 вставок в оркестратор это
+существенно: они компилируются, но что регистрация в sync работает, прогон не доказывает.
+
+Вопрос регенерации **существующих** сущностей этой частью не затрагивается — там по-прежнему
+38 конфликтов на сущность (части 1-2, далее TASK-048/049).
