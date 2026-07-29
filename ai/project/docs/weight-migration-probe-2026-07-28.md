@@ -352,3 +352,156 @@ git diff --numstat
 
 Вопрос регенерации **существующих** сущностей этой частью не затрагивается — там по-прежнему
 38 конфликтов на сущность (части 1-2, далее TASK-048/049).
+
+---
+
+# Часть 4: полная карта риска, 15 сущностей (TASK-048, 2026-07-29)
+
+Достроено то, что части 1-2 сделали для четырёх сущностей. Плюс — **поправка к числам
+частей 1-2**, см. факт 14.
+
+Прогон read-only: guard fail-closed, при конфликтах не записывается ни один файл.
+Та же worktree-копия, приведена к чистому состоянию до и после.
+
+## Факт 14 (ПОПРАВКА): конфликтов вдвое меньше, чем сообщали части 1-2
+
+Части 1-2 считали конфликты по числу `✗`-строк в выводе. **`generate-entity --human`
+печатает отчёт о конфликтах дважды** — потоком и повторно в сводке `FAILED / Errors (2)`
+([BUG-031](../bug-reports/031-generate-entity-duplicates-conflict-report-in-output.md)).
+Заголовок `Обнаружено конфликтов: N` всё это время сообщал правду.
+
+| Величина | Части 1-2 | **Реально** |
+| --- | --- | --- |
+| конфликтов на сущность | 38 | **19** |
+| `configuration` | 46 | **23** |
+| всего по проекту | ≈570 | **271** |
+
+Сверка, снявшая вопрос: `19+19+23+19 = 80` — ровно то `B`, которое часть 2 посчитала для
+четырёх сущностей. **Множества файлов у частей 1-2 верны**, завышен был только счётчик и
+экстраполяция. Все выводы про A ∩ B остаются в силе.
+
+## Факт 15: полная карта — 13 файлов под угрозой, все в `weighing`
+
+Множество **A** (файлы с точечными правками) воспроизведено по методике части 2:
+389 codegen-файлов по маркеру `// manifest:`, 51 коммит их трогал (12 массовых, ≥10 файлов;
+39 точечных), **A = 41 файл**. Числа совпали с частью 2 — методика воспроизводима.
+
+| Сущность | Конфликтов | Под угрозой (A ∩ B) | Источник |
+| --- | ---: | ---: | --- |
+| `weighing` | 19 | **6** | части 1-2 |
+| `driver` | 19 | **3** | TASK-048 |
+| `vehicle` | 19 | **3** | TASK-048 |
+| `contractor` | 19 | **1** | TASK-048 |
+| `cargo_type` | 19 | 0 | TASK-048 |
+| `configuration` | 23 | 0 | части 1-2 |
+| `correction_button` | 19 | 0 | TASK-048 |
+| `custom_field` | 19 | 0 | TASK-048 |
+| `device_owner` | 20 | 0 | TASK-048 |
+| `subscription` | 19 | 0 | части 1-2 |
+| `terminal_device` | 19 | 0 | части 1-2 |
+| `terminal_set` | 19 | 0 | TASK-048 |
+| `weighing_correction` | 19 | 0 | TASK-048 |
+| `weighing_photo` | 19 | 0 | TASK-048 |
+| `custom_field_value` | — | — | особый случай, факт 17 |
+
+**B = 271 уникальный файл** (сумма по сущностям равна объединению — сущности не делят
+между собой конфликтующие файлы).
+
+**A ∩ B = 13 файлов, все в фиче `weighing`.** Часть 2 нашла 6 из них на своих четырёх
+сущностях; остальные 7 добавили `driver`, `vehicle`, `contractor`.
+
+## Факт 16: 10 из 14 сущностей перезаписываются пакетно, без разбора
+
+Пустое пересечение → руками не правились ни разу → конфликты это чистая эволюция шаблона:
+
+```text
+cargo_type, configuration, correction_button, custom_field, device_owner,
+subscription, terminal_device, terminal_set, weighing_correction, weighing_photo
+```
+
+Разбирать вручную нужно **четыре**: `weighing` (6 файлов), `driver` (3), `vehicle` (3),
+`contractor` (1).
+
+### Все 13 файлов под угрозой — full-replace
+
+Ни у одного нет региона `:base` → при подтверждённой перезаписи затираются целиком
+(прежнее содержимое уйдёт в `.codegen/backup/<timestamp>/`).
+
+| Файл | Сущность | Происхождение правки |
+| --- | --- | --- |
+| `weighing/.../tables/extensions/weighing_table_extension.dart` | weighing | `113aec87` двойное взвешивание; `ccde34ab` UI весовой |
+| `weighing/.../remote/sources/weighing_remote_data_source.dart` | weighing | `ac464554` TASK-008 subscription guard |
+| `weighing/data/providers/weighing/weighing_data_providers.dart` | weighing | `ac464554` TASK-008 subscription guard |
+| `weighing/data/repositories/weighing_repository_impl.dart` | weighing | `3dcf6003` (сообщение «1») |
+| `weighing/domain/entities/extensions/weighing_entity_extension.dart` | weighing | `cb5c3751` печать талона взвешивания |
+| `weighing/presentation/providers/weighing/weighing_state_providers.dart` | weighing | `ac464554` guard; `113aec87` двойное взвешивание |
+| `weighing/.../tables/extensions/driver_table_extension.dart` | driver | `ccde34ab` UI весовой программы |
+| `weighing/data/models/extensions/driver_model_extension.dart` | driver | `ccde34ab` UI весовой программы |
+| `weighing/presentation/providers/driver/driver_state_providers.dart` | driver | `bc6a7a1f` (сообщение «work») |
+| `weighing/.../tables/extensions/vehicle_table_extension.dart` | vehicle | `ccde34ab` UI весовой программы |
+| `weighing/data/models/extensions/vehicle_model_extension.dart` | vehicle | `ccde34ab` UI весовой программы |
+| `weighing/presentation/providers/vehicle/vehicle_state_providers.dart` | vehicle | `bc6a7a1f` (сообщение «work») |
+| `weighing/presentation/providers/contractor/contractor_state_providers.dart` | contractor | `bc6a7a1f` (сообщение «work») |
+
+**Вердикт по ценности правок.** Содержательными выглядят четыре группы:
+
+- `weighing_repository_impl` + `weighing_data_providers` + `weighing_remote_data_source` +
+  `weighing_state_providers` — sync-логика и subscription-guard (`ac464554`), терять нельзя;
+- `weighing_entity_extension` — печать талона (`cb5c3751`), прикладная логика;
+- `*_table_extension` / `*_model_extension` у `driver`/`vehicle`/`weighing` (`ccde34ab`) —
+  похоже на доменные хелперы, смотреть глазами;
+- `*_state_providers` у `driver`/`vehicle`/`contractor` (`bc6a7a1f`, сообщение «work») —
+  происхождение непрозрачное, обязательно смотреть диффом, а не по сообщению коммита.
+
+## Факт 17: `custom_field_value` — не регенерация, а создание с нуля
+
+Пятнадцатая сущность выпадает из карты риска: YAML на сервере есть, а во flutter
+**ни одного файла** (`find weight_flutter/lib -name "*custom_field_value*"` → 0).
+Она никогда не генерировалась на клиент.
+
+Прогон: **exit 0, ноль конфликтов**, 24 файла создано, 9 «изменено» — все девять
+принадлежат ей самой (созданы в этом же прогоне и затем допатчены `relation_patcher`,
+у неё есть FK), плюс два общих файла. Чужого не тронуто.
+
+То есть это тот же безопасный сценарий, что и TASK-047, а не миграция.
+
+## Факт 18: `:base` есть ровно у трёх типов файлов
+
+По всему множеству B (271 файл): **merge — 44 (16%), full-replace — 227 (83%)**.
+Доля из части 1 подтверждается.
+
+Регион `:base` несут только:
+
+```text
+*_dao.dart                    *_repository.dart (domain-интерфейс)
+*_local_data_source.dart      + единичные local_datasource_service / usecases / usecase_providers
+```
+
+Для [TASK-049](../tasks/active/TASK-049-миграция-шаблонов-на-merge-дисциплину--base-регионы-в-full-replace-файлы/task.md)
+это точная отправная точка: защищены три типа из ~19 на сущность. Причём **ни один из
+13 файлов под угрозой не относится к защищённым типам** — под ударом ровно те слои,
+которые `:base` не покрывает: `*_extension`, `*_state_providers`, `*_data_providers`,
+`repository_impl`, `remote_data_source`.
+
+## Вывод части 4
+
+Миграция weight **меньше и безопаснее**, чем выглядела после части 1:
+
+1. не ≈570 файлов, а **271**;
+2. под угрозой **13 файлов**, все в одной фиче;
+3. **10 из 14** сущностей перезаписываются пакетно без разбора;
+4. `custom_field_value` — вообще не миграция.
+
+Порядок действий, вытекающий из фактов:
+
+1. Пакетно перезаписать 10 «чистых» сущностей — 199 файлов, backup включён по умолчанию.
+2. `contractor` (1 файл), `driver` (3), `vehicle` (3) — посмотреть три `*_state_providers`
+   из коммита `bc6a7a1f` и четыре `*_extension` из `ccde34ab` диффом, решить по каждому.
+3. `weighing` (6 файлов) — самый содержательный кусок: sync-логика и печать талона.
+   Вытащить кастом из git, применить поверх свежесгенерированного.
+4. `custom_field_value` — сгенерировать как новую, отдельно.
+
+TASK-049 (`:base` в full-replace файлы) от этого **не теряет смысла, а получает адрес**:
+мигрировать в первую очередь те типы, что стоят в таблице выше — `*_extension`,
+`*_state_providers`, `*_data_providers`, `repository_impl`, `remote_data_source`.
+Именно они и рвутся на живом проекте.
