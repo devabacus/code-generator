@@ -57,6 +57,19 @@
 
 ---
 
+## Разведка weight (2026-07-28) — читать перед планированием миграции
+
+Первый прогон guard'а на **реальном** проекте (не синтетическом `t2xx`). Полные числа и
+методика воспроизведения — [weight-migration-probe-2026-07-28.md](weight-migration-probe-2026-07-28.md).
+
+Коротко: под codegen в weight **15 сущностей из 43**; на каждой **38 конфликтов**
+(`legacy-mismatch`, ledger отсутствует) → ≈570 файлов, из них **84% full-replace**.
+**BUG-030 на текущем weight не стреляет** — в otm-регионах только машинные методы, ручного
+кода нет → приоритет понижен. Расхождения системные (шаблон ушёл вперёд), а не
+пользовательские; `--ceremony minimal` картину не меняет. Главный вывод: **per-file preserve
+из TASK-043 не масштабируется** на 570 файлов — не хватает обратного флага `--preserve`.
+Регенерация weight = миграция, а не запуск команды.
+
 ## Активные задачи (на 2026-07-22)
 
 - **TASK-042** (`active`, ветка `feature/TASK-042-preflight-ledger`, **реализовано, на ревью**) — BUG-029 preflight + ledger. В коде: двухфазный `plan → apply` в `GenerationService.generate` (при конфликте хотя бы в одном файле не записывается ни один), ledger `<project>/.codegen/ledger.json` (schema v1, project-relative пути, точный SHA-256, для merge-файлов — хеши регионов), CLI `generate-entity --overwrite-existing` + non-zero exit с diff, VS Code preview/confirm. **Workaround «`git diff` перед regen» больше не актуален** — guard громкий. Не входило в scope и остаётся открытым: миграция 65 шаблонов на merge-дисциплину, ownership-директива, [BUG-030](../bug-reports/030-relation-patcher-otm-region-outside-guard.md).
