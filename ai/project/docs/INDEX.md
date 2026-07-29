@@ -1,6 +1,6 @@
 # Индекс проекта code-generator (НАЧНИ ЗДЕСЬ)
 
-**Обновлено:** 2026-07-25 (**master `943535a`** — docs-handoff PR #52 merged; **TASK-042 реализована на ветке, ждёт PR**, **418 tests** на ветке / 345 на master). Предыдущее состояние: **AI-workflow v2 migration + TASK-037…040 merged — `c7227e9`**. Репо мигрирован на **v2-фреймворк** (`ai/core` upstream + `ai/project` project-owned; задачи через `ai/core/scripts/task.py`, не через ручной Write). Это **пилот раскатки** шаблона AI-workflow v2 (`G:\Templates\ai`) — шаг 1. За сессию 7 PR (#45–51): v2-миграция, model-policy, TASK-037 (junction explicit-parents директива), TASK-038 (triage), TASK-039 (BUG-015 cross-feature CONFIRMED + drift-fix + loud-guard), 2 дискуссии → **ADR-0006** (junction метадата в YAML-комментарии) + **ADR-0007** (BUG-029 preflight+ledger), TASK-040 (директива → comment-directive, serverpod generate PASS). **Активно:** TASK-042 (BUG-029 preflight+ledger — код готов на ветке `feature/TASK-042-preflight-ledger`, 2 раунда executor + Standard/Adversarial ревью, 418 tests; **не закоммичено, ждёт PR**), TASK-041 (junction fail-fast, ждёт миграции шаблонов владельцем). Подробности — [status.md](status.md).
+**Обновлено:** 2026-07-29 (**master `90a0056`**, **459 tests**). BUG-029 закрыт для regen-пути: fail-closed guard + ledger (TASK-042) и per-file preserve с backup (TASK-043) — регенерация больше не может молча затереть пользовательский код. Контур впервые проверен на **реальном** проекте: [weight-migration-probe-2026-07-28.md](weight-migration-probe-2026-07-28.md) — обязательное чтение перед планированием миграции weight. **Активно:** TASK-047 (полный цикл новой сущности на weight), TASK-048 (карта риска, 11 сущностей), TASK-049 (миграция шаблонов на merge-дисциплину — главное улучшение), TASK-044/045/046 (гигиена ledger/CLI), TASK-041 (junction fail-fast — ждёт миграции simplified/weight владельцем). Открыт PR #56 (docs-разведка). ⚠ Месячный лимит трат исчерпан — субагенты недоступны. Подробности — [status.md](status.md).
 
 ## Что это за проект
 
@@ -8,48 +8,53 @@
 
 Применение — генерация feature-слоёв по Clean Architecture из Serverpod YAML-моделей (`.spy.yaml`).
 
-## Текущее состояние
+## Текущее состояние (2026-07-29)
 
-**Phase 1.5 + Phase A + Phase B ✅ CLOSED.** Pipeline 5/5 closed (2026-05-26). **Сессия 2026-06-05:** BUG-023 ceremony flag + BUG-024/025 audit guards merged, BUG-026 deferred→TASK-015, BUG-027 filed (one-to-many back-relation leak).
+**master `90a0056`, 459 unit-тестов**, 0 failing. Compile clean, lint 0 errors / 18 pre-existing
+warnings. CI (`.github/workflows/test.yml`) — compile + lint + mocha на ubuntu-latest.
 
-- **293 unit tests passing** на master (271 baseline + 14 BUG-023 ceremony + 5 BUG-024 + 3 BUG-025)
-- **39 PRs merged** total (последние: BUG-023 #35, BUG-024 #36, BUG-025 #37, BUG-026 re-class #38, docs #39)
-- **master `a61c9cb`** (+ post-сессия docs/handoff/BUG-027 sync)
-- Full pipeline re-checked на **t204** (create-project + full + FK many-to-one + minimal + junction → verify errors=0)
-- CI workflow active ([.github/workflows/test.yml](../../../.github/workflows/test.yml))
-- t115 template (`devabacus/t115`) — supported path (per ADR-0005 amendment 2026-05-04, bug-fix-as-needed)
-- simplified template (`G:/Templates/flutter/simplified/`) — opt-in via `--template simplified` (Discussion #12 pivot 2026-05-04); **5 fixes applied в pipeline 5/5** (TASK-025 ref.mounted + TASK-026 quote-boundary snake + TASK-027 tryParseEnum + TASK-028 LWW guard + TASK-029 --with-server opt-in)
-- sync_core 0.3.0 в master, validated multi-entity cross-device
+**Главное за последнюю сессию: BUG-029 закрыт для regen-пути.** Регенерация больше не может
+молча затереть пользовательский код:
 
-**🎉 Pipeline 5/5 closed (TASK-019 weight handoff package complete):**
+- двухфазный `plan → apply` — при конфликте хотя бы в одном файле не записывается ни один;
+- ledger `<project>/.codegen/ledger.json` (schema v1, SHA-256 без нормализации, для merge-файлов
+  хеши регионов) как третья точка сравнения; самовосстановление при рассинхроне;
+- разбор конфликтов **по файлу** (`--overwrite-existing <пути>`), backup прежнего содержимого
+  в `.codegen/backup/<timestamp>/`;
+- сохранённые файлы не трогает никто, включая патчеры.
 
-- ✅ **TASK-030 BLOCKER** (PR #22, master `bffe07a`) — template pubGet drift fix через caret bump `custom_lint`.
-- ✅ **TASK-025** Bug 4 (Riverpod `ref.mounted` guard) — PR #23 merged. Closes [BUG-001](../bug-reports/001-state-provider-ref-disposed.md) для simplified.
-- ✅ **TASK-026** Bug 1 (entityType const snake_case fix + meta-bug test filename convention) — PR #24 merged.
-- ✅ **TASK-027** Bug 2 (enum `byName` → `tryParseEnum` graceful) — PR #25 merged. Closes [BUG-022](../bug-reports/022-enum-byname-state-error.md).
-- ✅ **TASK-028** Bug 3 (LWW skip-stale guard default ON, junction opt-out) — PR #27 merged. **Adversarial caught Configuration "singleton" claim** — fixed docstring inline. Follow-up TASK-031 (t115 LWW parity) + TASK-032 (Configuration legacy paths) suggested.
-- ✅ **TASK-029** Bug 5 (`generate-entity --with-server` opt-in default OFF) — PR #28 merged. **Adversarial caught RelationPatcher leak** — fixed inline (RelationPatcher теперь тоже filter'ит `server/` scan).
+**Контур впервые проверен на реальном проекте** —
+[weight-migration-probe-2026-07-28.md](weight-migration-probe-2026-07-28.md). Оттуда же
+уточнение прежних оценок: под codegen в weight **15 сущностей** (в старых доках было «13»).
 
-**Suggested follow-up TASKs (capacity-driven, post pipeline closure):**
+**Шаблоны:** t115 — default, мигрирован на `# codegen:junction:` (запушен `41eeba6`);
+simplified — opt-in через `--template simplified`, junction-YAML **ещё не мигрирован**
+(блокирует TASK-041).
 
-- **TASK-031** (suggested per TASK-028 adversarial R2 H-1): apply identical 4-file LWW guard pattern к t115 template (ADR-0005 amendment "bug-fix-as-needed"). ~1-2 часа (copy pattern).
-- **TASK-032** (suggested per TASK-028 adversarial R2 C-1): Configuration legacy paths (`handleSyncEvent` + `insertOrUpdateFromServer`) consolidation. ~2-3 часа.
-- **Post-pipeline weight backlog** (cross-repo, weight репо): регенерировать существующие 13 сущностей weight v1 под новые шаблоны + перенос кастомов. **Capacity-driven** when User starts.
+**Тест-проекты:** t115, t209–t212 на диске, следующий свободный — **t213**.
 
-**Architectural decisions still active:**
+**⚠ Ограничение:** месячный лимит трат исчерпан — субагенты (executor, ревьюеры) не
+запускаются. Проверить на старте сессии.
 
-- **Clean-slate** (Discussion #9 amendment 2026-05-03): weight v1 НЕ в production, нет dual-running concerns.
-- **⚠ CRITICAL Stack-lock** (Discussion #11 User_2 override 2026-05-03): стэк t115 baseline (Riverpod annotations + Drift + Clean directory + sync_core 0.3.0 + Serverpod) НЕ меняется без явного User approval. Versions update к latest stable.
-- **Discussion #12 pivot** (2026-05-04): DEFAULT_TEMPLATE simplified → t115; simplified opt-in. Both templates долго-сохраняемые.
+## Активные задачи
 
-**Diagnostic lesson** (TASK-030, MUST remember): compare sibling templates (admin/server) **before** "cascade impossible" diagnosis. Pubspec comments rot at scale — verify через current lockfile evidence. См. [BUG-021](../bug-reports/021-pub-deps-drift-template-pubspec.md) для canonical pattern.
+| Задача | Суть | Приоритет |
+| --- | --- | --- |
+| **TASK-047** | полный цикл новой сущности на weight (`--with-server` + verify) | 1 — закрывает «можно ли пользоваться сегодня» |
+| **TASK-048** | карта риска: прогон 11 оставшихся сущностей | 2 — read-only аналитика |
+| **TASK-049** | миграция шаблонов на merge-дисциплину (`:base`-регионы) | 3 — **главное улучшение**, поглощает BUG-007/013 |
+| TASK-044/045/046 | гигиена ledger и CLI | 4 — пригодность инструмента не меняют |
+| TASK-041 | junction fail-fast | **БЛОК** — ждёт миграции simplified + weight владельцем |
+
+Открыт **PR #56** (docs-разведка), ждёт merge.
 
 ## Onboarding flow для нового teamlead
 
 **Read in this order:**
 
 1. **Этот файл** — overview + state snapshot
-2. [agent_memory.md](agent_memory.md) — ОБЯЗАТЕЛЬНО, gotchas + invariants + architectural pivot context + stack-lock principle
+2. [weight-migration-probe-2026-07-28.md](weight-migration-probe-2026-07-28.md) — **обязательно перед разговорами о миграции weight**: замеры на реальном проекте
+3. [agent_memory.md](agent_memory.md) — ОБЯЗАТЕЛЬНО, gotchas + invariants + architectural pivot context + stack-lock principle
 3. [CLAUDE.md](../../../CLAUDE.md) — agent guide (DoD)
 4. [AGENTS.md](../../../AGENTS.md) — глобальные правила (запреты, block-rules, PR/merge flow)
 5. [roadmap.md](roadmap.md) — clean-slate revised sequence

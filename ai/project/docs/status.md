@@ -1,6 +1,60 @@
 # Статус проекта
 
-**Обновлено:** 2026-07-22 (**AI-workflow v2 migration + TASK-037…040 merged — master `c7227e9`**, **345 tests**). Репо мигрирован на v2-фреймворк (`ai/core` + `ai/project`, задачи через `task.py`). За сессию 7 PR (#45–51). Junction-контур закрыт по noсителю (comment-directive, ADR-0006), BUG-015 подтверждён и заграждён, BUG-029 переформулирован с архитектурным решением (ADR-0007). См. секцию «Сессия 2026-07-22» ниже.
+**Обновлено:** 2026-07-29 (**master `90a0056`**, **459 tests**). BUG-029 закрыт для regen-пути
+(TASK-042 guard + TASK-043 per-file preserve), контур впервые проверен на **реальном** проекте
+weight. См. секцию «Сессия 2026-07-28/29» ниже.
+
+---
+
+## Сессия 2026-07-28/29 (BUG-029 закрыт + первая разведка на weight)
+
+**Master:** `90a0056`. **459 passing**, 0 failing. Compile clean, lint 0 errors / 18
+pre-existing warnings. CI зелёный.
+
+**Merged PR:**
+
+- **PR #52** — docs: онбординг-доки под `c7227e9`.
+- **PR #53 — TASK-042** — BUG-029 preflight + ledger. Двухфазный `plan → apply` (при
+  конфликте хотя бы в одном файле не записывается ни один), ledger `.codegen/ledger.json`
+  (schema v1, SHA-256 без нормализации, для merge-файлов — хеши регионов), самовосстановление
+  при рассинхроне, CLI `--overwrite-existing` + non-zero exit с diff, VS Code preview.
+  Ревью: Standard APPROVE WITH MINOR, **Adversarial REQUEST CHANGES** — блокер (ложный
+  `user-modified` с диффом «содержимое совпадает») закрыт в раунде 2.
+- **PR #54** — chore: контракты TASK-043…046.
+- **PR #55 — TASK-043** — per-file preserve: `--overwrite-existing` принимает список путей,
+  backup в `.codegen/backup/<timestamp>/`, сохранённые файлы не трогает никто (включая
+  патчеры). Ревью снова дало блокер: **`preserve` не был preserve** — `relation_patcher`
+  дописывал сохранённый файл молча и без backup. Закрыт гардом `PreservedFiles` в трёх
+  патчерах (scope расширен владельцем). Плюс фикс платформозависимости гарда, пойманный
+  красным CI на ubuntu.
+- **PR #56** — docs: разведка weight (**открыт, ждёт merge**).
+
+**Вне репо:** t115 мигрирован на `# codegen:junction: [task, tag]`, запушен (`41eeba6`).
+
+### Разведка на weight (главное)
+
+Полные числа — [weight-migration-probe-2026-07-28.md](weight-migration-probe-2026-07-28.md).
+
+- под codegen **15 сущностей из 43**; на каждой **38 конфликтов**, ≈570 файлов; **84%
+  full-replace**;
+- **риск локализован**: пересечение «ручные правки» × «зона перезаписи» на 4 сущностях —
+  **6 файлов, все в `weighing`**; у `subscription`, `terminal_device`, `configuration` —
+  пусто;
+- **новая сущность генерируется без конфликтов** (exit 0), общие файлы не страдают;
+  компиляция пока не проверена → TASK-047;
+- **BUG-030 не стреляет** на текущем weight → приоритет понижен.
+
+### Заведено по итогам
+
+- **TASK-047** — полный цикл новой сущности на weight (`--with-server` + verify).
+- **TASK-048** — карта риска: 11 оставшихся сущностей.
+- **TASK-049** — миграция шаблонов на merge-дисциплину (`:base`-регионы); поглощает BUG-007 и BUG-013.
+- **BUG-030** — заведён (otm-регион вне guard'а), приоритет низкий.
+
+### Ограничение
+
+Месячный лимит трат исчерпан — субагенты недоступны. TASK-047/048 выполнимы в основном
+цикле; TASK-049 лучше начинать после восстановления лимита.
 
 ---
 
@@ -255,3 +309,6 @@ Sequence per Discussion #4 → #6:
 | TASK-044 | CLI: поле conflicts в stdout-JSON generate-entity | 🟡 In Progress | 2026-07-28 |
 | TASK-045 | Ledger: валидация project-relative путей (feature-path внутри workspace) | 🟡 In Progress | 2026-07-28 |
 | TASK-046 | Ledger: протухающие записи для писателей вне plan (патчеры, bootstrap) | 🟡 In Progress | 2026-07-28 |
+| TASK-047 | Полный цикл новой сущности на weight: with-server + verify | 🟡 In Progress | 2026-07-29 |
+| TASK-048 | Карта риска миграции weight: прогон 11 оставшихся сущностей | 🟡 In Progress | 2026-07-29 |
+| TASK-049 | Миграция шаблонов на merge-дисциплину: base-регионы в full-replace файлы | 🟡 In Progress | 2026-07-29 |
