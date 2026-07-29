@@ -140,3 +140,94 @@ Git-история файлов фичи `subscription` (19 `.dart` без `.g/.
   потеряется», либо поэтапная миграция по одной сущности.
 
 Оценка BUG-030 после этой разведки — низкий приоритет (см. Факт 4).
+
+---
+
+# Часть 2: анализ git-истории (2026-07-29)
+
+Продолжение разведки — ответ на вопрос «что в этих файлах ручное».
+
+## Методика
+
+Codegen-файлы определены по маркеру `// manifest:` в шапке (остаётся от шаблона):
+в `weight_flutter/lib` их **389**. По истории этих файлов коммиты разделены на
+**массовые** (≥10 codegen-файлов — почти наверняка регенерация) и **точечные**
+(<10 — почти наверняка ручная правка).
+
+```
+коммитов, трогавших codegen-файлы: 51
+  массовых (>=10 файлов):  12
+  точечных (<10 файлов):   39
+```
+
+Скрипты разбора — одноразовые, лежали в scratchpad сессии; методика воспроизводится
+командами `git grep -l "^// manifest:"` + `git log --name-only`.
+
+## Факт 7: ручная работа сосредоточена ВНЕ зоны генератора
+
+Топ файлов по числу точечных правок:
+
+```
+6x  weight_flutter/lib/main.dart
+6x  core/routing/router_config.dart
+5x  main_common.dart / main_esp32.dart / main_esp32_cloud.dart / main_nrf.dart
+5x  developer_tools/presentation/pages/developer_tools_page.dart
+5x  home/presentation/pages/home_page.dart
+5x  configuration/presentation/pages/configuration_page.dart
+3x  core/services/logger/file_log_appender.dart
+3x  core/sync/base_sync_repository.dart
+```
+
+Это **entry points, роутинг, UI-страницы и core-инфраструктура**. Ни одного
+`*_dao.dart`, `*_model.dart`, `*_adapter.dart`, `*_table.dart` — то есть слои, которые
+переписывает `generate-entity`, руками почти не трогали.
+
+## Факт 8: пересечение «ручное» × «зона перезаписи» — 6 файлов
+
+Прогнаны четыре сущности (`subscription`, `terminal_device`, `weighing`, `configuration`
+— 38/38/38/46 конфликтов соответственно):
+
+| Множество | Файлов |
+| --- | --- |
+| A — с точечными (ручными) правками | 41 |
+| B — которые перезапишет генератор (4 сущности) | 80 |
+| **A ∩ B** | **6** |
+
+Все шесть — в фиче `weighing` (самая старая и сложная), и все **full-replace**
+(регион `:base` отсутствует → при подтверждённой перезаписи затираются целиком):
+
+```
+weighing/data/datasources/local/tables/extensions/weighing_table_extension.dart
+weighing/data/datasources/remote/sources/weighing_remote_data_source.dart
+weighing/data/providers/weighing/weighing_data_providers.dart
+weighing/data/repositories/weighing_repository_impl.dart
+weighing/domain/entities/extensions/weighing_entity_extension.dart
+weighing/presentation/providers/weighing/weighing_state_providers.dart
+```
+
+Происхождение правок (по сообщениям коммитов): TASK-019 sync_core wire-up,
+TASK-007/008, и — содержательное — `fix(sync): защита sync engine от потери данных
+и гонок`. Последнее прямо указывает на ручную логику в `repository_impl` /
+`data_providers`, которую нельзя терять.
+
+## Вывод — стратегия миграции меняется
+
+Разведка первой части («570 файлов, 84% full-replace») выглядела как «миграция
+неподъёмна». Анализ истории это опровергает:
+
+- **риск не размазан по 570 файлам, а локализован в единицах**;
+- на четырёх проверенных сущностях под угрозой **6 файлов, все в `weighing`**;
+- остальные сущности (`subscription`, `terminal_device`, `configuration`) руками не
+  правились вовсе → их конфликты — чистая эволюция шаблона, перезапись безопасна.
+
+**Практический план** (предложение):
+
+1. Прогнать оставшиеся 11 сущностей тем же способом и достроить список A ∩ B.
+2. Для сущностей с пустым пересечением — массовая перезапись с backup, без разбора.
+3. Для `weighing` (и других с непустым пересечением) — ручной разбор шести файлов:
+   вытащить кастомные куски из git, применить поверх свежесгенерированного.
+4. `--preserve` (обратный флаг) остаётся желательным, но **перестаёт быть блокером**:
+   при таком раскладе проще перечислить то, что перезаписываешь.
+
+Оценка трудоёмкости после этих фактов: не «переписать проект», а «разобрать вручную
+единицы файлов, остальное регенерировать пакетно».
