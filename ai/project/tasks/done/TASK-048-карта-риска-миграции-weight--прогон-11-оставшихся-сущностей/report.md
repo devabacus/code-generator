@@ -28,7 +28,7 @@
 счётчик и экстраполяция; все выводы про пересечение A ∩ B остаются в силе.
 
 Дефект вывода заведён как
-[BUG-031](../../bug-reports/031-generate-entity-duplicates-conflict-report-in-output.md).
+[BUG-031](../../../bug-reports/031-generate-entity-duplicates-conflict-report-in-output.md).
 
 ## Карта риска
 

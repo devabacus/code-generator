@@ -102,18 +102,18 @@ Ledger отработал: `existing == ledger` → молчаливая пер�
 1. **`[SectionReplacer] Generator function not found for name: base` ×3** в первом прогоне.
    Не дефект: `:base` — не секционный генератор, а при **создании** файла идёт полный render.
    Поведение описано комментарием в
-   [generation_service.ts:428-434](../../../../src/features/generation/generators/generation_service.ts)
+   [generation_service.ts:428-434](../../../../../src/features/generation/generators/generation_service.ts)
    и покрыто тестом «merge-ветка не гоняет шаблон через SectionReplacer». Во втором прогоне
    (target существует → merge-ветка) шума нет. Кандидат на косметику: внести `base`
    в `SECTION_REPLACER_SKIP_MARKERS`.
 
 2. **Доля merge-файлов на свежей сущности — 3 из 24 (12.5%).** В ledger'е ровно 3 записи
    с `ownership: merge`, остальные 21 — full-replace. Это **ниже** прежней оценки 16%
-   (6 из 38) из разведки. Замер полезен для [TASK-049](../TASK-049-миграция-шаблонов-на-merge-дисциплину--base-регионы-в-full-replace-файлы/task.md)
+   (6 из 38) из разведки. Замер полезен для [TASK-049](../../active/TASK-049-миграция-шаблонов-на-merge-дисциплину--base-регионы-в-full-replace-файлы/task.md)
    как отправная точка «до».
 
 3. **`database.dart` и `sync_orchestrator_provider.dart` в ledger не попали** — 24 записи,
-   обоих файлов нет. Это ровно [TASK-046](../TASK-046-ledger--протухающие-записи-для-писателей-вне-plan--патчеры--bootstrap/task.md)
+   обоих файлов нет. Это ровно [TASK-046](../../active/TASK-046-ledger--протухающие-записи-для-писателей-вне-plan--патчеры--bootstrap/task.md)
    (писатели вне plan), наблюдение подтверждено на реальном проекте.
 
 4. **`serverpod generate` на weight переписывает ~60 файлов в `weight_server/lib/src/generated/`**
@@ -158,5 +158,5 @@ Ledger отработал: `existing == ledger` → молчаливая пер�
 ## Статус
 
 Готово, все критерии закрыты. Результат дописан в
-[weight-migration-probe-2026-07-28.md](../../docs/weight-migration-probe-2026-07-28.md) —
+[weight-migration-probe-2026-07-28.md](../../../docs/weight-migration-probe-2026-07-28.md) —
 «Часть 3: полный цикл новой сущности», факты 9-13.
