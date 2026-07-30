@@ -7,6 +7,7 @@ import { GenerationConfig } from '../../features/generation/config/generation_co
 import { JunctionDetector } from '../../features/generation/parsers/junction_detector';
 import { ServerpodModel, ServerpodField } from '../../features/generation/parsers/formatters/types';
 import { MockFileSystem } from '../mocks/mock_file_system';
+import { templateFlutterRoot } from '../helpers/templates';
 
 /**
  * TASK-028 (Bug 3 fix) — LWW skip-stale guard в сгенерированных
@@ -142,8 +143,7 @@ class TaskTagMapLocalApply implements LocalApplyAdapter<TaskTagMapEntity> {
 
 // ── Disk paths (для optional live regression check) ────────────────────────
 
-const SIMPLIFIED_TEMPLATE_ROOT =
-    'G:/Templates/flutter/simplified/simplified_flutter/lib/features';
+const SIMPLIFIED_TEMPLATE_ROOT = `${templateFlutterRoot('simplified')}/lib/features`;
 
 const LIVE_NON_JUNCTION_PATHS: Record<string, string> = {
     category: `${SIMPLIFIED_TEMPLATE_ROOT}/tasks/data/adapters/category/category_local_apply.dart`,
@@ -159,8 +159,7 @@ const LIVE_JUNCTION_PATH =
 // LWW guard pattern за исключением junction (task_tag_map, manifest: manyToMany).
 // Эти paths parallel SIMPLIFIED_* выше — same 4 non-junction + 1 junction.
 
-const T115_TEMPLATE_ROOT =
-    'G:/Templates/flutter/t115/t115_flutter/lib/features';
+const T115_TEMPLATE_ROOT = `${templateFlutterRoot('t115')}/lib/features`;
 
 const LIVE_T115_NON_JUNCTION_PATHS: Record<string, string> = {
     category: `${T115_TEMPLATE_ROOT}/tasks/data/adapters/category/category_local_apply.dart`,

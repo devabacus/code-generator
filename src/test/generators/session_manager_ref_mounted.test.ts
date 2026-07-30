@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
+import { templateFlutterRoot, templateAdminRoot } from '../helpers/templates';
 
 /**
  * TASK-033 — `ref.mounted` guard в `core/providers/session_manager_provider.dart`
@@ -43,10 +44,10 @@ const FETCH_USER_CONTEXT_PATCHED = `  Future<void> _fetchUserContext() async {
 // ── Disk paths (optional live regression) ───────────────────────────────────
 
 const SESSION_MANAGER_PATHS: Record<string, string> = {
-    t115Flutter: 'G:/Templates/flutter/t115/t115_flutter/lib/core/providers/session_manager_provider.dart',
-    t115Admin: 'G:/Templates/flutter/t115/t115_admin/lib/core/providers/session_manager_provider.dart',
-    simplifiedFlutter: 'G:/Templates/flutter/simplified/simplified_flutter/lib/core/providers/session_manager_provider.dart',
-    simplifiedAdmin: 'G:/Templates/flutter/simplified/simplified_admin/lib/core/providers/session_manager_provider.dart',
+    t115Flutter: `${templateFlutterRoot('t115')}/lib/core/providers/session_manager_provider.dart`,
+    t115Admin: `${templateAdminRoot('t115')}/lib/core/providers/session_manager_provider.dart`,
+    simplifiedFlutter: `${templateFlutterRoot('simplified')}/lib/core/providers/session_manager_provider.dart`,
+    simplifiedAdmin: `${templateAdminRoot('simplified')}/lib/core/providers/session_manager_provider.dart`,
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

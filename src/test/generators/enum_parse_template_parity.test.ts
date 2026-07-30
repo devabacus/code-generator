@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
+import { templateFlutterRoot, templateAvailable, skipUnlessTemplate } from '../helpers/templates';
 
 /**
  * TASK-050 / BUG-032 — целостность шаблона по enum-хелперу.
@@ -27,8 +28,6 @@ import * as path from 'path';
  * проверки — комплектность поставки, её нельзя замокать.
  */
 
-const TEMPLATES_ROOT = process.env.CODEGEN_TEMPLATES_PATH ?? 'G:/Templates';
-
 interface TemplateSpec {
     /** Имя каталога шаблона: G:/Templates/flutter/<id>/ */
     id: string;
@@ -42,7 +41,7 @@ const TEMPLATES: TemplateSpec[] = [
 ];
 
 function flutterRoot(spec: TemplateSpec): string {
-    return path.join(TEMPLATES_ROOT, 'flutter', spec.id, `${spec.id}_flutter`);
+    return templateFlutterRoot(spec.id);
 }
 
 function helperPath(spec: TemplateSpec): string {
@@ -56,9 +55,13 @@ function entityExtensionPath(spec: TemplateSpec, entity: string): string {
     );
 }
 
-/** Шаблоны лежат вне репозитория — на машине без них тест бессмысленно «красить». */
-function templateAvailable(spec: TemplateSpec): boolean {
-    return fs.existsSync(flutterRoot(spec));
+/**
+ * Шаблоны лежат вне репозитория — на машине без них тест бессмысленно «красить».
+ * TASK-051: пропуск идёт через общий helper, который при `REQUIRE_TEMPLATES=1`
+ * превращает «не проверено» в падение вместо невидимого pending (BUG-033).
+ */
+function available(spec: TemplateSpec): boolean {
+    return templateAvailable(spec.id);
 }
 
 suite('TASK-050 / BUG-032: enum-хелпер поставляется шаблоном, а не подразумевается', () => {
@@ -66,7 +69,7 @@ suite('TASK-050 / BUG-032: enum-хелпер поставляется шабло
     for (const spec of TEMPLATES) {
 
         test(`${spec.id}: lib/core/utils/enum_parse.dart существует и помечен manifest: startProject`, function () {
-            if (!templateAvailable(spec)) { this.skip(); }
+            if (skipUnlessTemplate(spec.id)) { this.skip(); }
 
             const p = helperPath(spec);
             assert.ok(
@@ -89,7 +92,7 @@ suite('TASK-050 / BUG-032: enum-хелпер поставляется шабло
 
         for (const entity of spec.entities) {
             test(`${spec.id}: ${entity}_entity_extension.dart импортирует enum_parse.dart`, function () {
-                if (!templateAvailable(spec)) { this.skip(); }
+                if (skipUnlessTemplate(spec.id)) { this.skip(); }
 
                 const p = entityExtensionPath(spec, entity);
                 assert.ok(fs.existsSync(p), `${spec.id}: не найден шаблон ${p}`);
@@ -117,10 +120,10 @@ suite('TASK-050 / BUG-032: enum-хелпер поставляется шабло
     }
 
     test('оба шаблона согласованы между собой (parity не разъезжается в любую сторону)', function () {
-        const available = TEMPLATES.filter(templateAvailable);
-        if (available.length < 2) { this.skip(); }
+        const present = TEMPLATES.filter(available);
+        if (present.length < 2) { this.skip(); }
 
-        const missing = available.filter(s => !fs.existsSync(helperPath(s))).map(s => s.id);
+        const missing = present.filter(s => !fs.existsSync(helperPath(s))).map(s => s.id);
         assert.deepStrictEqual(
             missing, [],
             `хелпер есть не во всех шаблонах: нет в [${missing.join(', ')}]. ` +
