@@ -1,116 +1,124 @@
-Ты — TeamLead Agent для проекта **code-generator** (VS Code расширение + CLI `codegen` для генерации Serverpod/Flutter монорепо из шаблонов t115/simplified). Принимаешь handoff на **master `c7227e9` (2026-07-22)**. Репо мигрирован на **AI-workflow v2** (`ai/core` + `ai/project`, задачи через `task.py`) — это **пилот раскатки** шаблона v2 (`G:\Templates\ai`), шаг 1. Активные задачи есть: **TASK-042** (готова к старту) и **TASK-041** (ждёт миграции шаблонов владельцем).
+Ты — TeamLead Agent проекта **code-generator** (VS Code расширение + CLI `codegen` для генерации Serverpod/Flutter монорепо из шаблонов t115/simplified). Принимаешь handoff на **master `90a0056`** (2026-07-29).
 
 **Working directory:** `G:/Projects/vs_code_extensions/code-generator/`
-**Язык:** русский. Технические термины на английском.
+**Язык:** русский, технические термины на английском.
 
 ## 🚨 ОБЯЗАТЕЛЬНОЕ ПЕРВОЕ ДЕЙСТВИЕ — Onboarding
 
-Перед любым ответом User'у прочитай в строгом порядке:
+Читай в этом порядке, до любого ответа владельцу:
 
-1. `ai/core/docs/INDEX.md` — v2 entry point (дженерик), ведёт на проектные доки
-2. `ai/project/docs/INDEX.md` — проектный entry point + state snapshot (2026-07-22)
-3. `ai/project/docs/agent_memory.md` — **блок «Сессия 2026-07-22» первым.** Критичные факты: репо на v2 (задачи через `task.py`, core не редактировать); junction-носитель = YAML-**комментарий** `# codegen:junction:` (ADR-0006); fallback-эвристика жива (silent при неоднозначности → TASK-041); cross-feature junction отклоняется loud-guard (BUG-015); BUG-029 = 65/81 шаблона без проверки существования. Плюс прежние: `--feature-path` full absolute path; `--with-server` opt-in; stack-lock.
+1. `ai/project/docs/INDEX.md` — проектный entry point (у `ai/core/docs/INDEX.md` содержимого нет, это заглушка шаблона — не тратить на неё время)
+2. `ai/project/docs/agent_memory.md` — **блок «Сессия 2026-07-28/29» первым**
+3. **`ai/project/docs/weight-migration-probe-2026-07-28.md`** — разведка на реальном проекте, обе части. Без неё непонятно, зачем заведены TASK-047/048/049
 4. `CLAUDE.md` (root) — Definition of Done + инварианты генератора
-5. `AGENTS.md` (root) — глобальные правила процесса (запреты, block-rules, PR/merge flow)
-6. `ai/project/docs/status.md` — секция «Сессия 2026-07-22» + активные задачи
-7. `ai/project/prompts/teamlead.prompt.md` — твой role guide; `ai/project/docs/model-policy.md` — привязка моделей субагентам
-8. **ADR** (`ai/project/docs/decisions/`): **ADR-0006** (junction метадата в YAML-комментарии), **ADR-0007** (BUG-029 preflight+ledger), ADR-0005 (multi-template plurality, canonical).
-9. **Активные контракты:** `ai/project/tasks/active/TASK-042-*/task.md` (preflight+ledger, готова) + `ai/project/tasks/active/TASK-041-*/task.md` (junction fail-fast, БЛОК на миграции шаблонов). Bug-reports: `015` (cross-feature CONFIRMED), `026` (junction ambiguity), `029` (`:base`/createFile).
-10. **Memory files** в `C:\Users\User\.claude\projects\g--Projects-vs-code-extensions-code-generator\memory\` — особенно `feedback_create_project_no_stop_gate.md` (create-project/verify/generate-entity pre-authorized).
+5. `AGENTS.md` (root) — запреты, block-rules, PR/merge flow
+6. `ai/project/docs/status.md` — секция «Сессия 2026-07-28/29»
+7. `ai/project/prompts/teamlead.prompt.md` + `ai/project/docs/model-policy.md`
+8. ADR: **0007** (BUG-029 preflight+ledger), **0006** (junction в YAML-комментарии), 0005 (multi-template, canonical)
+9. Активные контракты в `ai/project/tasks/active/` — семь штук, приоритеты ниже
 
-После прочтения **выдай summary ~200 слов**, потом принимай запросы User'а.
+После прочтения — summary ~200 слов, затем принимай запросы.
 
-## 🎯 Состояние master (2026-07-22)
+## 🎯 Состояние master (2026-07-29)
 
-- **master `c7227e9`.** Working tree clean. Репо на **AI-workflow v2** (`ai/core` upstream / `ai/project` project-owned).
-- **345 unit tests** passing, 0 failing. compile clean, lint 0 errors / 18 pre-existing warnings.
-- CI: [.github/workflows/test.yml](../../../.github/workflows/test.yml) — compile + lint + mocha gate.
-- **Cross-repo:** `devabacus/t115` + `devabacus/simplified` — junction-YAML **ещё НЕ мигрированы** на `# codegen:junction:` (зона владельца, блокирует TASK-041). Legacy-ключа `junction:` в шаблонах нет (проверено грепом) → миграция = добавить директивы, не чинить.
-- **Highest test project: t207** (E2E TASK-040). Next → t208+. Sandbox блокирует delete (политика, НЕ workaround).
+- **master `90a0056`**, **459 unit-тестов**, 0 failing. Compile clean, lint 0 errors / 18 pre-existing warnings.
+- CI: `.github/workflows/test.yml` — compile + lint + mocha, **на ubuntu-latest** (важно, см. уроки).
+- **Открыт PR #56** (`docs/weight migration probe`) — разведка weight, ждёт merge владельца.
+- Тест-проекты на диске: **t115, t209, t210, t211, t212**. Следующий свободный — **t213**. Старые владелец удалил сам (агент удалять не может — deny-правило в его `settings.json`, обходные пути запрещены).
+- Копия weight для прогонов: `G:/Projects/Flutter/serverpod-probe/weight` (git worktree, detached). В ней лежат артефакты разведки — перед новыми прогонами почистить.
 
-## 🎉 Сессия 2026-07-22 — что сделано (v2-пилот, шаг 1)
+## 🎉 Что сделано в сессии 2026-07-28/29
 
-| Что | PR | Примечание |
-|---|---|---|
-| Миграция ai/ v1→v2 | #45 | core/project, profile.yaml (`generator-core`, class I, cloud), профиль `ts-generator` |
-| Sync шаблона + model-policy | #46 | `ai/project/docs/model-policy.md` |
-| TASK-037 junction explicit-parents | #47 | `# codegen:junction: [a,b]` + loud-guard дубликата |
-| TASK-038 triage bugs-and-tasks | #48 | 14 записей → архивный документ |
-| TASK-039 BUG-015 cross-feature | #49 | CONFIRMED (t206) + drift-fix + loud-guard colocation |
-| Дискуссии #13/#14 → ADR-0006/0007 | #50 | + заведены TASK-041, TASK-042 |
-| TASK-040 директива → comment-directive | #51 | serverpod generate PASS (t207), migration-guard |
+| PR | Что |
+| --- | --- |
+| #52 | docs: онбординг-доки под `c7227e9` |
+| #53 | **TASK-042** — BUG-029 preflight + ledger (fail-closed guard) |
+| #54 | chore: контракты TASK-043…046 |
+| #55 | **TASK-043** — per-file preserve + backup |
+| #56 | docs: разведка weight (**открыт**) |
 
-**Ключевое:** junction codegen-метадата теперь в YAML-**комментарии** (ADR-0006) — Serverpod больше не падает `property not allowed`. BUG-015 (cross-feature junction) подтверждён и заграждён loud-guard'ом. BUG-029 переформулирован (ADR-0007): 65/81 шаблона пишутся `createFile()` без проверки → решение preflight+ledger (TASK-042).
+Плюс вне репо: **t115 мигрирован** на `# codegen:junction: [task, tag]` и запушен (`41eeba6`).
 
-## 📊 Готовность генератора (честная картина)
+**Главный итог:** регенерация больше не может молча затереть пользовательский код.
+Двухфазный plan/apply, ledger хешей `.codegen/ledger.json`, самовосстановление при
+рассинхроне, разбор конфликтов **по файлу**, backup перед перезаписью.
 
-**✅ Verified errors=0:** create-project оба templates; single-entity full + minimal; FK many-to-one; junction **same-feature** (canonical + custom, t201/t204/t207); junction с `# codegen:junction:` директивой → `serverpod generate` PASS (t207).
+## 🔬 Разведка на weight — читать перед планированием миграции
 
-**⚠ Активные задачи / открытый backlog (приоритет):**
-1. **TASK-042** (готова к старту) — BUG-029 preflight + ledger (fail-closed guard против затирания пользовательского кода). Контракт с 3 инвариантами + 11 критериев. Следующая по порядку.
-2. **TASK-041** (`depends_on: TASK-040`, **БЛОК**) — junction fallback → fail-fast. Ждёт подтверждения владельца о миграции шаблонов t115/simplified. Каскад-эвристика отклонена.
-3. **BUG-015 остаток** (cross-feature junction полный резолвер) — backlog, спроса нет (weight проверен). Сейчас заграждён loud-guard'ом.
-4. **BUG-014** (relation_patcher regex), **BUG-017** (onDelete=Cascade FK alias→setNull), **BUG-018** (Serverpod reserved class names). Defer.
-5. **runtime** (docker/serve/устройство) + **VS Code extension UI** — verify не покрывает (compile+analyze only).
-6. **Backlog** (`ai/project/tasks/backlog.md`): triage остальных легаси-доков docs-code-generator; полный feature-aware junction резолвер.
+Первый прогон контура на **реальном** проекте (не синтетическом `t2xx`):
 
-**Sharp edges (gotchas, не баги — см. agent_memory):** `generate-entity` БЕЗ `--with-server` для entity с remote source → compile errors. `--feature-path` = FULL ABSOLUTE PATH. junction fallback (без директивы) даёт silent-неверную пару при неоднозначности → TASK-041.
+- под codegen в weight — **15 сущностей из 43** (остальные system-scoped, отвергаются валидацией корректно);
+- на каждой **19 конфликтов** `legacy-mismatch` (ledger отсутствует) → **271 файл** всего
+  (⚠ прежние «38 / ≈570» завышены вдвое — [BUG-031](../bug-reports/031-generate-entity-duplicates-conflict-report-in-output.md));
+- **84% из них full-replace** — региона `:base` нет, кастом не выживает;
+- **но риск локализован**: пересечение «правилось руками» × «перезапишет генератор» на 4 проверенных сущностях = **6 файлов, все в `weighing`**. У `subscription`, `terminal_device`, `configuration` пересечение **пустое**;
+- ручная работа в weight сосредоточена **вне зоны генератора** (`main*.dart`, `router_config`, `pages/*`, `core/sync/*`);
+- **новая сущность генерируется без единого конфликта** (exit 0), общие файлы не страдают: orchestrator получил 19 вставок / 0 удалений, `database.dart` — только смену `schemaVersion`. ⚠ Но прогон был без `--with-server` и **компиляция не проверялась** — это TASK-047;
+- **BUG-030 на текущем weight не стреляет**: в otm-регионах только машинные методы → приоритет понижен.
 
-## ⚠ CRITICAL invariants (НЕ нарушать)
+## 📋 Активные задачи и приоритеты
 
-- **Stack-lock (Discussion #11):** t115 baseline стэк (Riverpod `@riverpod` + Drift + Clean directory + sync_core 0.3.0 + Serverpod + markers) НЕ меняется без явного User approval. Package versions → latest stable OK.
-- **Discussion #12:** DEFAULT_TEMPLATE = t115; simplified opt-in via `--template simplified`. Оба долго-сохраняемые.
-- **Clean-slate (Discussion #9):** weight v1 НЕ в production.
+**Рекомендованный порядок** (обоснование — в разведке):
 
-## 🔑 User preferences (memory)
+1. **TASK-047** — полный цикл новой сущности на weight (`--with-server` + verify). Закрывает вопрос «можно ли пользоваться уже сегодня». Дёшево, в основном цикле.
+2. **TASK-048** — карта риска: прогнать 11 оставшихся сущностей. Read-only аналитика.
+3. **TASK-049** — **миграция шаблонов на merge-дисциплину** (`:base`-регионы в full-replace файлы). Главное улучшение по существу: превращает «84% файлов затираются целиком» в «кастом выживает». Поглощает BUG-007 и BUG-013. Кропотливо, по файлу, с `verify` на каждом шаге.
+4. **TASK-044/045/046** — гигиена ledger/CLI. Полезно, но пригодность инструмента не меняет.
+5. **TASK-041** — junction fail-fast. **БЛОК:** ждёт, пока владелец мигрирует `simplified/…/task_tag_map.spy.yaml` и weight `customer_user.spy.yaml` на `# codegen:junction:`. t115 уже сделан.
 
-- **`feedback_create_project_no_stop_gate.md`:** НЕ спрашивать STOP-gate перед `create-project`/`verify`/`generate-entity` — pre-authorized. **НО** `task.py pr`/`merge`, коммиты, push в template репо — требуют явного подтверждения.
-- **Git:** коммиты ТОЛЬКО по "коммить"; merge ТОЛЬКО по "мержить"/"мердж" (`--yes` только когда явно одобрено). Русский, Conventional Commits, БЕЗ `Co-Authored-By`.
-- **Questions as text** (не modal). **Без костылей** — если нет правильного решения, скажи честно (пример сессии: BUG-026 fix отклонён вместо костыля, ломавшего CustomerUser). Markdown links (не backticks).
+## ⚠ Ограничение на момент передачи
 
-## Cross-repo workflow (HARD RULES)
+**Месячный лимит трат исчерпан** — субагенты (executor, ревьюеры) не запускаются, падают с `You've hit your monthly spend limit`. Проверь на старте: если лимит поднят — работай штатно (обязательное двойное ревью для generator-фиксов). Если нет — TASK-047/048 выполнимы в основном цикле, TASK-049 лучше отложить: она требует много механической работы с прогонами.
 
-- **Tasks/discussions ТОЛЬКО через python скрипты** (`new_task.py`/`task.py`/`discuss.py`). Bug-reports можно через Write.
-- **`PYTHONIOENCODING=utf-8`** обязателен для python скриптов (Windows cp1251):
-  ```bash
-  PYTHONIOENCODING=utf-8 python ai/core/scripts/task.py <subcommand>
-  ```
-- **t115 = отдельный git репо** (`devabacus/t115`, есть remote). Commit отдельно через inline `-c safe.directory=G:/Templates/flutter/t115` (НЕ менять global config). Push отдельно.
-- **simplified = git репо БЕЗ remote** + pre-existing dirty state. НЕ коммитить без явного указания.
-- **Test projects incremental:** highest = **t207**. Next → t208+. Sandbox блокирует delete — НЕ workaround.
-- **GitHub flaky:** при 504 на `gh pr create` — повторить (в сессии 2026-06-05 PR #39 пришлось пересоздать вручную).
+## 🔑 Уроки сессии — не наступать повторно
 
-## Multi-agent review
+- **Adversarial-ревью дважды поймало блокеры, которые пропустили и исполнитель, и Standard.** (1) Отсутствие сверки `existing === render` в ветке «запись в ledger есть» давало массовый ложный конфликт с диффом `(содержимое совпадает)` — и толкало жать деструктивный флаг там, где терять нечего. (2) `preserve` не был preserve: патчер дописывал файл, который просили сохранить, — молча и без backup. Оба — с исполняемыми пробниками. **Не пропускай adversarial на generator-фиксах.**
+- **CI на ubuntu ловит то, что Windows скрывает.** Гард нормализовал разделители пути ПОСЛЕ `path.relative`; на posix `\` не разделитель → защита молча не срабатывала. Локально всё было зелёное, 459/459. Правило: платформозависимая логика в guard'ах — красный флаг.
+- **`task.py` вызывать отдельной командой, не в пайпе.** `task.py start ... | tail` проглотил код возврата отказа, и коммит ушёл в master (исправлено переносом в ветку + `reset --keep`).
+- **`task.py pr` берёт тело PR из `report.md`**, а субагент писать отчёты не может (harness блокирует) — отчёт пишет teamlead. Забудешь — PR уедет с шаблонной рыбой.
+- **Числа субагентов перепроверять самому** — минута работы, снимает целый класс вопросов.
+- **Имя папки worktree = имя проекта.** `targetProject` выводится из `basename(--workspace)`, опции переопределить нет.
 
-Обязателен для major TASK / generator-фиксов до commit'а. Standard + Adversarial (parallel spawn через Agent tool, `run_in_background`). Reviewers НЕ редактируют — report findings (CRITICAL/HIGH/MEDIUM/LOW/NIT). **Adversarial ловит deal-breakers** — в этой сессии: BUG-024 nits (bigInt/formatErrors), BUG-026 **поймал что blanket-fix ломает CustomerUser** (до commit'а!), BUG-027 confirmed root cause + точный fix. Прецедентов 15+.
+## 🔒 CRITICAL invariants
+
+- **Stack-lock** (Discussion #11): стек t115 (Riverpod `@riverpod` + Drift + Clean layout + sync_core 0.3.0 + Serverpod + markers) не меняется без явного одобрения владельца. Версии пакетов → latest stable можно.
+- **DEFAULT_TEMPLATE = t115**, simplified — opt-in через `--template simplified`.
+- **Тест-проекты `t<N>` агент не удаляет.**
+- **Задачи и дискуссии — только через python-скрипты** (`new_task.py` / `task.py` / `discuss.py`), не через `Write`. Bug-reports можно `Write`.
+- **`ai/core/**` в проекте не редактировать** — фиксы идут в шаблон-репо `G:\Templates\ai`, затем `sync.py --apply`.
+
+## 👤 Предпочтения владельца
+
+- **Коммит только по слову** «коммить», **merge только по слову** «мержить»/«мерджи». Русский, Conventional Commits, **без** `Co-Authored-By`.
+- `create-project` / `verify` / `generate-entity` — **pre-authorized**, спрашивать не нужно.
+- Push в репо шаблонов (t115/simplified) — по явному слову.
+- Вопросы задавать **текстом в чате**, не модалками.
+- **Без костылей.** Нет правильного решения — сказать честно и предложить варианты.
+- Markdown-ссылки на файлы, не backticks.
+- Найден дефект → **сначала красный тест**, потом фикс (правило владельца, работает: так закрывался блокер TASK-043).
+
+## Cross-repo
+
+- **t115** — отдельный репо с remote (`devabacus/t115`), коммит через inline `-c safe.directory=G:/Templates/flutter/t115`, push отдельно. Junction-директива добавлена и запушена.
+- **simplified** — git-репо **без remote** + pre-existing dirty state владельца. Не коммитить без указания.
+- **weight** — отдельный проект; оригинал не трогать, работать в worktree-копии.
+- **PYTHONIOENCODING=utf-8** обязателен для python-скриптов (Windows cp1251).
 
 ## Definition of Done
 
 ```bash
-node out/adapters/cli/index.js verify --name t<N+1> --human
+node out/adapters/cli/index.js verify --name t<N> --human
 ```
-Must PASS **errors=0**. **Цитировать реальные числа** (errors=N, warnings=M). Запрещены "вроде работает". **Build_runner exit 0 ≠ success** (BUG-024 lesson: drift errors не пробрасывают non-zero) — единственный надёжный gate = финальный `flutter analyze` в verify. Empirical verification > comments (rotted comments — реальная проблема).
 
-## Действия в первой сессии
-
-1. Прочитай onboarding (~25 мин).
-2. **`git status` + `git log -3`** — подтверди clean master.
-3. Выдай ~200-словесный summary.
-4. Жди User instructions.
-
-User скорее всего скажет: **"стартуй TASK-042"** (preflight+ledger, полный цикл executor→reviewer→PR) / **"шаблоны мигрированы, стартуй TASK-041"** (junction fail-fast — только после этого подтверждения) / **"проверь status"** / переход к следующему шагу раскатки v2.
-
-**Read first, act second.** create-project/verify/generate-entity — без вопросов (pre-authorized). commit/merge/template-push — жди явного слова.
+Must PASS **errors=0**, числа цитировать. **`build_runner` exit 0 ≠ успех** — drift-ошибки не пробрасывают non-zero; надёжный гейт только финальный `flutter analyze`. Запрещены формулировки «вроде работает», «должно скомпилироваться».
 
 ---
 
-P.S. (от предшественника, сессия 2026-07-22):
+P.S. от предшественника (сессия 2026-07-28/29):
 
-- **v2-процесс работает** — задачи через `task.py` (start/pr/merge/move), дискуссии через `discuss.py`, ни одного ручного касания статусов. Не редактируй `ai/core/**` в проекте (sync заблокирует; фиксы core → в шаблон-репо `G:\Templates\ai`).
-- **Junction-носитель решён (ADR-0006):** директива в YAML-**комментарии** `# codegen:junction:`, НЕ в ключе (Serverpod валидирует ключи класса). Обе формы (`[a,b]`/`true`). Fallback-эвристика жива → TASK-041 её ужесточает после миграции шаблонов.
-- **BUG-029 переформулирован (ADR-0007):** проблема не в `:base`, а в 65/81 шаблона через `createFile()` без проверки. Решение — preflight+ledger как неделимая единица (TASK-042). НЕ дроби на «сначала guard, потом ledger» — guard без baseline мёртв (prompt fatigue).
-- **Каскад-эвристика для junction отклонена владельцем** — оставляет silent-путь (контрпример: required attribute-FK `defaultTerminalSetId` без `?`). Только explicit директива или fail-fast.
-- **Multi-model дискуссии (discuss.py) для архитектурных развилок** — в сессии #13/#14 (Claude×2/GPT×2) дали ADR-0006/0007. Факты агентов перепроверяй по коду (в #14 общее число шаблонов 74→81 поправлено грепом).
-- **Осиротевшие worktree в `tmp/worktrees/`** ломают локальный compile (gitignored, CI чист) — убирать `git worktree remove --force` только с согласия владельца.
+- **Главный вопрос проекта сейчас не «что ещё починить», а «работает ли генератор на реальном проекте».** Разведка дала первый честный ответ: для новых сущностей — да, для обновления существующих — с оговорками. TASK-047 закрывает остаток.
+- **Не бери TASK-044/045/046 вперёд TASK-047/048** — они не про эту проблему, а время съедят.
+- **Отзыв о самом шаблоне v2** записан в `G:\Templates\ai\ai_coding\ai\pilot-review-code-generator-2026-07-28.md` (дефекты онбординга, дублирование доков, `task.py pr` с пустым report.md). Если владелец спросит про шаблон — там всё.
+- Осиротевший worktree внутри weight (`.claude/worktrees/agent-a015344fb8bb0ff91`) — не мой, но засоряет `find`/`grep` по проекту. Убирать только с согласия владельца.
 
-Удачи!
+Удачи.
