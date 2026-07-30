@@ -54,6 +54,31 @@ EXAMPLE_FILE = os.path.join(CORE_DISCUSSIONS, "docs", "EXAMPLE.md")
 
 # ---------- helpers ----------
 
+def configure_stdio_utf8():
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) любой emoji роняет print с
+    UnicodeEncodeError, а кириллица (темы дискуссий) уходит в поток в cp1251 —
+    потребитель, читающий вывод как UTF-8, получает мусор. Раньше это лечилось внешним
+    PYTHONIOENCODING=utf-8; TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    errors="replace" здесь — только diagnostic rendering для человека; на входных данных
+    подмена символов запрещена (см. контракт TASK-018).
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод не глушится.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля. Правки вносить во ВСЕ копии.
+    Регрессия — core/scripts/test_stdio_utf8.py.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def sanitize_topic(topic):
     safe = re.sub(r'[^\w\s-]', '', topic.lower())
     safe = re.sub(r'[\s_]+', '-', safe)
@@ -594,6 +619,7 @@ def cmd_migrate(args):
 
 
 def main():
+    configure_stdio_utf8()   # до parse_args: argparse-ошибки тоже идут в UTF-8
     parser = argparse.ArgumentParser(description="Discussion CLI")
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 

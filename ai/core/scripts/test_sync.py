@@ -13,7 +13,9 @@
 Все assertions проверяют И текст, И exit code, где применимо.
 
 Запуск:
-    PYTHONIOENCODING=utf-8 python core/scripts/test_sync.py
+    python core/scripts/test_sync.py
+
+PYTHONIOENCODING=utf-8 больше НЕ требуется (TASK-018): скрипты сами настраивают UTF-8.
 
 Требует git в PATH. Временные папки удаляются в конце.
 """
@@ -35,11 +37,35 @@ SOURCE_AI = SCRIPT_DIR.parent.parent  # каталог ai/ шаблон-репо
 EXIT_CLEAN, EXIT_UPDATE, EXIT_INVARIANT = 0, 2, 3
 
 
+def configure_stdio_utf8() -> None:
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) галочка в check() роняет print с
+    UnicodeEncodeError, а кириллица уходит в поток в cp1251. Раньше это лечилось внешним
+    PYTHONIOENCODING=utf-8; TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод не глушится.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля. Правки вносить во ВСЕ копии.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def run_sync(*args: str) -> subprocess.CompletedProcess:
+    """Запустить sync.py БЕЗ PYTHONIOENCODING — он обязан сам отдавать UTF-8 (TASK-018).
+
+    Раньше здесь в env подставлялся PYTHONIOENCODING=utf-8; костыль убран намеренно,
+    так что этот тест заодно сторожит регрессию кодировки в sync.py.
+    """
     cmd = [sys.executable, str(SYNC), *args]
     return subprocess.run(cmd, text=True, capture_output=True,
-                          encoding="utf-8", errors="replace",
-                          env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                          encoding="utf-8", errors="replace")
 
 
 def git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
@@ -246,6 +272,11 @@ def apply_kill_test():
         # прогон _apply_atomic напрямую с fault_after=1 (kill после 1-го файла) через дочерний python
         driver = f'''
 import sys, importlib.util
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
 spec = importlib.util.spec_from_file_location("syncmod", r"{SYNC}")
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 from pathlib import Path
@@ -258,8 +289,7 @@ except RuntimeError as e:
     print("FAULT:", e)
 '''
         p = subprocess.run([sys.executable, "-c", driver], text=True, capture_output=True,
-                           encoding="utf-8", errors="replace",
-                           env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                           encoding="utf-8", errors="replace")
         print("   [inject]", (p.stdout + p.stderr).strip().splitlines()[-1] if (p.stdout+p.stderr).strip() else "")
         check("B5: fault действительно инъектирован", "FAULT" in (p.stdout + p.stderr))
         # core/ и lock НЕ должны быть повреждены (swap ещё не произошёл)
@@ -554,6 +584,7 @@ def apply_on_master_and_project_untouched():
 
 
 def main() -> int:
+    configure_stdio_utf8()
     basic_and_exit_codes()
     matrix_local_edit()
     matrix_local_add()

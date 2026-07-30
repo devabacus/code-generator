@@ -32,6 +32,31 @@ QUICK_TASKS_FILE = os.path.join(TASKS_DIR, "QUICK_TASKS.md")
 STATUS_FILE = os.path.join(DOCS_DIR, "STATUS.md")
 
 
+def configure_stdio_utf8():
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) любой emoji роняет print с
+    UnicodeEncodeError, а кириллица в названии задачи уходит в поток в cp1251 —
+    потребитель, читающий вывод как UTF-8, получает мусор. Раньше это лечилось внешним
+    PYTHONIOENCODING=utf-8; TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    errors="replace" здесь — только diagnostic rendering для человека; на входных данных
+    подмена символов запрещена (см. контракт TASK-018).
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод не глушится.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля. Правки вносить во ВСЕ копии.
+    Регрессия — core/scripts/test_stdio_utf8.py.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def get_next_task_id():
     """Find the next available TASK-XXX ID across ALL task states.
 
@@ -238,6 +263,7 @@ def create_lite_task(title, update_status_flag=True):
 
 
 def main():
+    configure_stdio_utf8()   # до parse_args: argparse-ошибки тоже идут в UTF-8
     parser = argparse.ArgumentParser(description="Create a new task")
     parser.add_argument("title", nargs="?", help="Task title")
     parser.add_argument("--lite", action="store_true", help="Quick entry in QUICK_TASKS.md")

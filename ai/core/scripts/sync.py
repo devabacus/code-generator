@@ -88,6 +88,31 @@ PROJECT_SKELETON = [
 ]
 
 
+def configure_stdio_utf8() -> None:
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) любой emoji роняет print с
+    UnicodeEncodeError, а кириллица уходит в поток в cp1251 — потребитель, читающий
+    вывод как UTF-8, получает мусор. Раньше это лечилось внешним PYTHONIOENCODING=utf-8;
+    TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    errors="replace" здесь — только diagnostic rendering для человека; на входных данных
+    (файлы, lock) подмена символов запрещена (см. контракт TASK-018).
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод не глушится.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля. Правки вносить во ВСЕ копии.
+    Регрессия — core/scripts/test_stdio_utf8.py.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 # ─── Хэширование (текстовость по детекции, не по whitelist расширений) ────────
 
 def _looks_text(data: bytes) -> bool:
@@ -158,17 +183,22 @@ def validate_source(source_ai: Path) -> None:
 
 
 # ─── Git / манифест источника ────────────────────────────────────────────────
+# encoding задан явно во всех вызовах: без него text=True декодирует вывод git
+# системной кодировкой (на Windows — cp1251), и не-ASCII пути/ветки приходят
+# крякозябрами. git отдаёт UTF-8.
 
 def git_short_sha(repo_dir: Path) -> str:
     r = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                       cwd=str(repo_dir), text=True, capture_output=True)
+                       cwd=str(repo_dir), text=True, capture_output=True,
+                       encoding="utf-8", errors="replace")
     return r.stdout.strip() if r.returncode == 0 else "unknown"
 
 
 def git_is_dirty(repo_dir: Path) -> bool:
     """True если рабочее дерево шаблон-репо грязное (есть незакоммиченные изменения)."""
     r = subprocess.run(["git", "status", "--porcelain"],
-                       cwd=str(repo_dir), text=True, capture_output=True)
+                       cwd=str(repo_dir), text=True, capture_output=True,
+                       encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return False  # не git — не можем судить, считаем чистым
     return bool(r.stdout.strip())
@@ -176,7 +206,8 @@ def git_is_dirty(repo_dir: Path) -> bool:
 
 def git_current_branch(repo_dir: Path) -> str | None:
     r = subprocess.run(["git", "symbolic-ref", "--short", "HEAD"],
-                       cwd=str(repo_dir), text=True, capture_output=True)
+                       cwd=str(repo_dir), text=True, capture_output=True,
+                       encoding="utf-8", errors="replace")
     return r.stdout.strip() if r.returncode == 0 else None
 
 
@@ -697,6 +728,7 @@ def resolve_ai_dir(path_str: str) -> Path:
 
 
 def main() -> int:
+    configure_stdio_utf8()   # до parse_args: argparse-ошибки тоже идут в UTF-8
     parser = argparse.ArgumentParser(
         description="sync.py — распространение шаблона core/ с контролем дрейфа",
         usage="sync.py (init | --check | --apply) <target> [--template SRC]",

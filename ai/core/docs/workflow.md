@@ -72,25 +72,34 @@
           └────────────┬────────────┘
                        ▼
     ┌──────────────────────────────────┐
-    │         TeamLead ревьюит         │
-    │         показывает User          │
+    │ TeamLead ревьюит diff/report и   │
+    │ показывает User                  │
     └──────────────────┬───────────────┘
-                       │
+                       │ User: COMMIT + PR OK
                        ▼
     ┌──────────────────────────────────┐
-    │         User: "MERGE OK"         │
+    │ Код commit в feature; затем      │
+    │ task.py pr --done: move+commit,  │
+    │ feature push и PR                │
     └──────────────────┬───────────────┘
-                       │
+                       │ CI + reviewer
                        ▼
     ┌──────────────────────────────────┐
-    │  User делает merge; статус двигает│
-    │  task.py move → project/tasks/done│
+    │ User: MERGE OK → task.py merge   │
+    │ (squash PR); post-merge verify   │
     └──────────────────────────────────┘
 ```
 
-> **Статусы двигает только скрипт** (`task.py move <id> <status>`) — атомарно со сменой
-> поля `status` во frontmatter. Руками папки между active/blocked/done не таскать.
-> `task.py lint` ловит расхождение папка↔status. Подробно: [task-schema.md](task-schema.md).
+> **Статусы двигает только скрипт** (`task.py move <id> <status>`). Руками папки между
+> active/blocked/done не таскать. Текущий move делает `git mv`, затем правит frontmatter:
+> `task.py lint` ловит расхождение, но crash-atomic recovery появится только в TASK-024.
+> Подробно: [task-schema.md](task-schema.md) и ADR-0003 в project docs.
+>
+> **Порядок publication нормативен:** task переводится в `done` **в feature branch до PR**
+> через `task.py pr --done`; после merge на `main` отдельного move/commit нет. Команда также
+> push'ит feature и создаёт PR, поэтому её запускает владелец либо агент только после явного
+> разрешения владельца на commit + feature push + PR. `task.py merge` делает squash merge
+> только после отдельного `MERGE OK`; ни одна команда не разрешает прямую правку/push `main`.
 
 ### CI и защита merge (B7)
 
@@ -105,11 +114,12 @@ checks сам по себе НЕ разрешает merge** — GitHub Actions �
   `--force`. Без флага — отказ (fail-closed).
 - Не удалось узнать статус CI (`gh` упал / сеть) — тоже BLOCK, не «checks нет».
 
-> **Рекомендация (обязательна для командной работы):** включи на GitHub **branch protection**
-> для базовой ветки с **required status checks**. Тогда «нет CI = нет merge» гарантируется
-> сервером, а не только клиентским скриптом — обход `--no-ci`/`--force` не сможет протолкнуть
-> непроверенный код в защищённую ветку. Настройка: Repo → Settings → Branches → Add rule →
-> Require status checks to pass before merging.
+> **Рекомендация (обязательна для командной работы):** включи на GitHub полный server-side gate
+> из milestone M-AUTOMERGE: require PR + required status checks, запрет bypass (включая admin,
+> где платформа позволяет), direct push, force-push и удаления защищённой ветки. Только весь этот
+> набор гарантирует «нет CI = нет merge» независимо от клиентского `--no-ci`/`--force`.
+> Одни required checks без PR/no-bypass/push restrictions такой гарантии не дают. Настройка:
+> Repo → Settings → Rules/Branches; точный обязательный набор зафиксирован в project backlog.
 
 ### ⚡ HOTFIX (Fast Track)
 
@@ -186,8 +196,18 @@ Executor → HOTFIX-XXX/report.md → TeamLead ревьюит → User merges
 ## 🧠 Политика моделей (capability tiers)
 
 Ядро описывает **абстрактные уровни** (tiers); привязка уровней к конкретным моделям —
-**на проектном уровне**: `ai/project/docs/model-policy.md` (референс —
+**на проектном уровне**: `ai/project/docs/model-policy.md` (референс формы, без имён —
 `core/examples/model-policy.example.md`). Так смена модельного парка не требует правки core.
+
+> **В `core/` нет ни привязки tier→модель, ни конкретных model ID** — это инвариант, а не
+> случайность. Единственное место, где они живут, — `ai/project/docs/model-policy.md`.
+> Появилась в core таблица «tier = такая-то модель» или строка вида `claude-…-2026…` —
+> это дефект, а не документация.
+>
+> Что в `core/` встречается и дефектом НЕ является: имена вендоров как **псевдонимы
+> участников дискуссии** (`core/discussions/scripts/discuss.py`, `_template_prompt.md`,
+> `discussions/docs/*`) — это метки колонок в протоколе обсуждения, а не указание, какой
+> моделью что запускать.
 
 | Tier | Назначение | Кто на нём работает |
 | --- | --- | --- |
@@ -198,16 +218,17 @@ Executor → HOTFIX-XXX/report.md → TeamLead ревьюит → User merges
 
 **Жёсткие правила:**
 
-- Субагенту ВСЕГДА назначается tier/модель **явно** при запуске. Наследование модели сессии
-  запрещено, если сессия на `frontier` — субагент всё равно получает `standard`/`mechanical`.
+- В интерактиве субагенту назначается named profile/модель **явно**; до TASK-009 это advisory convention.
+  В `mode:auto` subagents выключены, пока adapter-owned spawn не принудит named child profile, role и provenance.
 - Ночной оркестратор — **детерминированный скрипт, не модель**; tier выбирается для
   каждой запускаемой им сессии-исполнителя.
 - Исполнение обычных (не-архитектурных) задач — `standard`; `frontier` в исполнении задач
   не участвует.
 
-**Задел под ночной драйвер (TASK-009):** во frontmatter задачи появится поле
-`execution_profile` (имя tier'а, НЕ имя модели); в `runs.jsonl` пишутся requested
-profile И фактически resolved `provider/model/version`. До TASK-009 схема задач не меняется.
+**Задел под ночной драйвер (TASK-009):** `execution_profile` — имя exact profile из machine policy
+TASK-023, не tier и не prose-модель. Driver пишет requested profile/adapter/vendor/model и раздельные
+attested actual fields в ignored `project/.runtime/driver/tasks/<id>/runs.jsonl`; requested никогда не копируется в actual.
+До TASK-009 runtime-записи/enforcement нет.
 
 ---
 

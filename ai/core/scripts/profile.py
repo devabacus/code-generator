@@ -58,6 +58,31 @@ ZONE_KEYS = {
 REQUIRED_ZONE_KEYS = {"name", "class", "execution", "runner", "network", "side_effects"}
 
 
+def configure_stdio_utf8() -> None:
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) любой emoji роняет print с
+    UnicodeEncodeError, а кириллица уходит в поток в cp1251 — потребитель, читающий
+    вывод как UTF-8, получает мусор. Раньше это лечилось внешним PYTHONIOENCODING=utf-8;
+    TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    errors="replace" здесь — только diagnostic rendering для человека; на входных данных
+    подмена символов запрещена (см. контракт TASK-018).
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод не глушится.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля (та же причина, что у validate_safe_path). Правки вносить во
+    ВСЕ копии. Регрессия — core/scripts/test_stdio_utf8.py.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def load_yaml(path: Path):
     if not _HAS_YAML:
         sys.exit("❌ PyYAML недоступен — profile.py требует PyYAML для парсинга профилей.")
@@ -294,15 +319,20 @@ def cmd_lint(profile_path: Path, profiles_dir: Path) -> int:
             lint_verification_profile(p, errors)
 
     if errors:
+        # P3-1: lint с ошибками — это отказ, и печатать его в stdout нельзя. `profile.py lint
+        # | tail -3 && <дальше>` спрятал бы причину, а следующая команда цепочки выполнилась бы
+        # как ни в чём не бывало. Тот же инвариант, что у `task.py lint` (регрессия —
+        # core/scripts/test_task.py, секция E5).
         for e in errors:
-            print(f"❌ {e}")
-        print(f"\nprofile lint: {len(errors)} ошибок.")
+            print(f"❌ {e}", file=sys.stderr)
+        print(f"\nprofile lint: {len(errors)} ошибок.", file=sys.stderr)
         return 1
     print(f"✅ profile lint: ошибок нет ({len(zones)} зон).")
     return 0
 
 
 def main() -> int:
+    configure_stdio_utf8()   # до parse_args: argparse-ошибки тоже идут в UTF-8
     parser = argparse.ArgumentParser(description="Валидатор зонных профилей")
     sub = parser.add_subparsers(dest="command", required=True)
     p_lint = sub.add_parser("lint", help="Проверить profile.yaml и verification-профили")
