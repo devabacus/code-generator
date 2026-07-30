@@ -362,3 +362,4 @@ Sequence per Discussion #4 → #6:
 | TASK-049 | Миграция шаблонов на merge-дисциплину: base-регионы в full-replace файлы | ⛔ BLOCKED (посылка опровергнута: :base спасёт 1 файл из 13) | 2026-07-30 |
 | TASK-050 | BUG-032: в t115 нет enum_parse — regen сущности с enum ломает сборку | ✅ Done (E2E t213 errors=0, 468 тестов) | 2026-07-30 |
 | TASK-050 | BUG-032 t115 без enum_parse — regen сущности с enum-полем ломает сборку | 🟡 In Progress | 2026-07-30 |
+| TASK-051 | BUG-033 шаблонные тесты не выполняются в CI — сделать пропуск громким | 🟡 In Progress | 2026-07-30 |

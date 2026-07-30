@@ -5,6 +5,7 @@ import { ReplacingFileProcessor, ReplaceTask } from '../../features/generation/g
 import { getDictionaryRules } from '../../features/generation/replacement/replacement_util';
 import { GenerationConfig } from '../../features/generation/config/generation_config';
 import { MockFileSystem } from '../mocks/mock_file_system';
+import { templateFlutterRoot } from '../helpers/templates';
 
 /**
  * TASK-025 (BUG-001 fix) — Riverpod `ref.mounted` guard в сгенерированных
@@ -237,8 +238,7 @@ Stream<List<CategoryEntity>> categoriesStream(Ref ref) {
 
 // ── Disk paths (для optional live regression check) ────────────────────────
 
-const SIMPLIFIED_TEMPLATE_ROOT =
-    'G:/Templates/flutter/simplified/simplified_flutter/lib/features';
+const SIMPLIFIED_TEMPLATE_ROOT = `${templateFlutterRoot('simplified')}/lib/features`;
 
 const LIVE_STATE_PROVIDERS_PATHS: Record<string, { path: string; expectedGuards: number }> = {
     category: {
@@ -262,8 +262,7 @@ const LIVE_STATE_PROVIDERS_PATHS: Record<string, { path: string; expectedGuards:
 // TASK-032 (Bug 4 t115 parity): t115 template получает identical ref.mounted
 // guard pattern (TASK-025). Internal differs (usecase providers vs repository),
 // но guard counts identical: category/task/tag = 3 each, junction = 2.
-const T115_TEMPLATE_ROOT =
-    'G:/Templates/flutter/t115/t115_flutter/lib/features';
+const T115_TEMPLATE_ROOT = `${templateFlutterRoot('t115')}/lib/features`;
 
 const LIVE_T115_STATE_PROVIDERS_PATHS: Record<string, { path: string; expectedGuards: number }> = {
     category: {

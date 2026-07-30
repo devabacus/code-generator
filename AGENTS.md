@@ -291,6 +291,32 @@ node out/adapters/cli/index.js verify --name <test_project> --human
 
 - [.github/workflows/test.yml](.github/workflows/test.yml) — `Test` (TASK-CI-001 / TASK-020). Триггер: `pull_request` в master + `push` на master. Один job на `ubuntu-latest` с `timeout-minutes: 10` + `concurrency: { group: test-${{ github.ref }}, cancel-in-progress: true }` + `permissions: { contents: read }`. Steps: checkout@v4 → setup-node@v4 (Node 20, npm cache) → `npm ci` → `npm run compile` → `npm run lint` → `node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"` (explicit binary path вместо `npx mocha` — mocha = transitive dep через `@vscode/test-cli`, `npx` fallback'нул бы на latest при prune). Baseline: 163 passing, ожидаемый runtime <2 минут.
 
+### ⚠ CI не проверяет шаблоны (BUG-033)
+
+Шаблоны `t115` / `simplified` лежат **вне репозитория**, на ubuntu-раннере их нет — читающие
+их тесты уходят в `pending` и на зелёный статус не влияют. Сейчас это **31 тест**, среди них
+гарды тихой порчи данных (TASK-028 LWW skip-stale) и BUG-001 (`ref.mounted`).
+
+**Зелёный CI не подтверждает целостность шаблонов.** Отсюда и вырос BUG-032: фикс TASK-027
+доехал до одного шаблона, автоматика не заметила, дефект прожил месяцы.
+
+Что действует:
+
+- CI печатает число pending и **падает, если оно выросло** (`PENDING_BASELINE` в
+  [test.yml](.github/workflows/test.yml)) — новый молча-скипающийся тест больше не проскочит;
+- **перед любой правкой шаблона — локальный прогон в строгом режиме:**
+
+```bash
+REQUIRE_TEMPLATES=1 node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
+```
+
+  Норма: **0 pending**. Ненулевой pending локально = шаблоны не найдены, тесты не проверили
+  ничего. Путь к шаблонам переопределяется `CODEGEN_TEMPLATES_PATH`.
+
+Полное закрытие (шаблоны в CI) упирается в решение владельца: `t115` **приватный**, а этот
+репо публичный (секрет в публичном CI), у `simplified` **нет remote** вовсе. Варианты — в
+[bug-reports/033](ai/project/bug-reports/033-template-tests-never-run-in-ci.md).
+
 **Deferred (Initiative Phase A test inventory audit deliverable):**
 
 - 3-suite split: universal / t115 regression / simplified (Discussion #9 Addition #12)

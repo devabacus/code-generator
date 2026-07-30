@@ -41,4 +41,37 @@ jobs:
         # Explicit binary path вместо `npx mocha` — mocha = transitive dep через @vscode/test-cli,
         # `npx` fallback'нул бы на latest из реестра при prune (Adversarial review DEAL-BREAKER #1).
         # Соответствует prior-art TASK-013/016 reports.
-        run: node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js"
+        #
+        # TASK-051 / BUG-033: шаблоны (t115, simplified) лежат ВНЕ репозитория, на раннере их
+        # нет, и читающие их тесты уходят в pending. Раньше это было невидимо: «468 passing»
+        # звучало как покрытие, которого нет — среди пропущенного гарды тихой порчи данных
+        # (TASK-028 LWW) и BUG-001. Теперь число pending печатается и сверяется с baseline:
+        # прогон падает, если пропущенных стало БОЛЬШЕ, то есть новый молча-скипающийся тест
+        # больше не проскочит. Само наличие 31 pending — известный и вынесенный владельцу
+        # вопрос (bug-reports/033), а не регрессия этого PR.
+        run: |
+          set -o pipefail
+          node node_modules/mocha/bin/mocha.js --ui tdd "out/test/**/*.test.js" --ignore "out/test/extension.test.js" 2>&1 | tee mocha.log
+
+      - name: Guard pending count (BUG-033 — «не проверено» обязано быть видно)
+        if: always()
+        env:
+          # Столько тестов на раннере пропускается ЗАКОНОМЕРНО: все они читают шаблоны с диска.
+          # Поднимать это число можно только осознанно и с обоснованием в PR.
+          PENDING_BASELINE: '31'
+        run: |
+          if [ ! -f mocha.log ]; then
+            echo "::error::mocha.log отсутствует — тесты не отработали, проверять нечего"
+            exit 1
+          fi
+          PENDING=$(grep -oE '^[[:space:]]*[0-9]+ pending' mocha.log | grep -oE '[0-9]+' | head -1)
+          PENDING=${PENDING:-0}
+          echo "pending: $PENDING (baseline: $PENDING_BASELINE)"
+          if [ "$PENDING" -gt "$PENDING_BASELINE" ]; then
+            echo "::error::pending вырос: $PENDING > $PENDING_BASELINE. Появился тест, который на CI молча ничего не проверяет. Либо обеспечь ему окружение, либо осознанно подними PENDING_BASELINE в workflow с обоснованием."
+            exit 1
+          fi
+          if [ "$PENDING" -lt "$PENDING_BASELINE" ]; then
+            echo "::notice::pending снизился ($PENDING < $PENDING_BASELINE) — покрытие выросло, опусти PENDING_BASELINE в .github/workflows/test.yml"
+          fi
+          echo "::notice::$PENDING тестов на раннере НЕ выполнялись (нет шаблонов). Зелёный статус не подтверждает целостность t115/simplified — см. ai/project/bug-reports/033."
