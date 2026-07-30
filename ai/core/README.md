@@ -22,7 +22,7 @@
 | `core/prompts/` | Промпты ролей (teamlead, executor, reviewer, adversarial-reviewer, finalize) |
 | `core/discussions/` | `scripts/discuss.py`, `_template*.md`, `docs/` (протокол мульти-агентных дискуссий) |
 | `core/tasks/_template/` | Шаблон задачи (`task.md` с frontmatter, `report.md`) |
-| `core/docs/` | `workflow.md`, `INDEX.md` (каркас), `task-schema.md`, `profiles.md` |
+| `core/docs/` | `workflow.md`, `INDEX.md` (карта документации — точка входа), `task-schema.md`, `profiles.md` |
 | `core/guides/` | `user_guide.md`, `folder_structure.md`, `worktree_guide.md` |
 | `core/version.md` | Версия шаблона + changelog |
 

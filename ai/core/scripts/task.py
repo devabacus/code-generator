@@ -80,11 +80,43 @@ def validate_safe_path(value: str) -> str | None:
 # ─── Утилиты ─────────────────────────────────────────────────────────────────
 
 
+def configure_stdio_utf8() -> None:
+    """Человекочитаемые stdout/stderr скрипта — UTF-8, независимо от системной кодировки.
+
+    Без этого на Windows (ANSI code page 1251) любой emoji роняет print с
+    UnicodeEncodeError, а кириллица уходит в поток в cp1251 — потребитель, читающий
+    вывод как UTF-8, получает мусор. Раньше это лечилось внешним PYTHONIOENCODING=utf-8;
+    TASK-018 убирает этот костыль: скрипт настраивает себя сам.
+
+    errors="replace" здесь — только diagnostic rendering для человека; на входных данных
+    и machine-каналах подмена символов запрещена (см. контракт TASK-018).
+
+    Фолбэк безопасный: если stdout/stderr не TextIOWrapper (перенаправлен, подменён,
+    закрыт, отсутствует) — тихо продолжаем, а не падаем. Вывод при этом не глушится:
+    поток остаётся тем, что дал runtime.
+
+    ВНИМАНИЕ: намеренно продублировано в каждом CLI core/ — это standalone-скрипты без
+    общего импорт-модуля (та же причина, что у validate_safe_path выше). Правки вносить
+    во ВСЕ копии. Регрессия — core/scripts/test_stdio_utf8.py.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def run(cmd: list[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    """Запустить команду с cwd=REPO_ROOT."""
+    """Запустить команду с cwd=REPO_ROOT.
+
+    encoding задан явно: без него text=True декодирует вывод git/gh системной кодировкой
+    (на Windows — cp1251), и кириллица в сообщениях/ветках приходит крякозябрами.
+    """
     kwargs = {"cwd": str(REPO_ROOT), "text": True}
     if capture:
         kwargs["capture_output"] = True
+        kwargs["encoding"] = "utf-8"
+        kwargs["errors"] = "replace"
     result = subprocess.run(cmd, **kwargs)
     if check and result.returncode != 0:
         if capture:
@@ -163,15 +195,51 @@ def find_task_dir(task_id: str, where: Path = ACTIVE_DIR) -> Path | None:
 
 
 def find_task_anywhere(task_id: str) -> tuple[Path | None, str]:
-    """Найти папку task в active/ или done/. Возвращает (path, location)
-    где location = 'active', 'done' или 'none'."""
-    p = find_task_dir(task_id, ACTIVE_DIR)
-    if p is not None:
-        return p, "active"
-    p = find_task_dir(task_id, DONE_DIR)
-    if p is not None:
-        return p, "done"
+    """Найти папку task в active/, blocked/ или done/. Возвращает (path, location)
+    где location = 'active', 'blocked', 'done' или 'none'.
+
+    blocked/ обязателен: без него задача в blocked не находилась вообще ((None, 'none')),
+    и cmd_pr вёл себя так, будто задачи нет — PR не связывался с задачей и её report.md
+    (дискуссия #3, Decision п. 4). Порядок обхода — STATUS_DIRS (active → blocked → done),
+    он же канон для iter_task_dirs/move_task_status.
+    """
+    for status_name, base in STATUS_DIRS.items():
+        p = find_task_dir(task_id, base)
+        if p is not None:
+            return p, status_name
     return None, "none"
+
+
+# ─── Гейт на незаполненный report.md (отзыв пилота P1-2) ─────────────────────
+# Строки-заглушки из core/tasks/_template/report.md. new_task.py подставляет id ТОЛЬКО
+# в task.md, поэтому в свежесозданном отчёте буквально остаётся '# Отчёт TASK-XXX'.
+# Врезка «Тело PR берётся из этого файла…» — тоже маркер: она адресована автору отчёта, а
+# не читателю PR, и оставленная в файле уехала бы прямо в описание PR.
+# ВНИМАНИЕ: держать в синхроне с core/tasks/_template/report.md — если шаблон меняют,
+# правится и этот список. Синхронность проверяется НАСТОЯЩИМ файлом шаблона, а не копией
+# в тесте: core/scripts/test_task.py, секция D (D4/D5).
+REPORT_TEMPLATE_MARKERS = (
+    "# Отчёт TASK-XXX",
+    "Тело PR берётся из этого файла",
+    "Что было реализовано.",
+    "Список ключевых файлов и причины.",
+)
+
+
+def report_blockers(report_path: Path) -> list[str]:
+    """Причины, по которым report.md нельзя отдавать в тело PR. Пустой список — отчёт заполнен.
+
+    Отчёт пишет НЕ исполнитель (harness блокирует запись отчётов субагентами): executor
+    возвращает текст, а файл создаёт тимлид. Если не успел — в PR уезжает шаблонная рыба.
+    Fail-closed, как и `--done`: нечитаемый файл тоже блокирует, потому что отсутствие
+    доказательства заполненности не равно доказательству заполненности.
+    """
+    try:
+        text = report_path.read_text(encoding="utf-8")
+    except OSError as e:
+        return [f"файл не читается: {e}"]
+    return [f"строка-заглушка шаблона: {marker!r}"
+            for marker in REPORT_TEMPLATE_MARKERS if marker in text]
 
 
 def pr_number_for_current_branch() -> int | None:
@@ -233,9 +301,11 @@ def cmd_pr(args: argparse.Namespace) -> None:
     # Иначе новый непроиндексированный код теряется при последующем squash+delete-branch.
     dirty = dirty_porcelain(include_untracked=True)
     if dirty:
-        print("❌ Рабочий каталог не чист (включая untracked). Закоммить или удали перед pr:")
+        # P3-1: отказ печатаем в stderr — `... | tail` не должен его спрятать.
+        print("❌ Рабочий каталог не чист (включая untracked). Закоммить или удали перед pr:",
+              file=sys.stderr)
         for ln in dirty:
-            print(f"     {ln}")
+            print(f"     {ln}", file=sys.stderr)
         sys.exit(1)
 
     task_id = extract_task_id(branch)
@@ -245,7 +315,26 @@ def cmd_pr(args: argparse.Namespace) -> None:
     if task_id:
         task_dir, task_location = find_task_anywhere(task_id)
 
-    # B1: перевод active → done — ТОЛЬКО транзакционно (frontmatter + папка вместе) и
+    # P1-2: тело PR берётся из report.md, а пишет отчёт не исполнитель — файл вполне может
+    # остаться шаблонной рыбой (у пилота пустой PR поймал ревьюер). Тот же fail-closed, что
+    # и у --done: отказываем ДО любых мутаций, коммита перемещения и push.
+    if task_dir is not None:
+        _report = task_dir / "report.md"
+        if _report.exists():
+            blockers = report_blockers(_report)
+            if blockers:
+                listed = "\n".join(f"     - {b}" for b in blockers)
+                sys.exit(
+                    f"❌ {_report.relative_to(REPO_ROOT)} не заполнен — в нём остались "
+                    f"следы шаблона core/tasks/_template/report.md:\n"
+                    f"{listed}\n"
+                    f"   Тело PR из шаблонной рыбы не делается (fail-closed): именно этот текст "
+                    f"уехал бы в описание PR.\n"
+                    f"   Что делать: впиши в report.md фактический итог — что реализовано, какие "
+                    f"файлы изменены и почему, дословный вывод прогнанных команд — и перезапусти "
+                    f"ту же команду.")
+
+    # B1: перевод active → done — ТОЛЬКО штатным move-helper (frontmatter + папка) и
     # ТОЛЬКО по явному подтверждению. Наличие report.md само по себе done НЕ означает.
     if task_location == "active" and task_dir:
         has_report = (task_dir / "report.md").exists()
@@ -259,8 +348,9 @@ def cmd_pr(args: argparse.Namespace) -> None:
                 f"перезапусти: task.py pr --done\n"
                 f"   (или заранее: task.py move {task_id} done). "
                 f"Причину перевода обоснуй в report.md.")
-        # --done передан: транзакционная смена статуса + scoped-коммит + lint-гейт
-        print(f"📦 Перевод {task_id} active → done (транзакционно: frontmatter + папка)...")
+        # --done передан: lint-detectable смена статуса + scoped-коммит + lint-гейт.
+        # До TASK-024 это не crash-atomic при hard-kill.
+        print(f"📦 Перевод {task_id} active → done (штатный move; crash-recovery появится в TASK-024)...")
         try:
             _cur, task_dir = move_task_status(task_id, "done")
         except ValueError as e:
@@ -269,15 +359,16 @@ def cmd_pr(args: argparse.Namespace) -> None:
         # B1: lint ПЕРЕД коммитом перемещения — красный lint = отказ (и откат move).
         errors, _warnings = collect_lint_issues()
         if errors:
-            print("❌ lint не прошёл после перемещения — откатываю и отказываю:")
+            # P3-1: весь отказ (включая диагностику отката) — в stderr.
+            print("❌ lint не прошёл после перемещения — откатываю и отказываю:", file=sys.stderr)
             for e in errors:
-                print(f"     {e}")
-            # откат: вернуть задачу в active (транзакционно)
+                print(f"     {e}", file=sys.stderr)
+            # best-effort откат штатным helper; hard-kill recovery появится в TASK-024
             try:
                 move_task_status(task_id, "active")
             except ValueError as rollback_err:
                 print(f"⚠️  автоматический откат не удался: {rollback_err}. Восстанови вручную "
-                      f"(task.py move {task_id} active).")
+                      f"(task.py move {task_id} active).", file=sys.stderr)
             sys.exit(1)
         # scoped-коммит: только файлы задачи (git mv уже проиндексировал rename),
         # без -a и без захвата чужих staged изменений.
@@ -450,7 +541,10 @@ def cmd_merge(args: argparse.Namespace) -> None:
         print(f"\n🔀 Смержить PR #{pr_num} в {base} (squash + delete branch)?")
         answer = input("   [y/N]: ").strip().lower()
         if answer != "y":
-            print("Отменено. PR остаётся открытым.")
+            # P3-1: текст «не сделал» уходит в stderr, чтобы `| tail` его не спрятал.
+            # Exit-код НЕ меняем: отказ пользователя — не ошибка скрипта, публичная
+            # семантика merge (0 при отмене) остаётся прежней.
+            print("Отменено. PR остаётся открытым.", file=sys.stderr)
             return
 
     # Merge
@@ -792,20 +886,22 @@ def cmd_lint(args: argparse.Namespace) -> None:
     for w in warnings:
         print(f"⚠️  {w}")
     if errors:
+        # P3-1: lint с ошибками — это отказ. Ошибки и итог отказа идут в stderr, чтобы
+        # `task.py lint | tail` их не проглотил. Предупреждения (не отказ) — как были.
         for e in errors:
-            print(f"❌ {e}")
-        print(f"\nlint: {len(errors)} ошибок, {len(warnings)} предупреждений.")
+            print(f"❌ {e}", file=sys.stderr)
+        print(f"\nlint: {len(errors)} ошибок, {len(warnings)} предупреждений.", file=sys.stderr)
         sys.exit(1)
     print(f"✅ lint: ошибок нет ({len(warnings)} предупреждений).")
 
 
 def move_task_status(task_id: str, new_status: str) -> tuple[str, Path]:
-    """Транзакционно сменить status задачи: frontmatter + канбан-папка вместе.
+    """Штатно сменить status задачи: frontmatter + канбан-папка.
 
-    Единственная точка смены статуса (используется cmd_move и cmd_pr). Гарантирует,
-    что состояние «папка X + status Y» не возникает: сначала пишется frontmatter, затем
-    move; при сбое move — frontmatter откатывается (B1-smell), поэтому lint остаётся
-    зелёным. Возвращает (cur_status, new_task_dir).
+    Единственная текущая точка смены статуса (используется cmd_move и cmd_pr).
+    Обычные синхронные ошибки обрабатываются/откатываются best-effort и расхождение ловит
+    lint, но hard-kill между filesystem/Git/frontmatter шагами НЕ crash-atomic до TASK-024.
+    Возвращает (cur_status, new_task_dir).
 
     Бросает ValueError с человекочитаемым сообщением при любой невозможности.
     """
@@ -870,7 +966,7 @@ def move_task_status(task_id: str, new_status: str) -> tuple[str, Path]:
 
 
 def cmd_move(args: argparse.Namespace) -> None:
-    """Атомарно: сменить status во frontmatter + git mv папки в нужный канбан-каталог."""
+    """Штатно сменить status и папку; lint-detectable, не crash-atomic до TASK-024."""
     task_id = args.id.strip()
     new_status = args.status.strip()
     try:
@@ -884,7 +980,7 @@ def cmd_move(args: argparse.Namespace) -> None:
 
 
 def cmd_state(args: argparse.Namespace) -> None:
-    """Показать runtime-state задачи: state.json + runs.jsonl (если есть)."""
+    """Показать legacy task-local draft state; это не protected driver runtime."""
     task_id = args.id.strip()
     target: Path | None = None
     for _folder_status, task_dir in iter_task_dirs():
@@ -908,7 +1004,7 @@ def cmd_state(args: argparse.Namespace) -> None:
         except (OSError, json.JSONDecodeError) as e:
             print(f"⚠️  не читается: {e}")
     else:
-        print("\nstate.json: отсутствует (задача ещё не запускалась драйвером).")
+        print("\nstate.json: отсутствует (legacy task-local draft не создавался).")
 
     if runs_file.exists():
         print("\n=== runs.jsonl ===")
@@ -929,6 +1025,7 @@ def cmd_state(args: argparse.Namespace) -> None:
 
 
 def main() -> int:
+    configure_stdio_utf8()   # до parse_args: argparse-ошибки тоже идут в UTF-8
     parser = argparse.ArgumentParser(description="Task workflow CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -940,7 +1037,8 @@ def main() -> int:
 
     p_pr = subparsers.add_parser("pr", help="Push + create PR")
     p_pr.add_argument("--done", action="store_true",
-                      help="Явно перевести active-задачу в done/ (транзакционно) перед PR. "
+                      help="Явно перевести active-задачу в done/ штатным move перед PR; "
+                           "до TASK-024 операция не crash-atomic. "
                            "Без флага pr НЕ двигает задачу в done — наличие report.md не значит done.")
     p_pr.set_defaults(func=cmd_pr)
 
@@ -975,12 +1073,14 @@ def main() -> int:
     p_lint = subparsers.add_parser("lint", help="Валидация задач (frontmatter, папка↔status, id)")
     p_lint.set_defaults(func=cmd_lint)
 
-    p_move = subparsers.add_parser("move", help="Атомарно сменить status + переместить папку")
+    p_move = subparsers.add_parser(
+        "move", help="Сменить status + папку (lint-detectable; crash-recovery — TASK-024)")
     p_move.add_argument("id", help="ID задачи, напр. TASK-007")
     p_move.add_argument("status", help=f"Новый статус: {'|'.join(VALID_STATUS)}")
     p_move.set_defaults(func=cmd_move)
 
-    p_state = subparsers.add_parser("state", help="Показать state.json/runs.jsonl задачи")
+    p_state = subparsers.add_parser(
+        "state", help="Показать legacy task-local state.json/runs.jsonl (read-only draft)")
     p_state.add_argument("id", help="ID задачи, напр. TASK-007")
     p_state.set_defaults(func=cmd_state)
 

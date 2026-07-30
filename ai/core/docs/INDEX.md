@@ -1,37 +1,35 @@
-# Индекс проекта (НАЧНИ ЗДЕСЬ)
+# Точка входа в документацию (НАЧНИ ЗДЕСЬ)
 
-## Что это за проект
+Карта: что читать и в каком порядке. Файл принадлежит upstream-owned `core/` и
+перезаписывается `sync.py --apply` целиком — **описание конкретного проекта сюда не
+вписывают**, оно живёт в `project/docs/`.
 
-(Краткое описание своими словами)
+**Порядок чтения на старте сессии:** [workflow.md](workflow.md) → `project/docs/status.md`
+(состояние на сегодня) → `project/docs/agent_memory.md` (факты и gotchas) → промпт своей роли
+→ `task.md` своей задачи.
 
-## Как организована работа
+## Процесс — одинаково во всех проектах (core)
 
-- ⭐ **Основной процесс:** [workflow.md](workflow.md) *(core)*
-- Стратегические решения: [../../project/docs/decisions/](../../project/docs/decisions/)
-- Архитектура: [../../project/docs/architecture.md](../../project/docs/architecture.md)
-- Дорожная карта: [../../project/docs/roadmap.md](../../project/docs/roadmap.md)
-- Правила: [../../project/docs/conventions.md](../../project/docs/conventions.md)
-- Настройка разработки: [../../project/docs/dev_guide.md](../../project/docs/dev_guide.md)
-- Текущее состояние: [../../project/docs/status.md](../../project/docs/status.md)
-- Решение проблем: [../../project/docs/troubleshooting.md](../../project/docs/troubleshooting.md)
-- Задачи: [../../project/tasks/](../../project/tasks/)
+- ⭐ [workflow.md](workflow.md) — роли, жизненный цикл задачи, capability tiers моделей, CI-гейты
+- [task-schema.md](task-schema.md) — frontmatter задачи: какие поля читаются, а какие зарезервированы
+- [profiles.md](profiles.md) — зоны, capability policy, verification-профили
+- [../README.md](../README.md) — граница `core/` ↔ `project/`: что править нельзя и почему
+- [../guides/user_guide.md](../guides/user_guide.md) — установка и первые шаги (рядом: `folder_structure.md`, `worktree_guide.md`, `migration-v1-to-v2.md`)
+- [../prompts/](../prompts/) — промпты ролей: teamlead, executor, reviewer, adversarial-reviewer, finalize
 
-## Знания агентов
+## Этот конкретный проект (project — заполняет проект)
 
-- Факты и gotchas: [../../project/docs/agent_memory.md](../../project/docs/agent_memory.md)
+- [../../project/docs/](../../project/docs/) — `status.md`, `agent_memory.md`, `architecture.md`,
+  `conventions.md`, `dev_guide.md`, `roadmap.md`, `troubleshooting.md`, `model-policy.md`
+  (единственное место, где живут конкретные model ID), `decisions/` (ADR)
+- [../../project/tasks/](../../project/tasks/) — `active/`, `blocked/`, `done/`, `backlog.md`
+- `project/profile.yaml` и `project/profiles/` — зоны и verification-профили проекта
 
-## Роли
-
-| Роль               | Описание                           | Документация                                                   |
-| ------------------ | ---------------------------------- | -------------------------------------------------------------- |
-| **User**           | Финальные решения, одобрение merge | —                                                              |
-| **TeamLead Agent** | Декомпозирует работу, ревьюит      | [../prompts/teamlead.prompt.md](../prompts/teamlead.prompt.md) |
-| **Executor Agent** | Реализует задачи                   | [../prompts/executor.prompt.md](../prompts/executor.prompt.md) |
-
-> **Стратегические решения** принимаются через мульти-агентные дискуссии и фиксируются в [../../project/docs/decisions/](../../project/docs/decisions/).
+> `sync.py init` создаёт в `project/` только пустые каталоги. Пока файла нет — его нет:
+> не додумывай содержимое, заведи файл или спроси владельца.
 
 ## Золотые правила
 
 - Репозиторий > память чата
 - Задачи — это контракты
-- Никаких merge без одобрения User
+- Никаких merge без одобрения владельца

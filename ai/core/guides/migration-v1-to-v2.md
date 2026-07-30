@@ -176,6 +176,8 @@ CORE» / «ЛОКАЛЬНО ДОБАВЛЕННЫЙ» / «УДАЛЁННЫЙ» (e
 - Python 3.11+ с **PyYAML** (`pip install -r ai/core/scripts/requirements.txt`) — нужен для
   `profile.py` и полноценного frontmatter-парсинга в `task.py`. `sync.py` работает на stdlib
   (lock — JSON).
-- На Windows-консоли запускать скрипты с `PYTHONIOENCODING=utf-8` (иначе emoji в выводе
-  роняют print на cp1251).
+- Отдельная настройка кодировки **не требуется**: скрипты сами переводят свои stdout/stderr
+  на UTF-8 (TASK-018), включая ошибки argparse. `PYTHONIOENCODING=utf-8` / `python -X utf8`
+  могут пригодиться, только если вы запускаете скрипты сторонними обёртками, которые сами
+  печатают в консоль.
 - `git` в PATH (для `task.py move`, `sync.py --apply`).

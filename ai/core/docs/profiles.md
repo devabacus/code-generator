@@ -69,17 +69,28 @@ zones:
 
 ## `ai/project/profiles/<имя>.yaml` — verification-профиль
 
-Именованные проверки → команда, таймаут (сек), опционально рабочая директория:
+Именованные проверки задаются structured `CommandSpec`, а задача выбирает только их имена. Целевая схема TASK-026:
 
 ```yaml
 name: ts-generator
 checks:
-  compile: {cmd: "npm run compile", timeout: 300}
-  unit:    {cmd: "npm test", timeout: 600}
+  compile:
+    launcher_id: npm
+    argv: ["run", "compile"]
+    cwd: "."
+    timeout_seconds: 300
+  unit:
+    launcher_id: npm
+    argv: ["test"]
+    cwd: "."
+    timeout_seconds: 600
 ```
 
-**Verify — только по именам checks**, не произвольными shell-командами в задаче (контракт с
-схемой задач v2). `task.md` ссылается: `verification_profile: ts-generator`, `checks: [compile, unit]`.
+`launcher_id` резолвится только через owner-owned machine enrollment вне repo в exact executable dependency closure; `argv` — bounded typed list, `cwd` — canonical repo-relative path. `cmd`, shell fragments, executable path, PATH lookup, project-controlled env и containment/resource overrides запрещены. Запуск выполняет process-adapter TASK-018 с core-derived sandbox/ResourcePolicy.
+
+> **Текущее переходное состояние:** live `profile.py` и существующие sample-профили пока принимают legacy `cmd`; это допустимо только для attended interactive запуска человеком и **не является auto-safe**. Ночной драйвер жёстко заблокирован TASK-026. В рамках TASK-026 parser, examples и consumers мигрируются атомарно; после этого любой legacy `cmd` становится lint error без fallback.
+
+**Verify — только по именам checks**, не командами в `task.md` (контракт со схемой задач v2). `task.md` ссылается: `verification_profile: ts-generator`, `checks: [compile, unit]`.
 
 ## Связь со схемой задач (TASK-002)
 
@@ -89,8 +100,10 @@ checks:
   каждое имя `checks` с checks указанного verification-профиля** (чужое имя — error). Для
   `mode: auto` `verification_profile`+`checks` — обязательные непустые.
 - Таким образом задача не может задать произвольную verify-команду, несуществующую зону или
-  чужую проверку — только выбрать из утверждённого человеком профиля. (Границы этого
-  enforcement — статические; runtime-пиновка — за драйвером, см. «Границы enforcement».)
+  чужую проверку — только выбрать из утверждённого человеком профиля. Пока TASK-026 не закрыта,
+  сам legacy profile всё ещё содержит свободный `cmd`, поэтому эта гарантия ограничена выбором
+  имени и не является безопасным process launch. Runtime-пиновка и enforcement — за драйвером,
+  см. «Границы enforcement».
 
 ## Пиновка SHA и human approval — ПЛАНИРУЕТСЯ (драйвер, TASK-009)
 

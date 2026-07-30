@@ -102,7 +102,12 @@
 - **t115** — отдельный репо с remote (`devabacus/t115`), коммит через inline `-c safe.directory=G:/Templates/flutter/t115`, push отдельно. Junction-директива добавлена и запушена.
 - **simplified** — git-репо **без remote** + pre-existing dirty state владельца. Не коммитить без указания.
 - **weight** — отдельный проект; оригинал не трогать, работать в worktree-копии.
-- **PYTHONIOENCODING=utf-8** обязателен для python-скриптов (Windows cp1251).
+- **`PYTHONIOENCODING=utf-8` для скриптов `ai/core/` больше НЕ нужен** — после апдейта шаблона
+  (2026-07-30) они настраивают UTF-8 на stdout/stderr сами. Проверено: `sync.py --check` до
+  апдейта падал здесь `UnicodeEncodeError` на эмодзи (системный `python` — из ESP-IDF,
+  `C:\Espressif\tools\python`, cp1251), после — exit 0 без переменной.
+  ⚠ Для **своих** одноразовых python-скриптов переменная по-прежнему нужна: фикс живёт
+  внутри core-скриптов, а не в интерпретаторе.
 
 ## Definition of Done
 
