@@ -1,7 +1,7 @@
 ---
 id: TASK-049
 schema_version: 2
-status: active
+status: blocked
 mode: interactive
 zone: "generator-core"
 verification_profile: "ts-generator"
